@@ -17,6 +17,10 @@ const VIEW_H = 180;
 const DISPLAY_W = 640;
 const DISPLAY_H = 360;
 
+// The canvas's real pixels match the size it is shown at on the page, so the game is drawn
+// straight at screen resolution and the browser never stretches it. Everything is still laid out
+// in display pixels above and scaled up by this much.
+
 // the overlay is laid out on this grid
 const GUI_W = 640;
 const GUI_H = 360;
@@ -136,6 +140,15 @@ const Draw = {
 	ctx: null,
 	// the stretch from layer pixels to canvas pixels, set per layer
 	base: { sx: 1, sy: 1, ox: 0, oy: 0 },
+	// screen pixels per display pixel on the page canvas, and the one in use for the current target,
+	// which is one while drawing into a layer's own canvas
+	screenScale: 1,
+	targetScale: 1,
+	// set while drawing a parallax layer, whose scroll and positions are not snapped to whole
+	// layer pixels, so it slides by screen pixels instead of hopping by game pixels
+	subpixel: false,
+	// how many updates the frame being drawn covers, so animation and shake keep update pace
+	frameSteps: 1,
 	// the scroll of the layer being drawn, taken off every room position
 	curdrawoffx: 0,
 	curdrawoffy: 0,
@@ -161,6 +174,21 @@ const Draw = {
 	attach(ctx) {
 		this.ctx = ctx;
 		ctx.imageSmoothingEnabled = false;
+	},
+
+	// Sizes the page canvas to a whole multiple of the display that fits the window, with its real
+	// pixels matching the screen's, and shows it at that size. Resizing a canvas forgets its
+	// settings, so smoothing is turned off again.
+	fitCanvas(canvas, winW, winH, pixelRatio) {
+		const fit = Math.max(1, Math.floor(Math.min(winW / DISPLAY_W, winH / DISPLAY_H)));
+		const scale = Math.max(1, Math.round(fit * pixelRatio));
+		canvas.style.width = (DISPLAY_W * fit) + "px";
+		canvas.style.height = (DISPLAY_H * fit) + "px";
+		canvas.width = DISPLAY_W * scale;
+		canvas.height = DISPLAY_H * scale;
+		canvas.getContext("2d").imageSmoothingEnabled = false;
+		this.screenScale = scale;
+		this.targetScale = scale;
 	},
 
 	// Reads the font tables and pictures. A font that will not load is left out and falls back.
@@ -213,7 +241,8 @@ const Draw = {
 	// starts every drawing call from the current layer's stretch
 	resetTransform() {
 		const b = this.base;
-		this.ctx.setTransform(b.sx, 0, 0, b.sy, b.ox, b.oy);
+		const k = this.targetScale;
+		this.ctx.setTransform(b.sx * k, 0, 0, b.sy * k, b.ox * k, b.oy * k);
 	},
 
 	// ------------------------------------------------------------ sprites
@@ -294,14 +323,16 @@ const Draw = {
 	// its draw offset, taking off the layer scroll. Tiled ones repeat the frame one way or both
 	// instead of stretching it, keeping the stretch the other way. Looping tiles slide with the
 	// camera scroll so they look endless. Nothing is drawn without a sprite.
+	// On a parallax layer nothing is snapped, the canvas puts it on the nearest screen pixel.
 	lpSprite(s) {
 		if (!s.spi) return;
-		const bx = Math.floor(s.x) - Math.floor(s.exoffx);
-		const by = Math.floor(s.y) - Math.floor(s.exoffy);
+		const snap = this.subpixel ? (v) => v : Math.floor;
+		const bx = snap(s.x) - snap(s.exoffx);
+		const by = snap(s.y) - snap(s.exoffy);
 		let xo = -this.curdrawoffx;
 		let yo = -this.curdrawoffy;
 		if (!truthy(s.tiled)) {
-			this.spriteRaw(s.spi, s.ifr, bx + Math.floor(xo), by + Math.floor(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alph);
+			this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alph);
 			return;
 		}
 		const tx = truthy(s.tiledx);
@@ -320,7 +351,7 @@ const Draw = {
 		const flipy = ty ? s.t_flipy : s.y_sc;
 		for (let j = 0; j < s.t_spw; j += jinc) {
 			for (let k = 0; k < s.t_sph; k += kinc) {
-				this.spriteRaw(s.spi, s.ifr, bx + Math.floor(j - stx + xo), by + Math.floor(k - sty + yo),
+				this.spriteRaw(s.spi, s.ifr, bx + snap(j - stx + xo), by + snap(k - sty + yo),
 					flipx, flipy, s.ang, s.col, s.alph);
 			}
 		}
@@ -329,12 +360,13 @@ const Draw = {
 	// Moves a placed sprite's animation on by one frame of play, at the asset's own pace times its
 	// speed, wrapping around both ways. Running past either end calls its end of animation function
 	// when it has one. The frame drawing calls this right after drawing each thing.
+	// A frame of drawing that covers several updates moves the animation on by that many.
 	animate(s) {
 		if (!s.spi) return;
 		const rec = Sprites.get(s.spi);
 		const n = rec.frameCount;
 		if (!(n > 0)) return;
-		s.ifr += s.spd * rec.imageSpeed;
+		s.ifr += s.spd * rec.imageSpeed * this.frameSteps;
 		let ended = false;
 		if (s.ifr >= n) {
 			s.ifr -= n * Math.floor(s.ifr / n);
@@ -548,13 +580,13 @@ const Draw = {
 		let shx = 0;
 		let shy = 0;
 		if (cam.shake > 0) {
-			cam.shake--;
+			cam.shake = Math.max(0, cam.shake - this.frameSteps);
 			const toDisplay = DISPLAY_W / ORIGINAL_SCREEN_W;
 			shx = round((Math.random() * 2 - 1) * cam.xmag) * 3 * toDisplay;
 			shy = round((Math.random() * 2 - 1) * cam.ymag) * 3 * toDisplay;
 		}
 
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.setTransform(this.screenScale, 0, 0, this.screenScale, 0, 0);
 		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = "source-over";
 		ctx.fillStyle = SCREEN_CLEAR_COLOR;
@@ -586,14 +618,25 @@ const Draw = {
 				lyrh = Math.floor(lyr.ht / curzoom);
 			}
 
-			this.curdrawoffx = Math.floor(cam.scrox + (lyr.wd - lyrw) / 2);
-			this.curdrawoffy = Math.floor(cam.scroy + (lyr.ht - lyrh) / 2);
+			const plxXMod = 1 - lyr.plx_x;
+			const plxYMod = 1 - lyr.plx_y;
+			const paraxing = plxXMod !== 0 || plxYMod !== 0;
+			// a layer on its own canvas is drawn at game pixels, so it stays snapped
+			const buffered = lyr.mask_list.length > 0;
+			this.subpixel = paraxing && !truthy(lyr.gui) && !buffered;
+
+			// A parallax layer follows the camera's own unsnapped spot, so the part of the scroll it
+			// keeps is a fraction of a pixel when the camera moves one. Other layers stay on whole pixels.
+			const scrollx = this.subpixel ? cam.x - cam.cx : cam.scrox;
+			const scrolly = this.subpixel ? cam.y - cam.cy : cam.scroy;
+			this.curdrawoffx = this.subpixel ? scrollx + (lyr.wd - lyrw) / 2 : Math.floor(scrollx + (lyr.wd - lyrw) / 2);
+			this.curdrawoffy = this.subpixel ? scrolly + (lyr.ht - lyrh) / 2 : Math.floor(scrolly + (lyr.ht - lyrh) / 2);
 
 			// how far the camera moved since this layer last drew, so a layer that was off catches up
-			const oxdiff = lyr.lastscrox - cam.scrox;
-			const oydiff = lyr.lastscroy - cam.scroy;
-			lyr.lastscrox = cam.scrox;
-			lyr.lastscroy = cam.scroy;
+			const oxdiff = lyr.lastscrox - scrollx;
+			const oydiff = lyr.lastscroy - scrolly;
+			lyr.lastscrox = scrollx;
+			lyr.lastscroy = scrolly;
 
 			if (truthy(lyr.zsort)) g.zsortLayer(lyr);
 
@@ -605,7 +648,6 @@ const Draw = {
 			const desth = DISPLAY_H + lzoffh;
 
 			// a mask needs the layer on its own canvas, weather would too once it exists
-			const buffered = lyr.mask_list.length > 0;
 			let screenCtx = null;
 			if (buffered) {
 				if (!lyr.layerSurf || zoomchange || lyr.layerSurf.width !== lyrw || lyr.layerSurf.height !== lyrh) {
@@ -617,6 +659,7 @@ const Draw = {
 				this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 				this.ctx.clearRect(0, 0, lyrw, lyrh);
 				this.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
+				this.targetScale = 1;
 			} else {
 				this.base = { sx: destw / lyrw, sy: desth / lyrh, ox: destx, oy: desty };
 			}
@@ -648,9 +691,6 @@ const Draw = {
 				}
 			}
 
-			const plxXMod = 1 - lyr.plx_x;
-			const plxYMod = 1 - lyr.plx_y;
-			const paraxing = plxXMod !== 0 || plxYMod !== 0;
 			const loopX = lyr.loop_x;
 			const loopY = lyr.loop_y;
 			const lpStx = cam.x - loopX / 2;
@@ -693,7 +733,8 @@ const Draw = {
 				layerCtx.globalCompositeOperation = "source-over";
 
 				this.ctx = screenCtx;
-				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				this.targetScale = this.screenScale;
+				ctx.setTransform(this.screenScale, 0, 0, this.screenScale, 0, 0);
 				ctx.globalAlpha = 1;
 				ctx.drawImage(lyr.layerSurf, destx, desty, destw, desth);
 			}
@@ -702,6 +743,7 @@ const Draw = {
 		}
 
 		this.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
+		this.subpixel = false;
 		this.curdrawoffx = 0;
 		this.curdrawoffy = 0;
 		this.overlay(g);

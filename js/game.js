@@ -1,6 +1,6 @@
 // The game shell: loads the world, the sprites and the fonts, then runs the world at a fixed
-// rate whatever the display rate. Each step is followed by its draw, as in the original,
-// where drawing is part of every frame and some things only move or animate as they draw.
+// rate whatever the display rate. Each browser frame runs the updates that are due, then draws
+// once if any ran, telling the drawing how many it covers so animation keeps update pace.
 // Sound, scripts, effects, pop up messages and the inventory are stand ins here that log
 // once what was asked of them, until their own stages exist.
 
@@ -204,13 +204,16 @@ const Shell = {
 					game.step();
 					Save.update();
 				}
-				game.draw();
-				roomPicker.draw();
 				this.acc -= stepMs;
 				steps++;
 			}
 			// too far behind, drop the rest rather than spiral
 			if (steps === MAX_CATCHUP_STEPS) this.acc = 0;
+			if (steps > 0) {
+				Draw.frameSteps = steps;
+				game.draw();
+				roomPicker.draw();
+			}
 			requestAnimationFrame(tick);
 		};
 		requestAnimationFrame(tick);
