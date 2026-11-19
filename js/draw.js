@@ -730,7 +730,7 @@ const Draw = {
 		const now = (typeof performance !== "undefined") ? performance.now() : Date.now();
 		if (this.lastFrameTime > 0) {
 			const fps = 1000 / Math.max(1, now - this.lastFrameTime);
-			this.fpsHist = round(this.fpsHist * 0.975 + Math.min(fps, GAME_FPS) * 0.025);
+			this.fpsHist = this.fpsHist * 0.975 + Math.min(fps, GAME_FPS) * 0.025;
 		}
 		this.lastFrameTime = now;
 
@@ -743,7 +743,7 @@ const Draw = {
 
 		if (!g.drawStats) {
 			this.alpha = STATS_ALPHA_OFF;
-			this.textRaw(STATS_X - 1, STATS_Y, String(this.fpsHist), -1, -1, 1, 1, 0);
+			this.textRaw(STATS_X - 1, STATS_Y, String(round(this.fpsHist)), -1, -1, 1, 1, 0);
 			this.alpha = 1;
 			return;
 		}

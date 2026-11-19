@@ -351,6 +351,20 @@ class World {
 		cam.setTo(guy.x, guy.y);
 	}
 
+	// Puts the player where a save says: the spot, the layer by name when the room has it, the way
+	// they face, then settled into the room as at the start, with the camera on them.
+	placeGuyAt(x, y, layerName, facing, facingy) {
+		const guy = this.guy;
+		const lyr = typeof layerName === "string" ? this.findLayer(layerName) : undefined;
+		if (lyr !== undefined && !Array.isArray(lyr) && guy.mylayer !== lyr) this.layerInsert(lyr, guy);
+		guy.x = x;
+		guy.y = y;
+		if (facing !== undefined) guy.facing = facing;
+		if (facingy !== undefined) guy.facingy = facingy;
+		this.settleGuy();
+		this.last_cp = { x: guy.x, y: guy.y };
+	}
+
 	// Gives a room with no player of its own one, as the original's start does: a plain top down
 	// character named as the main one.
 	// The original puts it at the origin in the overlay layer, which only suits the editor.
