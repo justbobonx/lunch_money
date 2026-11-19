@@ -2,7 +2,8 @@
 // follows the player inside a small slack window, pans with an easing curve to a person or a
 // fixed spot, zooms, shakes, and is pushed out of camera blocking boxes like any mover.
 // Everything that asks where the view is reads it from here: the scroll of the view's top left
-// corner, its middle, its size, and whether something is on screen.
+// corner, its middle, its size, and whether something is on screen. Nothing is checked for objects
+// by itself: one that cares whether it is out of view asks here.
 // Also the two room objects that steer it: blocking boxes and trigger areas that frame themselves.
 
 // the view at no zoom
@@ -26,14 +27,10 @@ const CAM_ON_ME_PAN_TIME = 50;
 const CAM_ON_ME_BACK_TIME = 20;
 
 class oCamera extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
-		this.exoffx = 0;
-		this.exoffy = 0;
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
-		this.visible = true;
-		this.persistent = true;
-		this.sprite_index = "sBlankGrCtr";
+		this.spi = "sBlankGrCtr";
 
 		this.zoom1w = CAM_ZOOM1_W;
 		this.zoom1h = CAM_ZOOM1_H;
@@ -199,9 +196,10 @@ class oCamera extends oBaseObject {
 		return false;
 	}
 
-	// The camera's end of frame: out of any blocking box, zoom on, then toward the follow spot,
-	// sliding against blocking boxes, and the new view corner.
-	onEndStep() {
+	// The camera's turn each frame, run by the world after every object has updated and settled:
+	// out of any blocking box, zoom on, then toward the follow spot, sliding against blocking boxes,
+	// and the new view corner.
+	update() {
 		const boxes = [];
 		this.instancePlaceList(this.x, this.y, oCamBox, boxes, true);
 		for (const cbox of boxes) this.pushOutOfBox(cbox);
@@ -265,8 +263,8 @@ class oCamera extends oBaseObject {
 		}
 
 		// the mask is the view's size
-		this.image_xscale = this.curw / 2;
-		this.image_yscale = this.curh / 2;
+		this.x_sc = this.curw / 2;
+		this.y_sc = this.curh / 2;
 
 		this.xspd = ncx - this.x;
 		this.yspd = ncy - this.y;
@@ -334,16 +332,16 @@ class oCamera extends oBaseObject {
 
 // Keeps the camera out. Never drawn.
 class oCamBox extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
-		this.visible = false;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.pvis = false;
 	}
 }
 
 // A trigger area that pans the camera onto itself, zooming to fit, and back to the player on leaving.
 class oCamOnMe extends oTrigScript {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.group = null;
 		this.only_inside = 1;
 		this.andzoom = 1;

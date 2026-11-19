@@ -101,59 +101,39 @@ class Inventory {
 
 // ---------------------------------------------------------------- base
 
-// Sets a sprite and works out what drawing needs from it: odd sizes for flipped drawing,
-// and for tiled things the tile size, flips and where tiling starts so the stretched area is
-// covered from the origin out. Shared by objects and plain room pictures.
-function setSpritePlus(o, spri) {
-	o.spi = spri;
-	o.sprite_index = spri;
-	// the default mask, for things that swap masks
-	o.dmi = o.mask_index;
-	o.xodd = o.sprite_width % 2 !== 0;
-	o.yodd = o.sprite_height % 2 !== 0;
-	o.tiled = o.tiledx || o.tiledy;
-	const rec = Sprites.get(spri);
-	const tw = rec ? rec.w : 0;
-	const th = rec ? rec.h : 0;
-	if (truthy(o.tiled)) {
-		o.t_flipx = sign(o.image_xscale);
-		o.t_flipy = sign(o.image_yscale);
-		const ofx = rec ? rec.ox : 0;
-		const ofy = rec ? rec.oy : 0;
-		o.t_stx = ofx * (Math.abs(o.image_xscale) - 1) * o.t_flipx + (o.t_flipx < 0 ? (Math.abs(o.image_xscale) - 1) * tw : 0);
-		o.t_sty = ofy * (Math.abs(o.image_yscale) - 1) * o.t_flipy + (o.t_flipy < 0 ? (Math.abs(o.image_yscale) - 1) * th : 0);
-		o.t_spw = Math.abs(tw * o.image_xscale);
-		o.t_sph = Math.abs(th * o.image_yscale);
-	}
-	o.t_w = tw;
-	o.t_h = th;
-}
-
-// The shared base of almost everything placed in a room.
+// The base of every game engine object. An object is made from one config, which for anything a
+// room places is that room's entry for it as saved, with its setup block and any settings kept for
+// its name already laid on top. Making one goes in this order: the placed sprite fields and their
+// defaults copied on first, so every object has the same fields in the same order; the spot taken
+// from the config, so defaults can be worked out from it; every class's defaults, from this base
+// out to the object's own class; then the config over all of that, and the sprite asset set.
+// Classes give their defaults by extending defaults rather than the constructor, because a base
+// constructor runs before the classes built on it, so the config could not come last otherwise.
+// The life of an object: made, then its optional setup once everything in its room exists, then
+// each frame its update, then its optional after update once everything has updated, then its draw,
+// until it is destroyed. Objects with no sprite draw nothing.
 class oBaseObject {
-	constructor(x, y) {
-		// engine side state
-		this.x = x;
-		this.y = y;
-		this.xstart = x;
-		this.ystart = y;
-		this.sprite_index = this.constructor.defaultSprite || null;
-		this.mask_index = null;
-		this.image_index = 0;
-		this.image_speed = 1;
-		this.image_xscale = 1;
-		this.image_yscale = 1;
-		this.image_angle = 0;
-		this.image_blend = "#ffffff";
-		this.image_alpha = 1;
-		this.visible = true;
+	constructor(cfg) {
+		Object.assign(this, LP_SPRITE_DEFAULTS);
+		if (cfg === undefined) cfg = {};
+		if (cfg.x !== undefined) this.x = cfg.x;
+		if (cfg.y !== undefined) this.y = cfg.y;
+		this.defaults(cfg);
+		this.configure(cfg);
+	}
+
+	// The base defaults. Classes extend this, starting with the parent's defaults.
+	defaults(cfg) {
+		this.spi = this.constructor.defaultSprite || null;
+		// its own collision mask, when not its sprite's box, and the one it started with
+		this.mask = null;
+		this.dmi = null;
+		// comes along when the player changes rooms
 		this.persistent = false;
 		// switched off with its layer, then it neither runs, collides nor draws
 		this.deactivated = false;
-		this.destroyed = false;
-
-		this.mylayer = null;
-		this.draw_as_sprite = 0;
+		// functions waiting a number of updates
+		this.timers = null;
 
 		this.xspd = 0;
 		this.yspd = 0;
@@ -196,16 +176,16 @@ class oBaseObject {
 		// only used top down, so no facing by default
 		this.facingy = 0;
 
-		this.xodd = 0;
-		this.yodd = 0;
-
-		this.tiledx = 0;
-		this.tiledy = 0;
-		this.tiled = 0;
-
 		this.cur_stayin = null;
+	}
 
-		this.dmi = this.mask_index;
+	// Lays a config over the object and sets its sprite asset from it. Making an object ends with
+	// this, and a room taking over an object of the same name from another room uses it again.
+	configure(cfg) {
+		Object.assign(this, cfg);
+		Draw.setSprite(this, this.spi);
+		// the mask it started with, for things that swap masks
+		this.dmi = this.mask;
 	}
 
 	// bounding box edges at the current spot, whole pixels, both edges included
@@ -214,8 +194,8 @@ class oBaseObject {
 	get bbox_right() { const s = maskShape(this, this.x, this.y); return s ? s.r : this.x; }
 	get bbox_bottom() { const s = maskShape(this, this.x, this.y); return s ? s.b : this.y; }
 
-	get sprite_width() { const s = Sprites.get(this.sprite_index); return s ? s.w * Math.abs(this.image_xscale) : 0; }
-	get sprite_height() { const s = Sprites.get(this.sprite_index); return s ? s.h * Math.abs(this.image_yscale) : 0; }
+	get sprite_width() { const s = Sprites.get(this.spi); return s ? s.w * Math.abs(this.x_sc) : 0; }
+	get sprite_height() { const s = Sprites.get(this.spi); return s ? s.h * Math.abs(this.y_sc) : 0; }
 
 	sprite_cx() {
 		return Math.floor((this.bbox_right + this.bbox_left + 1) / 2);
@@ -224,25 +204,37 @@ class oBaseObject {
 		return Math.floor((this.bbox_bottom + this.bbox_top + 1) / 2);
 	}
 
-	set_sprite(spri) {
-		setSpritePlus(this, spri);
-	}
+	// Each frame's own logic. Nothing by default.
+	update() {}
 
-	// The layer drawing calls this. It runs the object's own draw events in order,
-	// begin, main and end, the way the original fired them by hand.
+	// By default the sprite through the one sprite draw that layer pictures use too.
 	draw() {
-		if (typeof this.onDrawBegin === "function") this.onDrawBegin();
-		this.onDraw();
-		if (typeof this.onDrawEnd === "function") this.onDrawEnd();
+		Draw.lpSprite(this);
 	}
 
-	// By default the sprite at its spot less the draw offset.
-	// Guess: the original skips sprite number zero here too, which names cannot express.
-	onDraw() {
-		if (this.sprite_index) {
-			Draw.spriteExt(this.sprite_index, this.image_index, this.x - Math.floor(this.exoffx), this.y - Math.floor(this.exoffy),
-				this.image_xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+	// Gone for good: out of its layer, its name and the frame. Anything that owns other objects
+	// destroys them here too, after this base. Destroying twice does nothing.
+	destroy() {
+		game.forgetObject(this);
+	}
+
+	// Runs a function after a number of updates. Counted in updates, never in real time, so it
+	// waits while play is paused and stays in step with movement.
+	startTimer(updates, fn) {
+		if (this.timers === null) this.timers = [];
+		this.timers.push({ left: updates, fn: fn });
+	}
+
+	// Counts the timers down, the world calls this just before each update. A timer that runs out
+	// is dropped before it runs, so it can start another.
+	countDownTimers() {
+		for (let i = 0; i < this.timers.length; i++) {
+			const t = this.timers[i];
+			if (--t.left > 0) continue;
+			this.timers.splice(i--, 1);
+			t.fn.call(this);
 		}
+		if (this.timers.length === 0) this.timers = null;
 	}
 }
 Object.assign(oBaseObject.prototype, Collision);
@@ -250,8 +242,8 @@ Object.assign(oBaseObject.prototype, Movers);
 
 // Solid things. They block movement by default and are endlessly tall top down.
 class oObject extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.ht = BIGGEST_INT;
 	}
 	// any object can be acted on, by default nothing happens
@@ -260,8 +252,8 @@ class oObject extends oBaseObject {
 
 // Terrain, hangable by default.
 class oGround extends oObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = true;
 	}
 }
@@ -269,18 +261,18 @@ class oGround extends oObject {
 // Stretchable ground: an edge strip along the top and a fill stretched over the rest.
 // Both pieces are eight pixels square with no origin.
 class oFloor extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = true;
 		this.landed = true;
 		this.top_spr = "sFloorTop";
 		this.mid_spr = "sFloorMid";
 	}
-	onDraw() {
-		Draw.spriteExt(this.top_spr, this.image_index, this.x, this.y, this.sprite_width / 8, 1,
-			this.image_angle, this.image_blend, this.image_alpha);
-		Draw.spriteExt(this.mid_spr, this.image_index, this.x, this.y + 8, this.sprite_width / 8, (this.sprite_height - 8) / 8,
-			this.image_angle, this.image_blend, this.image_alpha);
+	draw() {
+		Draw.spriteExt(this.top_spr, this.ifr, this.x, this.y, this.sprite_width / 8, 1,
+			this.ang, this.col, this.alph);
+		Draw.spriteExt(this.mid_spr, this.ifr, this.x, this.y + 8, this.sprite_width / 8, (this.sprite_height - 8) / 8,
+			this.ang, this.col, this.alph);
 	}
 }
 
@@ -288,8 +280,8 @@ class oSolidFloor extends oGround {}
 
 // Spiky wall that hurts on touch.
 class oWall extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hurts = 2;
 	}
 	acton(action, who) {
@@ -301,14 +293,14 @@ class oWall extends oGround {
 
 // Breaks when hit fast, slowing whoever broke it a little.
 class oGlass extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 	}
 	acton(action, who) {
 		if (action === "hit") {
 			Hooks.particles("glass break", this, who.x + who.xspd, who.y + who.yspd);
-			game.destroyObject(this);
+			this.destroy();
 			who.xspd = sign(who.xspd) * (Math.abs(who.xspd) - 0.2);
 			who.calcOnFloorAtWall();
 		}
@@ -319,8 +311,8 @@ class oGlassv extends oGlass {}
 
 // One way floor, pass from below and the sides, drop down through it.
 class oFloorThru extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 		this.thruable = true;
 		this.thruUp = true;
@@ -331,8 +323,8 @@ class oFloorThru extends oGround {
 }
 
 class oPlatform extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.xspd = 0;
 		this.yspd = 0;
 		this.rspd = 0;
@@ -346,21 +338,28 @@ class oPlatform extends oGround {
 class oPlank extends oGround {}
 class oBox extends oGround {}
 
-// Ground drawn repeated over its size when tiled, else stretched.
+// Ground drawn repeated over its size when tiled, else stretched. Its own tiling always repeats
+// both ways at unit size, even when only one way was asked for, and leaves out the draw offset.
 class oSolidGr extends oGround {
-	constructor(x, y) {
-		super(x, y);
-		this.tiled = false;
-	}
-	onDraw() {
-		if (truthy(this.tiled)) Draw.spriteTiled(this);
-		else Draw.self(this);
+	draw() {
+		if (!truthy(this.tiled)) {
+			Draw.lpSprite(this);
+			return;
+		}
+		// a zero size would never finish
+		if (!(this.t_w > 0) || !(this.t_h > 0)) return;
+		for (let j = 0; j < this.t_spw; j += this.t_w) {
+			for (let k = 0; k < this.t_sph; k += this.t_h) {
+				Draw.spriteExt(this.spi, this.ifr, this.x + j - this.t_stx, this.y + k - this.t_sty,
+					this.t_flipx, this.t_flipy, this.ang, this.col, this.alph);
+			}
+		}
 	}
 }
 
 class oIaSolidGr extends oSolidGr {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initInteractive();
 		this.pickupable = false;
 	}
@@ -368,15 +367,15 @@ class oIaSolidGr extends oSolidGr {
 mixin(oIaSolidGr, Interactive);
 
 class oBlankGr extends oGround {
-	constructor(x, y) {
-		super(x, y);
-		this.visible = false;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.pvis = false;
 	}
 }
 
 class oGrWall extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 		this.landed = true;
 	}
@@ -384,8 +383,8 @@ class oGrWall extends oGround {
 class oGrWall2 extends oGrWall {}
 
 class oOneWayDoor extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.xspd = 0;
 		this.yspd = 0;
 		this.rspd = 0;
@@ -397,15 +396,15 @@ class oOneWayDoor extends oGround {
 
 // Placeholder: falls and tumbles once its own step is ported.
 class oBoxFall extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.landed = false;
 		this.xspd = rng.randomRange(-0.1, 0.1);
 		this.yspd = rng.randomRange(-0.1, 0.1);
 		this.rspd = (this.yspd / 3 + rng.random(0.2)) * (rng.random(10) < 5 ? -1 : 1);
-		this.image_speed = 0;
-		this.image_index = 0;
+		this.spd = 0;
+		this.ifr = 0;
 		this.life = 130;
 	}
 }
@@ -413,8 +412,8 @@ oBoxFall.ported = false;
 
 // Placeholder: a bobbing floor once its own step is ported.
 class oGrTechno extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 		this.moving = true;
 		this.initMoveable();
@@ -427,8 +426,8 @@ class oGrTechno extends oGround {
 oGrTechno.ported = false;
 
 class oGrTechnoVoid extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 		this.moving = true;
 		this.initMoveable();
@@ -441,16 +440,16 @@ oGrTechnoVoid.ported = false;
 
 // Placeholder: the original turns its pass flags on, then straight back off.
 class oJgHeart extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 	}
 }
 oJgHeart.ported = false;
 
 class oJgLogShooter extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 	}
 }
@@ -458,8 +457,8 @@ oJgLogShooter.ported = false;
 
 // Placeholder: a hangable flying bird once its step is ported.
 class oBird extends oGround {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.hangable = true;
 	}
@@ -467,16 +466,16 @@ class oBird extends oGround {
 oBird.ported = false;
 
 class oBouncer extends oObject {
-	constructor(x, y) {
-		super(x, y);
-		this.image_speed = 0;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.spd = 0;
 	}
 }
 oBouncer.ported = false;
 
 class oTank extends oObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 	}
 }
@@ -484,8 +483,8 @@ oTank.ported = false;
 
 // Solid interactive things.
 class oIaObject extends oObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initInteractive();
 		this.landed = true;
 		this.hitFloor = false;
@@ -499,13 +498,13 @@ mixin(oIaObject, Interactive);
 
 // Loose crate: falls, slides and can be picked up.
 class oCrate extends oIaObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 		this.holdoffx = 1;
 		this.initMoveable();
 	}
-	onStep() {
+	update() {
 		this.calcOnFloorAtWall();
 		this.lastx = this.x;
 		this.lasty = this.y;
@@ -519,8 +518,8 @@ mixin(oCrate, Pickupable);
 
 // Crate that stays put but can be picked up.
 class oCrateSt extends oIaObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 		this.holdoffx = 1;
 	}
@@ -529,15 +528,14 @@ mixin(oCrateSt, Pickupable);
 
 // Big crate that gets pushed along the floor.
 class oCrateBg extends oIaObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.pushable = true;
 		this.pushAdj = 0.8;
-		this.image_speed = 0;
-		this.dmi = this.mask_index;
+		this.spd = 0;
 	}
-	onStep() {
+	update() {
 		this.calcOnFloorAtWall();
 		if (this.atWall) {
 			this.xspd = -sign(this.xspd) * Math.max(Math.abs(this.xspd) - 0.1, 0);
@@ -553,8 +551,8 @@ class oCrateBg extends oIaObject {
 
 // Metal crate, pulled by the magnet and knocked by hits.
 class oCrateMetal extends oIaObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.maxspd = 1;
 	}
@@ -571,7 +569,7 @@ class oCrateMetal extends oIaObject {
 			this.yspd = sign(this.yspd) * Math.min(Math.abs(this.yspd), this.maxspd);
 		}
 	}
-	onStep() {
+	update() {
 		this.calcOnFloorAtWall();
 		this.applyFrictionGravity();
 		this.lastx = this.x;
@@ -586,8 +584,8 @@ class oCrateMetal extends oIaObject {
 class oBgObject extends oBaseObject {}
 
 class oIaBgObject extends oBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initInteractive();
 		this.landed = true;
 		this.pickupable = false;
@@ -598,9 +596,9 @@ class oIaBgObject extends oBgObject {
 mixin(oIaBgObject, Interactive);
 
 class oClimbableObj extends oBgObject {
-	constructor(x, y) {
-		super(x, y);
-		this.visible = false;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.pvis = false;
 		this.climbable = true;
 		this.jumpoff = true;
 		this.twoway = true;
@@ -612,16 +610,16 @@ class oLadder extends oClimbableObj {}
 class oPit extends oBgObject {}
 
 class oRope extends oBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = true;
 	}
 }
 oRope.ported = false;
 
 class oLogEater extends oBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.hangable = false;
 	}
 }
@@ -635,10 +633,10 @@ oAniSpark.ported = false;
 // to the layers it leads to, or goes to the room it connects to. It can open by itself when
 // something stands at its sensor, and be locked.
 class oLyrDoor extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
-		this.image_speed = 0;
-		this.image_index = 0;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.spd = 0;
+		this.ifr = 0;
 		this.open = false;
 		this.locked = false;
 		this.connected = -1;
@@ -659,9 +657,8 @@ class oLyrDoor extends oIaBgObject {
 	}
 
 	init() {
-		this.wall_obj = game.instanceCreate(oBlankGr, this.x, this.y);
-		this.wall_obj.mask_index = this.sprite_index;
-		this.wall_obj.visible = false;
+		this.wall_obj = game.createObject(oBlankGr, { x: this.x, y: this.y });
+		this.wall_obj.mask = this.spi;
 		this.open_sensor = game.lookupInst(this.open_sensor, this);
 		this.set_open(this.open, 0, 1);
 	}
@@ -670,11 +667,11 @@ class oLyrDoor extends oIaBgObject {
 	set_open(open, animate, lockOverride) {
 		if (truthy(this.locked) && !truthy(lockOverride)) return false;
 		this.open = open;
-		this.wall_obj.mask_index = truthy(open) ? "sNoMask" : this.sprite_index;
+		this.wall_obj.mask = truthy(open) ? "sNoMask" : this.spi;
 		if (truthy(animate)) {
-			this.image_speed = 1;
+			this.spd = 1;
 		} else {
-			this.image_index = truthy(open) ? Math.ceil(Sprites.frameCount(this.sprite_index) / 2) : 0;
+			this.ifr = truthy(open) ? Math.ceil(Sprites.frameCount(this.spi) / 2) : 0;
 		}
 		return true;
 	}
@@ -686,12 +683,12 @@ class oLyrDoor extends oIaBgObject {
 		if (this.open_sensor !== undefined && this.sense_on !== null) this.manual_override = 1;
 	}
 
-	onStep() {
-		const frames = Sprites.frameCount(this.sprite_index);
-		if (this.image_speed > 0) {
-			if ((truthy(this.open) && Math.floor(this.image_index) === Math.ceil(frames / 2))
-				|| (!truthy(this.open) && Math.floor(this.image_index) === 0)) {
-				this.image_speed = 0;
+	update() {
+		const frames = Sprites.frameCount(this.spi);
+		if (this.spd > 0) {
+			if ((truthy(this.open) && Math.floor(this.ifr) === Math.ceil(frames / 2))
+				|| (!truthy(this.open) && Math.floor(this.ifr) === 0)) {
+				this.spd = 0;
 			} else {
 				return;
 			}
@@ -724,8 +721,10 @@ class oLyrDoor extends oIaBgObject {
 		}
 	}
 
-	onDestroy() {
-		game.destroyObject(this.wall_obj);
+	// the wall goes with the door
+	destroy() {
+		super.destroy();
+		if (this.wall_obj) this.wall_obj.destroy();
 	}
 }
 
@@ -742,8 +741,8 @@ oBike.ported = false;
 
 // Placeholder items: they keep the pickup shape, their use comes later.
 class oPickupObj extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -751,8 +750,8 @@ mixin(oPickupObj, Pickupable);
 oPickupObj.ported = false;
 
 class oHoldObject extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -761,8 +760,8 @@ oHoldObject.ported = false;
 
 // Placeholder items, each keeps its real parent and the pickup shape, their use comes later.
 class oKey extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -770,8 +769,8 @@ mixin(oKey, Pickupable);
 oKey.ported = false;
 
 class oGun extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -779,8 +778,8 @@ mixin(oGun, Pickupable);
 oGun.ported = false;
 
 class oFlamer extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -788,8 +787,8 @@ mixin(oFlamer, Pickupable);
 oFlamer.ported = false;
 
 class oArBow extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -797,8 +796,8 @@ mixin(oArBow, Pickupable);
 oArBow.ported = false;
 
 class oMagnet extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 	}
 }
@@ -806,8 +805,8 @@ mixin(oMagnet, Pickupable);
 oMagnet.ported = false;
 
 class oRocketpack extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initPickupable();
 		this.active = 0;
 	}
@@ -816,8 +815,8 @@ mixin(oRocketpack, Pickupable);
 oRocketpack.ported = false;
 
 class oSword extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.initPickupable();
 	}
@@ -825,8 +824,8 @@ class oSword extends oIaBgObject {
 mixin(oSword, Pickupable);
 oSword.ported = false;
 class oBall extends oIaBgObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.initMoveable();
 		this.initPickupable();
 	}
@@ -840,16 +839,16 @@ class oWater extends oBaseObject {}
 // Repeats its sprite at unit size over its stretched area.
 class oSpriteTiler extends oBaseObject {
 	init() {
-		const rec = Sprites.get(this.sprite_index);
+		const rec = Sprites.get(this.spi);
 		this.w = rec ? rec.w : 0;
 		this.h = rec ? rec.h : 0;
 	}
-	onDraw() {
+	draw() {
 		// a zero size would never finish
 		if (!(this.w > 0) || !(this.h > 0)) return;
 		for (let i = 0; i < this.sprite_width; i += this.w) {
 			for (let k = 0; k < this.sprite_height; k += this.h) {
-				Draw.spriteExt(this.sprite_index, this.image_index, this.x + i, this.y + k, 1, 1, 0, this.image_blend, this.image_alpha);
+				Draw.spriteExt(this.spi, this.ifr, this.x + i, this.y + k, 1, 1, 0, this.col, this.alph);
 			}
 		}
 	}
@@ -858,9 +857,9 @@ class oWaterFg extends oSpriteTiler {}
 oWaterFg.ported = false;
 
 class oFloorEffect extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
-		this.visible = false;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.pvis = false;
 	}
 	// called by whoever stands on it so it can change their movement
 	effect_obj(obj, acc, maxspd) {}
@@ -870,9 +869,9 @@ class oFloorEffect extends oBaseObject {
 // It can need the player wholly inside, under its height, or other conditions first,
 // can wait some frames before firing, and can fire only once.
 class oTrigger extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
-		this.visible = false;
+	defaults(cfg) {
+		super.defaults(cfg);
+		this.pvis = false;
 		// was on by default once, it almost never should be
 		this.trigOnce = 0;
 		this.only_inside = false;
@@ -900,7 +899,7 @@ class oTrigger extends oBaseObject {
 		console.log("off trigger");
 	}
 
-	onStep() {
+	update() {
 		let tr = this.instancePlace(this.x, this.y, this.triggerer);
 		// wholly inside means every edge of its box within ours
 		if (tr !== null && truthy(this.only_inside) && !(tr.bbox_left >= this.bbox_left && tr.bbox_right <= this.bbox_right
@@ -951,8 +950,8 @@ class oTrigger extends oBaseObject {
 
 // A trigger that runs a script on entering, and another on leaving if it has one.
 class oTrigScript extends oTrigger {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.triggerScript = [["say", "triggered", "actor", 0, -20, 50]];
 		this.skippable = false;
 		this.skipScript = [];
@@ -968,8 +967,8 @@ class oTrigScript extends oTrigger {
 
 // An extra area for another trigger, passing on who entered and taking its settings.
 class oTrigKid extends oTrigger {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.trigDad = undefined;
 	}
 	init() {
@@ -990,8 +989,8 @@ class oTrigKid extends oTrigger {
 
 // An area's bounds. Walking wholly inside a connected area moves the player into it.
 class oGroupBounds extends oTrigScript {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.group = null;
 		this.only_inside = 1;
 	}
@@ -1002,8 +1001,8 @@ class oGroupBounds extends oTrigScript {
 
 // Brings an area into view while the player is inside it, and takes it out after.
 class oVisBounds extends oTrigScript {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.group = null;
 		this.only_inside = 0;
 	}
@@ -1018,8 +1017,8 @@ class oVisBounds extends oTrigScript {
 // A shape that limits what some layers show to where it covers. It sits in no layer and never runs.
 // It has no parent in the original, it sits on the base here only to share engine state.
 class oLayerMask extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this._mask = true;
 		this.layer_list = [];
 	}
@@ -1028,8 +1027,8 @@ class oLayerMask extends oBaseObject {
 // A sign: text in one of the pixel fonts, centred or placed by an offset, shadowed,
 // and blinking when asked.
 class oText extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.step = 0;
 		this.font = "ftSmall";
 		this.color = "#ffffff";
@@ -1047,7 +1046,7 @@ class oText extends oBaseObject {
 
 	// Kept from the original: the width for centring is measured before this sign's font is set,
 	// so it uses whichever font was drawn last.
-	onDraw() {
+	draw() {
 		if (truthy(this.blinkr)) {
 			this.step = (this.step + 1) % (this.blinkr * 2);
 			if (this.step > this.blinkr) return;
@@ -1063,12 +1062,12 @@ class oText extends oBaseObject {
 			Draw.color = "#000000";
 			Draw.alpha = this.alphac * this.alphash;
 			Draw.textTransformed(this.x - this.exoffx + xo + 1, this.y - this.exoffy + yo + 1, this.text,
-				this.linesep, this.twidth, 1, 1, this.image_angle);
+				this.linesep, this.twidth, 1, 1, this.ang);
 		}
 		Draw.color = this.color;
 		Draw.alpha = this.alphac;
 		Draw.textTransformed(this.x - this.exoffx + xo, this.y - this.exoffy + yo, this.text,
-			this.linesep, this.twidth, 1, 1, this.image_angle);
+			this.linesep, this.twidth, 1, 1, this.ang);
 		Draw.alpha = 1;
 	}
 }
@@ -1083,8 +1082,8 @@ class oGuyPlacer extends oBaseObject {}
 
 // Anything that moves itself: contact flags, abilities and states for the movers.
 class oActor extends oBaseObject {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.ch_side = 1;
 		this.ch_topd = 0;
 
@@ -1167,7 +1166,7 @@ class oActor extends oBaseObject {
 
 	// The sprite flipped by facing, nudged a pixel when an odd width is flipped,
 	// with the mask box and origin shown when the debug overlay is on.
-	onDraw() {
+	draw() {
 		if (game.drawStats) {
 			Draw.alpha = 0.5;
 			Draw.color = "#00ff00";
@@ -1176,8 +1175,8 @@ class oActor extends oBaseObject {
 		}
 		const xscale = this.facing === 0 ? 1 : this.facing;
 		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
-		Draw.spriteExt(this.sprite_index, this.image_index, this.x + xoadj, this.y, xscale, this.image_yscale,
-			this.image_angle, this.image_blend, this.image_alpha);
+		Draw.spriteExt(this.spi, this.ifr, this.x + xoadj, this.y, xscale, this.y_sc,
+			this.ang, this.col, this.alph);
 		if (game.drawStats) {
 			Draw.color = truthy(this.facing) ? "#ff0000" : "#ff00ff";
 			Draw.rectangle(this.x, this.y + this.z, this.x, this.y + this.z, 0);
@@ -1226,8 +1225,8 @@ oNpcChar.ported = false;
 
 // Shared by the player characters only.
 class oChar extends oActor {
-	constructor(x, y) {
-		super(x, y);
+	defaults(cfg) {
+		super.defaults(cfg);
 		this.status = null;
 		// when on, death just lets the body fall away
 		this.deadfall = 0;
@@ -1241,7 +1240,7 @@ class oChar extends oActor {
 	init() {
 		const spi = this.skin + "_stand";
 		if (Sprites.exists(spi)) {
-			this.set_sprite(spi);
+			Draw.setSprite(this, spi);
 		}
 	}
 
@@ -1296,8 +1295,8 @@ class oChar extends oActor {
 			if (this.con.iBtnY) {
 				this.drop_request = 1;
 				this.lockface = 1;
-				const omi = this.carrying.mask_index;
-				this.carrying.mask_index = this.carrying.dmi;
+				const omi = this.carrying.mask;
+				this.carrying.mask = this.carrying.dmi;
 				if (truthy(this.ch_side)) {
 					this.drop_offx = (this.carrying.x - this.x) * this.facing;
 					this.drop_offy = this.carrying.y - this.y;
@@ -1305,7 +1304,7 @@ class oChar extends oActor {
 					this.drop_offx = 3 + (this.facing < 0 ? (this.carrying.bbox_right + 1 - this.carrying.x) : (this.carrying.x - this.carrying.bbox_left));
 					this.drop_offy = 2 + (this.facingy < 0 ? (this.carrying.bbox_bottom + 1 - this.carrying.y) : (this.carrying.y - this.carrying.bbox_top));
 				}
-				this.carrying.mask_index = omi;
+				this.carrying.mask = omi;
 			}
 			// release drops it, or gives it to whoever is in reach and wants it
 			if (this.con.iBtnYr) {

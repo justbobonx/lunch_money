@@ -1,6 +1,7 @@
 // Everything that puts pixels on the screen: sprites with scale, turn, tint and fade,
+// placed sprites, which room pictures and objects share, with their one draw and animation step,
 // tiled sprites, rectangles, text in the game's own pixel fonts, and the whole frame,
-// which is the player's draw event: every room layer in order with its scroll, parallax,
+// which draws every room layer in order with its scroll, parallax,
 // looping, depth sorting, area backdrops and masks, then the overlay on top.
 // The original drew every layer to its own surface and stretched it onto the screen.
 // Here a layer only gets its own offscreen canvas when it has an effect that needs one,
@@ -57,6 +58,79 @@ const STATS_ALPHA_OFF = 0.3;
 const STATS_X = 6;
 const STATS_Y = -2;
 const STATS_LINE = 10;
+
+// ---------------------------------------------------------------- placed sprites
+
+// A placed sprite: everything drawing needs to show one sprite asset somewhere, and nothing else.
+// Layer pictures are bare ones of these. Every object starts as a copy of the defaults below, so
+// objects and pictures share one set of drawing fields, and the one sprite draw and the one
+// animation step in the drawing code serve both. It has no methods on purpose, so that copying its
+// fields onto an object brings everything along. A field added here reaches every object.
+// The names are the ones room files save, so a room's entry for a picture or object can be
+// handed over as it is. Defaults stay plain numbers and text, never shared lists.
+class lpSprite {
+	constructor(cfg) {
+		// the sprite asset, the frame showing, and the animation speed, one being the asset's own pace
+		this.spi = null;
+		this.ifr = 0;
+		this.spd = 1;
+		// called with the sprite whenever its animation runs past its last frame or before its first
+		this.onAnimEnd = null;
+
+		// where it is, and how far back from there the picture is drawn, so a footprint can sit
+		// apart from its picture
+		this.x = 0;
+		this.y = 0;
+		this.exoffx = 0;
+		this.exoffy = 0;
+
+		// stretch, turn counterclockwise in degrees, blend colour and opacity
+		this.x_sc = 1;
+		this.y_sc = 1;
+		this.ang = 0;
+		this.col = NO_TINT;
+		this.alph = 1;
+
+		// repeated instead of stretched, one way or both, and sliding with the camera to look endless
+		this.tiledx = 0;
+		this.tiledy = 0;
+		this.tile_loop = 0;
+
+		// worked out from the asset each time it is set: odd sizes, and the tiling layout
+		this.xodd = 0;
+		this.yodd = 0;
+		this.tiled = 0;
+		this.t_w = 0;
+		this.t_h = 0;
+		this.t_stx = 0;
+		this.t_sty = 0;
+		this.t_spw = 0;
+		this.t_sph = 0;
+		this.t_flipx = 1;
+		this.t_flipy = 1;
+
+		// shown in play, and switched off by itself or with its group
+		this.pvis = true;
+		this.pdis = 0;
+
+		// its name in the room, the layer it sits in, and whether it is gone
+		this.name = undefined;
+		this.mylayer = null;
+		this.destroyed = false;
+
+		if (cfg) {
+			Object.assign(this, cfg);
+			Draw.setSprite(this, this.spi);
+		}
+	}
+}
+
+// The defaults every object copies onto itself first thing.
+const LP_SPRITE_DEFAULTS = new lpSprite();
+
+// What a room file saves for everything it places. A missing one takes the default.
+const LP_SAVED_FIELDS = ["spi", "ifr", "spd", "x", "y", "exoffx", "exoffy", "x_sc", "y_sc", "ang", "col", "alph",
+	"tiledx", "tiledy", "tile_loop"];
 
 const Draw = {
 	ctx: null,
@@ -216,54 +290,87 @@ const Draw = {
 			Math.floor(y) - Math.floor(this.curdrawoffy) + rec.oy * sy, sx, sy, 0, this.color, this.alpha);
 	},
 
-	// an object drawn as itself, less its draw offset
-	self(o) {
-		this.spriteRaw(o.sprite_index, o.image_index,
-			Math.floor(o.x) - Math.floor(o.exoffx) - Math.floor(this.curdrawoffx),
-			Math.floor(o.y) - Math.floor(o.exoffy) - Math.floor(this.curdrawoffy),
-			o.image_xscale, o.image_yscale, o.image_angle, o.image_blend, o.image_alpha);
-	},
-
-	// A layer picture or mask: its own sprite at its spot less its draw offset, moved by the
-	// offsets given, with the scale given or its own.
-	layerSprite(obj, xo, yo, scx, scy) {
-		if (scx === undefined) scx = obj.image_xscale;
-		if (scy === undefined) scy = obj.image_yscale;
-		const dx = Math.floor(obj.x) - Math.floor(obj.exoffx) + Math.floor(xo);
-		const dy = Math.floor(obj.y) - Math.floor(obj.exoffy) + Math.floor(yo);
-		this.spriteRaw(obj.spi, obj.image_index, dx, dy, scx, scy, obj.image_angle, obj.image_blend, obj.image_alpha);
-	},
-
-	// A layer picture repeated instead of stretched, one way or both. Looping tiles slide with the
-	// camera scroll so they look endless. The other way keeps the stretch.
-	layerSpriteTiled(obj, xo, yo) {
-		if (truthy(obj.tile_loop)) {
-			xo -= truthy(obj.tiledx) ? (game.cam.scrox % obj.t_w) : 0;
-			yo -= truthy(obj.tiledy) ? (game.cam.scroy % obj.t_h) : 0;
+	// The one draw for placed sprites, layer pictures and objects alike: the sprite at its spot less
+	// its draw offset, taking off the layer scroll. Tiled ones repeat the frame one way or both
+	// instead of stretching it, keeping the stretch the other way. Looping tiles slide with the
+	// camera scroll so they look endless. Nothing is drawn without a sprite.
+	lpSprite(s) {
+		if (!s.spi) return;
+		const bx = Math.floor(s.x) - Math.floor(s.exoffx);
+		const by = Math.floor(s.y) - Math.floor(s.exoffy);
+		let xo = -this.curdrawoffx;
+		let yo = -this.curdrawoffy;
+		if (!truthy(s.tiled)) {
+			this.spriteRaw(s.spi, s.ifr, bx + Math.floor(xo), by + Math.floor(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alph);
+			return;
 		}
-		const tx = truthy(obj.tiledx);
-		const ty = truthy(obj.tiledy);
-		const stx = tx ? obj.t_stx : 0;
-		const sty = ty ? obj.t_sty : 0;
-		const jinc = tx ? obj.t_w : obj.t_spw;
-		const kinc = ty ? obj.t_h : obj.t_sph;
-		const flipx = tx ? obj.t_flipx : obj.image_xscale;
-		const flipy = ty ? obj.t_flipy : obj.image_yscale;
-		for (let j = 0; j < obj.t_spw; j += jinc) {
-			for (let k = 0; k < obj.t_sph; k += kinc) {
-				this.layerSprite(obj, j - stx + xo, k - sty + yo, flipx, flipy);
+		const tx = truthy(s.tiledx);
+		const ty = truthy(s.tiledy);
+		if (truthy(s.tile_loop)) {
+			xo -= tx ? (game.cam.scrox % s.t_w) : 0;
+			yo -= ty ? (game.cam.scroy % s.t_h) : 0;
+		}
+		const stx = tx ? s.t_stx : 0;
+		const sty = ty ? s.t_sty : 0;
+		const jinc = tx ? s.t_w : s.t_spw;
+		const kinc = ty ? s.t_h : s.t_sph;
+		// a zero step would never finish
+		if (!(jinc > 0) || !(kinc > 0)) return;
+		const flipx = tx ? s.t_flipx : s.x_sc;
+		const flipy = ty ? s.t_flipy : s.y_sc;
+		for (let j = 0; j < s.t_spw; j += jinc) {
+			for (let k = 0; k < s.t_sph; k += kinc) {
+				this.spriteRaw(s.spi, s.ifr, bx + Math.floor(j - stx + xo), by + Math.floor(k - sty + yo),
+					flipx, flipy, s.ang, s.col, s.alph);
 			}
 		}
 	},
 
-	// An object's sprite repeated over its stretched size, always both ways at unit size.
-	spriteTiled(o) {
-		for (let j = 0; j < o.t_spw; j += o.t_w) {
-			for (let k = 0; k < o.t_sph; k += o.t_h) {
-				this.spriteExt(o.sprite_index, o.image_index, o.x + j - o.t_stx, o.y + k - o.t_sty,
-					o.t_flipx, o.t_flipy, o.image_angle, o.image_blend, o.image_alpha);
-			}
+	// Moves a placed sprite's animation on by one frame of play, at the asset's own pace times its
+	// speed, wrapping around both ways. Running past either end calls its end of animation function
+	// when it has one. The frame drawing calls this right after drawing each thing.
+	animate(s) {
+		if (!s.spi) return;
+		const rec = Sprites.get(s.spi);
+		const n = rec.frameCount;
+		if (!(n > 0)) return;
+		s.ifr += s.spd * rec.imageSpeed;
+		let ended = false;
+		if (s.ifr >= n) {
+			s.ifr -= n * Math.floor(s.ifr / n);
+			ended = true;
 		}
+		if (s.ifr < 0) {
+			s.ifr += n * Math.ceil(-s.ifr / n);
+			ended = true;
+		}
+		if (ended && s.onAnimEnd !== null) s.onAnimEnd(s);
+	},
+
+	// Sets a placed sprite's asset and works out what drawing needs from it: odd sizes for flipped
+	// drawing, and for tiled ones the tile size, flips and where tiling starts so the stretched area
+	// is covered from the origin out. These are worked out here once, not as it draws, so a later
+	// change of stretch only shows once the asset is set again.
+	setSprite(s, name) {
+		s.spi = name;
+		const rec = Sprites.get(name);
+		const tw = rec ? rec.w : 0;
+		const th = rec ? rec.h : 0;
+		s.xodd = (tw * Math.abs(s.x_sc)) % 2 !== 0;
+		s.yodd = (th * Math.abs(s.y_sc)) % 2 !== 0;
+		s.tiled = s.tiledx || s.tiledy;
+		if (truthy(s.tiled)) {
+			s.t_flipx = sign(s.x_sc);
+			s.t_flipy = sign(s.y_sc);
+			const ofx = rec ? rec.ox : 0;
+			const ofy = rec ? rec.oy : 0;
+			s.t_stx = ofx * (Math.abs(s.x_sc) - 1) * s.t_flipx + (s.t_flipx < 0 ? (Math.abs(s.x_sc) - 1) * tw : 0);
+			s.t_sty = ofy * (Math.abs(s.y_sc) - 1) * s.t_flipy + (s.t_flipy < 0 ? (Math.abs(s.y_sc) - 1) * th : 0);
+			s.t_spw = Math.abs(tw * s.x_sc);
+			s.t_sph = Math.abs(th * s.y_sc);
+		}
+		s.t_w = tw;
+		s.t_h = th;
 	},
 
 	// ------------------------------------------------------------ shapes
@@ -429,7 +536,8 @@ const Draw = {
 
 	// ------------------------------------------------------------ the frame
 
-	// The player's draw event, then the shake and the overlay.
+	// The whole frame: every room layer, then the shake and the overlay. Each thing animates right
+	// after it draws, unless drawing is paused.
 	// Screen shake moves the room layers only, the overlay stays still, as in the original.
 	// Shake uses the page's own random numbers so drawing never moves the game's seeded ones.
 	frame(g) {
@@ -561,7 +669,10 @@ const Draw = {
 
 				if (!truthy(obj.pvis) || truthy(obj.pdis)) continue;
 				this.totSpriteDrwn++;
-				obj.draw();
+				// objects draw themselves, by default through the same sprite draw as pictures
+				if (obj instanceof oBaseObject) obj.draw();
+				else this.lpSprite(obj);
+				if (!g.drawPaused) this.animate(obj);
 				if (SHOW_UNPORTED_MARKERS && obj.constructor.ported === false) this.unportedMarker(obj);
 			}
 
@@ -575,10 +686,7 @@ const Draw = {
 				this.ctx.imageSmoothingEnabled = false;
 				this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 				this.ctx.clearRect(0, 0, lyrw, lyrh);
-				for (const mobj of lyr.mask_list) {
-					if (truthy(mobj.tiled)) this.layerSpriteTiled(mobj, -this.curdrawoffx, -this.curdrawoffy);
-					else this.layerSprite(mobj, -this.curdrawoffx, -this.curdrawoffy);
-				}
+				for (const mobj of lyr.mask_list) this.lpSprite(mobj);
 				layerCtx.setTransform(1, 0, 0, 1, 0, 0);
 				layerCtx.globalCompositeOperation = "destination-in";
 				layerCtx.drawImage(lyr.maskSurf, 0, 0);

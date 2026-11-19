@@ -19,9 +19,8 @@ const TOPD_LADDER_JUMP_BOOST = 0.7;
 const TOPD_RUN_SPRITE_SPEED = 1.4;
 
 class oCharTopd extends oChar {
-	constructor(x, y) {
-		super(x, y);
-		this.persistent = true;
+	defaults(cfg) {
+		super.defaults(cfg);
 
 		this.skin = "guy";
 
@@ -51,8 +50,8 @@ class oCharTopd extends oChar {
 
 		this.jumping = 0;
 		this.jumped = 1;
-		this.prejumpx = x;
-		this.prejumpy = y;
+		this.prejumpx = this.x;
+		this.prejumpy = this.y;
 
 		this.maxjumph = 1.0;
 		this.jumpRunBoost = 0.2;
@@ -106,8 +105,8 @@ class oCharTopd extends oChar {
 		this.deadXspd = 0;
 		this.deadYspd = 0;
 
-		this.lastsx = x;
-		this.lastsy = y;
+		this.lastsx = this.x;
+		this.lastsy = this.y;
 		this.lastsz = this.z;
 
 		this.xmoving = 0;
@@ -139,7 +138,7 @@ class oCharTopd extends oChar {
 	// sets the stand sprite, then the special top down mask and the reach mask
 	init() {
 		super.init();
-		this.mask_index = Sprites.exists(this.skin + "_topd_mask") ? this.skin + "_topd_mask" : null;
+		this.mask = Sprites.exists(this.skin + "_topd_mask") ? this.skin + "_topd_mask" : null;
 		this.look_mask = Sprites.exists(this.skin + "_ia_bb") ? this.skin + "_ia_bb" : null;
 	}
 
@@ -231,24 +230,24 @@ class oCharTopd extends oChar {
 			}
 
 			if (si.indexOf("_run") >= 0) {
-				this.carrying.y += this.carryofy_run[Math.floor(this.image_index)];
+				this.carrying.y += this.carryofy_run[Math.floor(this.ifr)];
 			} else if (si === this.skin + "_crouch") {
 				this.carrying.y += -1;
 			} else if (truthy(this.jumped) || !truthy(this.onFloor)) {
 				this.carrying.y += this.carryofy_jump;
 			}
 
-			this.carrying.image_xscale = (this.facing + this.facingy) * Math.abs(this.carrying.image_xscale);
+			this.carrying.x_sc = (this.facing + this.facingy) * Math.abs(this.carrying.x_sc);
 		}
 
 		// running animates with move speed
 		if (si.indexOf("_run") >= 0) {
-			this.image_speed = pointDistance(0, 0, this.xspd, this.yspd) / this.runspd;
+			this.spd = pointDistance(0, 0, this.xspd, this.yspd) / this.runspd;
 		} else {
-			this.image_speed = 1;
+			this.spd = 1;
 		}
 
-		this.image_yscale = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
+		this.y_sc = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
 
 		const oldsp = this.drawSprite;
 		this.drawSprite = Sprites.exists(si) ? si : this.skin + "_stand_d";
@@ -257,12 +256,12 @@ class oCharTopd extends oChar {
 
 		if (oldsp !== this.drawSprite) {
 			// restart the animation
-			this.image_index = 0;
+			this.ifr = 0;
 
 			const mos = [];
 			this.instancePlaceList(this.x, this.y, oObject, mos, true);
 
-			this.sprite_index = this.drawSprite;
+			this.spi = this.drawSprite;
 
 			const nmos = [];
 			this.instancePlaceList(this.x, this.y, oObject, nmos, true);
@@ -272,7 +271,7 @@ class oCharTopd extends oChar {
 		}
 	}
 
-	onStep() {
+	update() {
 		if (truthy(this.paused)) return;
 
 		this.step++;
@@ -365,7 +364,7 @@ class oCharTopd extends oChar {
 				this.rx = 0;
 			}
 
-			this.image_speed = truthy(this.climbing) ? this.zspd : 1;
+			this.spd = truthy(this.climbing) ? this.zspd : 1;
 		} else {
 			// climb start: the ladder must be at our drawn height, then height replaces ladder distance
 			this.climbobj = this.instancePlace(this.x, this.y, oClimbableObj);
@@ -688,8 +687,8 @@ class oCharTopd extends oChar {
 			if (!lo.destroyed) lo.inview = null;
 		}
 		this.lookObjs.length = 0;
-		const omi = this.mask_index;
-		this.mask_index = this.look_mask;
+		const omi = this.mask;
+		this.mask = this.look_mask;
 		this.x += 4 * this.facing;
 		this.y += 3 * this.facingy;
 		this.instancePlaceList(this.x, this.y - this.z, oIaObject, this.lookObjs, true);
@@ -698,7 +697,7 @@ class oCharTopd extends oChar {
 		this.instancePlaceList(this.x, this.y - this.z, oIaSolidGr, this.lookObjs, true);
 		this.x -= 4 * this.facing;
 		this.y -= 3 * this.facingy;
-		this.mask_index = omi;
+		this.mask = omi;
 		if (this.lookObjs.length > 0) {
 			this.lookObjs[0].inview = this;
 		}
@@ -707,18 +706,18 @@ class oCharTopd extends oChar {
 	// The look box when debugging, the item in hand behind us when facing up, the aim dots,
 	// the drop spot tinted, the presenting sparkle, our shadow, ourselves lifted by our height,
 	// anything drawn over us, and the item in front when facing any other way.
-	onDraw() {
+	draw() {
 		if (game.drawStats) {
 			Draw.alpha = 0.3;
 			Draw.color = "#ff3300";
-			const omi = this.mask_index;
-			this.mask_index = this.look_mask;
+			const omi = this.mask;
+			this.mask = this.look_mask;
 			this.x += 4 * this.facing;
 			this.y += 3 * this.facingy;
 			Draw.rectangle(this.bbox_left, this.bbox_top - this.z, this.bbox_right, this.bbox_bottom - this.z, 0);
 			this.x -= 4 * this.facing;
 			this.y -= 3 * this.facingy;
-			this.mask_index = omi;
+			this.mask = omi;
 			Draw.alpha = 1;
 		}
 
@@ -744,8 +743,8 @@ class oCharTopd extends oChar {
 		if (truthy(this.drop_request) && this.carrying) {
 			const c = this.carrying;
 			const tcol = (this.lookObjs.length > 0 && truthy(this.lookObjs[0].cangive)) ? "#ff9900" : "#ff3300";
-			Draw.spriteExt(c.sprite_index, c.image_index, this.x + this.drop_offx * this.facing, this.y + this.drop_offy * this.facingy,
-				c.image_xscale, c.image_yscale, c.image_angle, tcol, 0.6);
+			Draw.spriteExt(c.spi, c.ifr, this.x + this.drop_offx * this.facing, this.y + this.drop_offy * this.facingy,
+				c.x_sc, c.y_sc, c.ang, tcol, 0.6);
 		}
 
 		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
@@ -753,16 +752,16 @@ class oCharTopd extends oChar {
 		const xscale = this.facing === 0 ? 1 : this.facing;
 		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
 		if (this.shadowSprite !== null && !truthy(this.swimming) && !this.riding) {
-			Draw.spriteExt(this.shadowSprite, this.image_index, this.x + xoadj, this.y - this.z + this.haf,
-				xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+			Draw.spriteExt(this.shadowSprite, this.ifr, this.x + xoadj, this.y - this.z + this.haf,
+				xscale, this.y_sc, this.ang, this.col, this.alph);
 		}
 		this.y -= this.z;
-		super.onDraw();
+		super.draw();
 		this.y += this.z;
 
 		if (this.over_sprite !== null && this.over_sprite !== undefined) {
-			Draw.spriteExt(this.over_sprite, this.image_index, this.x, this.y - this.z + this.haf,
-				xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+			Draw.spriteExt(this.over_sprite, this.ifr, this.x, this.y - this.z + this.haf,
+				xscale, this.y_sc, this.ang, this.col, this.alph);
 		}
 
 		if (drawCarry && (this.facing !== 0 || this.facingy > 0)) this.drawCarriedAtHeight();
@@ -777,7 +776,8 @@ class oCharTopd extends oChar {
 		this.carrying.y += this.z;
 	}
 
-	onEndStep() {
+	// after every object has updated: the sprite again, in case collisions changed our state
+	afterUpdate() {
 		this.update_sprite();
 	}
 }

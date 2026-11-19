@@ -1,5 +1,5 @@
 // The world: rooms, their layers and layer groups (areas), every object and room picture,
-// turning layers, areas and objects on and off, moving between rooms, and the frame's events.
+// turning layers, areas and objects on and off, moving between rooms, and the order of each frame.
 // A port of the original's player side: the game object's room and layer scripts and its
 // start, room loading and room switching. The global name is the original's, so every
 // object reaches the world the same way the original reached its game object.
@@ -52,75 +52,6 @@ const ETC_LAYER_NAME = "_etc";
 const GUI_LAYER_W = 640;
 const GUI_LAYER_H = 360;
 const ETC_LAYER_SIZE = 10;
-
-// A plain picture placed in a room. It never runs or collides, it only draws, animating as it draws.
-class lp_Sprite {
-	constructor() {
-		this.mylayer = null;
-		this.spi = null;
-		this.sprite_index = null;
-		this.x = 0;
-		this.y = 0;
-		this.image_index = 0;
-		this.mask_index = null;
-		this.image_xscale = 1;
-		this.image_yscale = 1;
-		this.image_angle = 0;
-		this.image_blend = "#ffffff";
-		this.image_alpha = 1;
-		this.image_speed = 1;
-		this.name = "";
-		this.visible = true;
-		this.pvis = true;
-		this.pdis = 0;
-		// frames per second, and how many
-		this.sprite_speed = 1;
-		this.sprite_num = 1;
-		this.tiledx = 0;
-		this.tiledy = 0;
-		this.exoffx = 0;
-		this.exoffy = 0;
-		this.z = 0;
-		this.destroyed = false;
-	}
-
-	set_sprite(spri) {
-		const rec = Sprites.get(spri);
-		this.sprite_speed = rec ? rec.imageSpeed * GAME_FPS : 0;
-		this.sprite_num = rec ? rec.frameCount : 1;
-		this.sprite_xoffset = rec ? rec.ox : 0;
-		this.sprite_yoffset = rec ? rec.oy : 0;
-		this.sprite_width = rec ? rec.w : 0;
-		this.sprite_height = rec ? rec.h : 0;
-		// from the origin to the middle, unscaled
-		this.sprite_cox = this.sprite_width / 2 - this.sprite_xoffset;
-		this.sprite_coy = this.sprite_height / 2 - this.sprite_yoffset;
-		this.mask_index = spri;
-		// tells anyone checking that this is not an object
-		this.object_index = -1;
-		setSpritePlus(this, spri);
-	}
-
-	draw() {
-		const xo = -Draw.curdrawoffx;
-		const yo = -Draw.curdrawoffy;
-		if (truthy(this.tiled)) Draw.layerSpriteTiled(this, xo, yo);
-		else Draw.layerSprite(this, xo, yo);
-		this.image_index = (this.image_index + (this.sprite_speed / GAME_FPS) * this.image_speed) % this.sprite_num;
-	}
-
-	// the middle of the picture, turned and stretched with it
-	sprite_cx() {
-		const dx = this.sprite_cox * this.image_xscale;
-		const dy = this.sprite_coy * this.image_yscale;
-		return Math.floor(this.x + lengthdirX(pointDistance(0, 0, dx, dy), pointDirection(0, 0, dx, dy) + this.image_angle));
-	}
-	sprite_cy() {
-		const dx = this.sprite_cox * this.image_xscale;
-		const dy = this.sprite_coy * this.image_yscale;
-		return Math.floor(this.y + lengthdirY(pointDistance(0, 0, dx, dy), pointDirection(0, 0, dx, dy) + this.image_angle));
-	}
-}
 
 // A layer of a room. A dot in the name puts it in the group, or area, named before the dot.
 class Layer {
@@ -179,7 +110,18 @@ class Room {
 		// the room's object settings file text, when it has one
 		this.objDefsText = null;
 	}
+
+	// A room's own logic. Setup runs once the room is built, with everything in it made and set up.
+	// Update runs every frame of play while it is the current room, before any object updates.
+	// Teardown runs when the room is cleared away, before everything in it is destroyed.
+	// A room named in the room types gets its own class with these filled in, any other does nothing.
+	setup() {}
+	update() {}
+	teardown() {}
 }
+
+// Room classes by room name, for rooms with logic of their own. Each extends the room.
+const ROOM_TYPES = {};
 
 // A named set of objects switched on and off together.
 class lp_Group {
@@ -192,7 +134,7 @@ class lp_Group {
 
 class World {
 	constructor() {
-		// every live object in creation order, which is also the order events run in
+		// every live object in creation order, which is also the order they update in
 		this.instances = [];
 		this.rooms = [];
 		this.roombyname = {};
@@ -202,7 +144,7 @@ class World {
 		this.guy = null;
 		// made before anything in a room, so it runs ahead of them
 		this.controller = new Controller();
-		this.cam = new oCamera(0, 0);
+		this.cam = new oCamera();
 		this.allObjects = Object.create(null);
 		this.obj_groups = Object.create(null);
 		this.cur_areas_inview = [];
@@ -215,7 +157,11 @@ class World {
 		this.goto_room = null;
 		this.frames = 0;
 		this.loading = 0;
-		this.paused = false;
+		// play paused stops every update, drawing paused stops animation, either way the frame still draws
+		this.simPaused = false;
+		this.drawPaused = false;
+		// objects that come along when the player changes rooms, waiting to be placed in the new one
+		this.carryOver = [];
 		this.curuid = 0;
 		this.drawStats = DRAW_STATS_AT_START;
 		this.popupLayer = null;
@@ -265,7 +211,7 @@ class World {
 		this.rooms = [];
 		this.roombyname = {};
 		for (const r of info.rooms) {
-			const rm = new Room(r.name);
+			const rm = new (ROOM_TYPES[r.name] || Room)(r.name);
 			this.rooms.push(rm);
 			this.roombyname[r.name] = this.rooms.length - 1;
 		}
@@ -358,7 +304,8 @@ class World {
 		const cam = this.cam;
 		cam.reset();
 		cam.roomlimit = false;
-		this.paused = false;
+		this.simPaused = false;
+		this.drawPaused = false;
 		cam.fastjump = 1;
 		this.controller.conOff = false;
 
@@ -411,7 +358,8 @@ class World {
 	// bounds the room was saved with, or at the origin when it has none.
 	placeStandInGuy() {
 		const rm = this.curroom;
-		const guy = this.createObject(oCharTopd, 0, 0, "main_char", { skin: "char" });
+		const guy = this.createObject(oCharTopd, { x: 0, y: 0, name: "main_char", skin: "char" });
+		guy.init();
 		this.setCharAsGuy(guy);
 		let layer = null;
 		for (const lyr of rm.layers) {
@@ -433,10 +381,16 @@ class World {
 	// files are fixed data, so they stay loaded instead of being read again.
 	clearWorld() {
 		this.guy = null;
+		// objects are destroyed, so they take what they own with them, pictures are just dropped
+		const remove = (obj) => {
+			if (obj instanceof oBaseObject) obj.destroy();
+			else this.forgetObject(obj);
+		};
 		for (const rm of this.rooms) {
 			if (rm.layers !== null) {
+				rm.teardown();
 				for (const lyr of rm.layers) {
-					for (const obj of lyr.lsprites.slice()) this.destroyObject(obj);
+					for (const obj of lyr.lsprites.slice()) remove(obj);
 				}
 			}
 			rm.layers = null;
@@ -448,8 +402,9 @@ class World {
 			rm.lasty = undefined;
 		}
 		// whatever was left in no layer, such as masks and objects that never run
-		for (const name of Object.keys(this.allObjects)) this.destroyObject(this.allObjects[name]);
+		for (const name of Object.keys(this.allObjects)) remove(this.allObjects[name]);
 		this.instances.length = 0;
+		this.carryOver.length = 0;
 		this.allObjects = Object.create(null);
 		this.obj_groups = Object.create(null);
 		this.object_defs = {};
@@ -523,47 +478,27 @@ class World {
 		}
 	}
 
-	// The engine's plain create: a new object joining the run order, in no layer.
-	instanceCreate(cls, x, y) {
-		const obj = new cls(x, y);
-		this.instances.push(obj);
-		return obj;
-	}
-
-	// Makes an object the way the original's levels do: named, remembering its own visibility
-	// and hidden from the engine, set up from a table and started if one is given, and put in a layer.
-	createObject(cls, x, y, name, initObj, layer, idx) {
+	// The one way objects are made: from a class or an object name and one config, joining the frame
+	// in creation order, and put in a layer when one is given. A name asked for is made unique.
+	// The object's own setup is left to the caller, since rooms run it once everything exists.
+	createObject(cls, cfg, layer, idx) {
 		if (typeof cls === "string") cls = objectType(cls);
-		const obj = this.instanceCreate(cls, x, y);
-		if (name === 0) name = undefined;
-		obj.name = name !== undefined ? this.uniqueName(name) : this.nextUid();
-		obj.spi = null;
-		obj.pvis = obj.visible;
-		obj.visible = false;
-		obj.pdis = 0;
-		obj.exoffx = 0;
-		obj.exoffy = 0;
-		obj.sprite_speed = 1;
-		obj.sprite_num = 1;
-		obj.tiledx = 0;
-		obj.tiledy = 0;
-		if (initObj) {
-			Object.assign(obj, initObj);
-			if (typeof obj.init === "function") obj.init();
-		}
+		const obj = new cls(cfg);
+		if (obj.name !== undefined) obj.name = this.uniqueName(obj.name);
+		this.instances.push(obj);
 		if (layer !== undefined) this.layerInsert(layer, obj, idx);
 		return obj;
 	}
 
-	destroyObject(o) {
+	// Takes an object or a picture out of play for good: out of its layer, its name and the frame.
+	// Objects call this from their destroy, anything else that owns them goes through that.
+	forgetObject(o) {
 		if (!o || o.destroyed) return;
 		if (o.mylayer) this.layerRemove(o.mylayer, o);
 		if (this.allObjects[o.name] === o) delete this.allObjects[o.name];
 		o.destroyed = true;
-		if (o instanceof lp_Sprite) return;
 		const i = this.instances.indexOf(o);
 		if (i >= 0) this.instances.splice(i, 1);
-		if (typeof o.onDestroy === "function") o.onDestroy();
 	}
 
 	// Makes this character the one the player controls and the camera follows.
@@ -595,7 +530,7 @@ class World {
 		obj.mylayer = lyr;
 		if (obj.name === undefined || obj.name === 0) obj.name = this.nextUid();
 		this.allObjects[obj.name] = obj;
-		if (!(obj instanceof lp_Sprite)) obj.deactivated = truthy(lyr.disabled);
+		if (obj instanceof oBaseObject) obj.deactivated = truthy(lyr.disabled);
 	}
 
 	layerRemove(lyr, obj) {
@@ -628,7 +563,7 @@ class World {
 		if (enabled !== undefined) lyr.disabled = truthy(enabled) ? 0 : 1;
 		const on = truthy(this.curroom.enabled) && !truthy(lyr.disabled);
 		for (const spr of lyr.lsprites) {
-			if (spr instanceof lp_Sprite) continue;
+			if (!(spr instanceof oBaseObject)) continue;
 			const oenabled = on && !truthy(spr.pdis);
 			spr.deactivated = !oenabled;
 			if (oenabled && spr.inTrigger !== undefined && !truthy(spr.no_trig_on_reenter)) {
@@ -663,7 +598,7 @@ class World {
 
 	// One object on or off. Off also takes it out of its layer's order, on puts it back on top.
 	setObjEnabled(obj, enabled) {
-		if (!(obj instanceof lp_Sprite)) obj.deactivated = !truthy(enabled);
+		if (obj instanceof oBaseObject) obj.deactivated = !truthy(enabled);
 		const pdis = !truthy(enabled);
 		if (truthy(obj.pdis) !== pdis && obj.mylayer) {
 			if (pdis) this.layerRemove(obj.mylayer, obj);
@@ -785,7 +720,7 @@ class World {
 
 	// Builds a room in the original's order: its areas, every layer and its things, then every
 	// object's own setup, then the layers saved as switched off, then masks, then layers
-	// regrouped by area, then the system layers on top, then the room's own setup.
+	// regrouped by area, then the system layers on top, then the room's own setup block, then its setup.
 	loadRoom(rmi) {
 		const rm = this.rooms[rmi];
 		if (rm.text === null) return;
@@ -861,6 +796,22 @@ class World {
 					spi = "sNoSprite";
 				}
 
+				// The entry as saved is the config, picture or object, under the same names. What it
+				// leaves out takes the default, the colour gets its mark, the speed is made a number
+				// since some files keep it as text, and the spot moves by the draw offset, so the thing
+				// stands at its footprint and its picture draws back where it was placed.
+				// Its setup block goes on top, then any settings kept for its name in the object file.
+				const cfg = { name: oname };
+				for (const k of LP_SAVED_FIELDS) cfg[k] = spri[k] !== undefined ? spri[k] : LP_SPRITE_DEFAULTS[k];
+				cfg.spi = spi;
+				if (spri.col !== undefined) cfg.col = "#" + spri.col;
+				cfg.spd = Number(cfg.spd);
+				cfg.x += cfg.exoffx;
+				cfg.y += cfg.exoffy;
+				if (spri.paths !== undefined) cfg.paths = spri.paths;
+				if (oimap) Object.assign(cfg, oimap);
+				if (this.object_defs[oname] !== undefined) Object.assign(cfg, this.object_defs[oname]);
+
 				let obj;
 				if (cls !== undefined) {
 					if (oimap && oimap.objtype !== undefined) {
@@ -871,44 +822,17 @@ class World {
 					// room or of another type, is taken over instead of a new one being made.
 					if (this.allObjects[oname] !== undefined) {
 						obj = this.allObjects[oname];
+						obj.configure(cfg);
 					} else {
-						obj = this.createObject(cls, spri.x, spri.y, oname);
+						obj = this.createObject(cls, cfg);
 					}
 					if (oimap && oimap.mainchar !== undefined) {
 						this.setCharAsGuy(obj);
 						rm.mainchar = obj;
 					}
 				} else {
-					obj = new lp_Sprite();
-					obj.spi = spi;
+					obj = new lpSprite(cfg);
 				}
-
-				// the same setup for pictures and objects, the offset moves where it is
-				obj.x = spri.x;
-				obj.y = spri.y;
-				obj.exoffx = spri.exoffx !== undefined ? spri.exoffx : 0;
-				obj.exoffy = spri.exoffy !== undefined ? spri.exoffy : 0;
-				obj.x += obj.exoffx;
-				obj.y += obj.exoffy;
-				obj.image_xscale = spri.x_sc !== undefined ? spri.x_sc : 1;
-				obj.image_yscale = spri.y_sc !== undefined ? spri.y_sc : 1;
-				obj.image_angle = spri.ang !== undefined ? spri.ang : 0;
-				obj.image_blend = spri.col !== undefined ? "#" + spri.col : "#ffffff";
-				obj.image_alpha = spri.alph !== undefined ? spri.alph : 1;
-				// some files store the speed as text
-				obj.image_speed = spri.spd !== undefined ? Number(spri.spd) : 1;
-				obj.name = oname;
-				obj.tiledx = spri.tiledx !== undefined ? spri.tiledx : 0;
-				obj.tiledy = spri.tiledy !== undefined ? spri.tiledy : 0;
-				obj.tile_loop = spri.tile_loop !== undefined ? spri.tile_loop : 0;
-
-				obj.set_sprite(spi);
-				// the frame has to come after the sprite
-				obj.image_index = spri.ifr !== undefined ? spri.ifr : 0;
-
-				if (oimap) Object.assign(obj, oimap);
-				// settings kept for this named object in the room's object file come after its own setup
-				if (this.object_defs[oname] !== undefined) Object.assign(obj, this.object_defs[oname]);
 				Hooks.todo("saved object states");
 
 				if (spri.groups !== undefined) {
@@ -922,8 +846,6 @@ class World {
 						return gp;
 					});
 				}
-
-				if (spri.paths !== undefined) obj.paths = spri.paths;
 
 				// area bounds find their area
 				if (obj.constructor === oGroupBounds || obj.constructor === oVisBounds) {
@@ -1035,6 +957,7 @@ class World {
 			const ri = this.parseHandWritten(smap.room_init, rm.name);
 			if (ri) Object.assign(rm, ri);
 		}
+		rm.setup();
 	}
 
 	// Leaves the current room switched off where the player was, and enters another by number or
@@ -1046,6 +969,7 @@ class World {
 			this.curroom.lastlyr = this.guy.mylayer;
 			this.curroom.lastx = this.guy.x;
 			this.curroom.lasty = this.guy.y;
+			this.takeCarryOver();
 			this.roomSetEnabled(this.curroom, 0);
 		}
 		this.cur_areas_inview.length = 0;
@@ -1067,6 +991,32 @@ class World {
 		this.spotOn = false;
 		if (this.curroom.enter_script !== undefined) Hooks.runScript(this.curroom.enter_script, this);
 		this.cam.fastjump = 1;
+	}
+
+	// Lifts everything marked to come along with the player out of the room being left, remembering
+	// each one's offset from the player. The player itself moves rooms by its own rule: the room's
+	// main character, taken over by name, so it is never in this list.
+	takeCarryOver() {
+		for (const lyr of this.curroom.layers) {
+			for (const obj of lyr.lsprites.slice()) {
+				if (!(obj instanceof oBaseObject) || !truthy(obj.persistent) || obj === this.guy) continue;
+				this.layerRemove(lyr, obj);
+				obj.mylayer = null;
+				obj.carryx = obj.x - this.guy.x;
+				obj.carryy = obj.y - this.guy.y;
+				this.carryOver.push(obj);
+			}
+		}
+	}
+
+	// Puts what came along into the player's layer in the new room, at the same offsets from them.
+	placeCarryOver() {
+		for (const obj of this.carryOver) {
+			obj.x = this.guy.x + obj.carryx;
+			obj.y = this.guy.y + obj.carryy;
+			this.layerInsert(this.guy.mylayer, obj);
+		}
+		this.carryOver.length = 0;
 	}
 
 	// A room change asked for during a frame happens at the start of the next.
@@ -1121,6 +1071,7 @@ class World {
 			}
 		}
 
+		this.placeCarryOver();
 		this.findAndGotoAreaAtGuy();
 
 		let gox = guy.x;
@@ -1137,13 +1088,15 @@ class World {
 
 	// ------------------------------------------------------------ the frame
 
-	// One fixed step. Guess at the engine's order within a step: the controller reads input first,
-	// a waiting room change, then begin step, step, animation, and end step with the camera first,
-	// since the original made it before anything in a room.
+	// One fixed step: the controller reads input first, then a waiting room change, then while play
+	// is not paused the room's own update, every object's update, and every after update, then the
+	// camera. Every object updates before any settles in its after update, so an after update sees
+	// where everyone ended up: carried things following their carrier, riders and followers.
+	// The camera goes last so it frames where everything settled. A timer that runs out goes just
+	// before its object's update.
 	step() {
 		Input.pollPad();
-		// the controller has an ordinary step in the original, run ahead of everyone so
-		// characters read this frame's buttons, which assumes it was made first
+		// the controller is read ahead of everyone so characters see this frame's buttons
 		this.controller.poll();
 
 		if (this.goto_room !== null) {
@@ -1157,31 +1110,21 @@ class World {
 
 		Hooks.lines.length = 0;
 
-		// a copy, so objects made or destroyed during the step do not upset the walk
-		const live = this.instances.slice();
-
-		for (const o of live) {
-			if (o.deactivated || o.destroyed || typeof o.onBeginStep !== "function") continue;
-			o.onBeginStep();
+		if (!this.simPaused) {
+			if (this.curroom !== null) this.curroom.update();
+			// a copy, so objects made or destroyed during the step do not upset the walk
+			const live = this.instances.slice();
+			for (const o of live) {
+				if (o.deactivated || o.destroyed) continue;
+				if (o.timers !== null) o.countDownTimers();
+				if (!o.destroyed) o.update();
+			}
+			for (const o of live) {
+				if (o.deactivated || o.destroyed || o.afterUpdate === undefined) continue;
+				o.afterUpdate();
+			}
 		}
-		for (const o of live) {
-			if (o.deactivated || o.destroyed || typeof o.onStep !== "function") continue;
-			o.onStep();
-		}
-		// animation moves on between step and end step, a guess at the engine's timing
-		for (const o of live) {
-			if (o.deactivated || o.destroyed || o.sprite_index === null) continue;
-			const spr = Sprites.get(o.sprite_index);
-			const n = Sprites.frameCount(o.sprite_index);
-			o.image_index += o.image_speed * spr.imageSpeed;
-			if (o.image_index >= n) o.image_index -= n * Math.floor(o.image_index / n);
-			if (o.image_index < 0) o.image_index += n * Math.ceil(-o.image_index / n);
-		}
-		this.cam.onEndStep();
-		for (const o of live) {
-			if (o.deactivated || o.destroyed || typeof o.onEndStep !== "function") continue;
-			o.onEndStep();
-		}
+		this.cam.update();
 
 		Input.endFrame();
 	}

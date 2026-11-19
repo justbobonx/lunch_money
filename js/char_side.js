@@ -10,9 +10,8 @@ const SIDE_CLIMB_SPEED = 0.5;
 const SIDE_SHORT_JUMP_FRAMES = 7;
 
 class oCharSide extends oChar {
-	constructor(x, y) {
-		super(x, y);
-		this.persistent = true;
+	defaults(cfg) {
+		super.defaults(cfg);
 
 		this.skin = "guy";
 		this.skin_hang_wch = "guy_hang_wch";
@@ -94,8 +93,8 @@ class oCharSide extends oChar {
 		this.dead = false;
 
 		// last spot we stood still, for saving and restoring
-		this.lastsx = x;
-		this.lastsy = y;
+		this.lastsx = this.x;
+		this.lastsy = this.y;
 
 		this.lookObjs = [];
 		this.curlooki = -1;
@@ -146,10 +145,10 @@ class oCharSide extends oChar {
 	// or it is a one way floor, or we were already overlapping it.
 	// The last test uses the current mask again, not the standing one, as in the original.
 	checkOkToStand() {
-		const omi = game.guy.mask_index;
-		game.guy.mask_index = "guy_stand";
+		const omi = game.guy.mask;
+		game.guy.mask = "guy_stand";
 		const hobj = game.guy.instancePlace(game.guy.x, game.guy.y, oObject);
-		game.guy.mask_index = omi;
+		game.guy.mask = omi;
 		return hobj === null || truthy(hobj.thruUp) || game.guy.placeMeeting(game.guy.x, game.guy.y, hobj);
 	}
 
@@ -161,13 +160,13 @@ class oCharSide extends oChar {
 	checkSetHanging(iUp) {
 		this.hangingObj = null;
 		if (truthy(this.canHang)) {
-			const omi = this.mask_index;
-			this.mask_index = this.skin_hang_wch;
+			const omi = this.mask;
+			this.mask = this.skin_hang_wch;
 			let hawt = this.instancePlace(this.x + this.facing, this.y, oObject);
 			const hawb = this.instancePlace(this.x + this.facing, this.y + 2, hawt);
 			const hawbt = this.instancePlace(this.x + sign(this.xspd), this.y, oBgObject);
 			const hawbb = this.instancePlace(this.x + sign(this.xspd), this.y + 2, hawbt);
-			this.mask_index = omi;
+			this.mask = omi;
 
 			// already inside it means we are passing through, so no hang
 			if (hawt !== null && this.placeMeeting(this.x, this.y, hawt)) hawt = null;
@@ -260,7 +259,7 @@ class oCharSide extends oChar {
 		if (this.carrying && !truthy(this.dead)) {
 			this.carrying.x = this.x + Math.ceil(this.facing * 2.5) + this.carrying.holdoffx * this.facing;
 			if (si === this.skin + "_run") {
-				this.carrying.y = this.y + this.carryofx_run[Math.floor(this.image_index)];
+				this.carrying.y = this.y + this.carryofx_run[Math.floor(this.ifr)];
 			} else if (si === this.skin + "_crouch") {
 				this.carrying.y = this.y - 1;
 			} else {
@@ -268,14 +267,14 @@ class oCharSide extends oChar {
 			}
 			this.carrying.y += this.carrying.holdoffy;
 
-			this.carrying.image_xscale = this.facing * Math.abs(this.carrying.image_xscale);
+			this.carrying.x_sc = this.facing * Math.abs(this.carrying.x_sc);
 
 			if (!truthy(this.presenting) && this.in_pose === null) {
 				si += "_carry";
 			}
 		}
 
-		this.image_yscale = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
+		this.y_sc = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
 
 		const oldsp = this.drawSprite;
 		this.drawSprite = Sprites.exists(si) ? si : this.skin + "_stand";
@@ -285,7 +284,7 @@ class oCharSide extends oChar {
 			const mos = [];
 			this.instancePlaceList(this.x, this.y, oObject, mos, true);
 
-			this.sprite_index = this.drawSprite;
+			this.spi = this.drawSprite;
 
 			// get pushed out of anything the new mask overlaps that the old one did not
 			const nmos = [];
@@ -296,7 +295,7 @@ class oCharSide extends oChar {
 		}
 	}
 
-	onStep() {
+	update() {
 		if (truthy(this.paused)) return;
 
 		this.step++;
@@ -784,13 +783,13 @@ class oCharSide extends oChar {
 
 		// crawling and sliding tilt to the floor's slope, if there is room
 		if (truthy(this.onFloor) && (truthy(this.crawling) || this.sliding > 0)) {
-			const lasta = this.image_angle;
-			this.image_angle = (360 + this.onFloorObj.image_angle) % 90;
-			this.image_angle = this.image_angle > 45 ? this.image_angle - 90 : this.image_angle;
+			const lasta = this.ang;
+			this.ang = (360 + this.onFloorObj.ang) % 90;
+			this.ang = this.ang > 45 ? this.ang - 90 : this.ang;
 
-			if (ne(lasta, this.image_angle)) {
+			if (ne(lasta, this.ang)) {
 				if (this.instancePlace(this.x, this.y, oObject) !== null) {
-					this.image_angle = lasta;
+					this.ang = lasta;
 					this.crawling = false;
 					// the original stores false here, which reads the same as zero
 					this.sliding = 0;
@@ -799,7 +798,7 @@ class oCharSide extends oChar {
 				}
 			}
 		} else {
-			this.image_angle = 0;
+			this.ang = 0;
 		}
 
 		// cap each axis
@@ -857,12 +856,12 @@ class oCharSide extends oChar {
 		}
 
 		this.lookObjs.length = 0;
-		const omi = this.mask_index;
-		this.mask_index = "guy_stand_ia_bb";
+		const omi = this.mask;
+		this.mask = "guy_stand_ia_bb";
 		this.instancePlaceList(this.x, this.y, oIaObject, this.lookObjs, true);
 		this.instancePlaceList(this.x, this.y, oIaBgObject, this.lookObjs, true);
 		this.instancePlaceList(this.x, this.y, oActor, this.lookObjs, true);
-		this.mask_index = omi;
+		this.mask = omi;
 
 		this.curlooki = 0;
 		for (; this.curlooki < this.lookObjs.length; this.curlooki++) {
@@ -878,14 +877,14 @@ class oCharSide extends oChar {
 
 	// The held item's drop spot shown faint red while dropping, the presenting sparkle,
 	// ourselves, the item in hand, and the aim dots.
-	onDraw() {
+	draw() {
 		if (truthy(this.drop_request) && this.carrying) {
 			const c = this.carrying;
-			Draw.spriteExt(c.sprite_index, c.image_index, this.x + this.drop_offx * this.facing, this.y + this.drop_offy,
-				c.image_xscale, c.image_yscale, c.image_angle, "#ff2222", 0.5);
+			Draw.spriteExt(c.spi, c.ifr, this.x + this.drop_offx * this.facing, this.y + this.drop_offy,
+				c.x_sc, c.y_sc, c.ang, "#ff2222", 0.5);
 		}
 		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
-		super.onDraw();
+		super.draw();
 		if (this.carrying && !truthy(this.presenting)) this.carrying.draw();
 		if (truthy(this.aiming)) {
 			const cx = this.sprite_cx();
@@ -901,8 +900,8 @@ class oCharSide extends oChar {
 		if (this.inv.in_inv_sel) this.inv.qp_draw();
 	}
 
-	// end of frame: the sprite again, in case collisions changed our state
-	onEndStep() {
+	// after every object has updated: the sprite again, in case collisions changed our state
+	afterUpdate() {
 		this.update_sprite();
 	}
 }

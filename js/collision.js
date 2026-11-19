@@ -12,27 +12,27 @@ function maskShape(o, x, y) {
 	// shapes at an object's own spot are asked for constantly, so the last one is kept
 	// until anything that changes it does
 	const c = o.shapeCache;
-	if (c && c.x === x && c.y === y && x === o.x && y === o.y && c.mask === o.mask_index && c.sprite === o.sprite_index
-		&& c.sx === o.image_xscale && c.sy === o.image_yscale && c.ang === o.image_angle) {
+	if (c && c.x === x && c.y === y && x === o.x && y === o.y && c.mask === o.mask && c.sprite === o.spi
+		&& c.sx === o.x_sc && c.sy === o.y_sc && c.ang === o.ang) {
 		return c.shape;
 	}
 	const shape = computeMaskShape(o, x, y);
 	if (x === o.x && y === o.y) {
-		o.shapeCache = { x: x, y: y, mask: o.mask_index, sprite: o.sprite_index,
-			sx: o.image_xscale, sy: o.image_yscale, ang: o.image_angle, shape: shape };
+		o.shapeCache = { x: x, y: y, mask: o.mask, sprite: o.spi,
+			sx: o.x_sc, sy: o.y_sc, ang: o.ang, shape: shape };
 	}
 	return shape;
 }
 
 function computeMaskShape(o, x, y) {
-	const name = (o.mask_index !== null && o.mask_index !== undefined) ? o.mask_index : o.sprite_index;
+	const name = (o.mask !== null && o.mask !== undefined) ? o.mask : o.spi;
 	if (name === null || name === undefined) return null;
 	const spr = Sprites.get(name);
 	if (!spr || !spr.mask) return null;
 	const m = spr.mask;
-	const sx = o.image_xscale;
-	const sy = o.image_yscale;
-	const ang = o.image_angle % 360;
+	const sx = o.x_sc;
+	const sy = o.y_sc;
+	const ang = o.ang % 360;
 
 	if (m.kind === "circle") {
 		const r = m.r * Math.abs(sx);

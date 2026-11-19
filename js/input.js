@@ -98,7 +98,6 @@ const Input = {
 // One player's controls, worked out once per frame before anyone reads them.
 class Controller {
 	constructor() {
-		this.persistent = true;
 		this.conOff = 0;
 		this.gpnum = 0;
 
