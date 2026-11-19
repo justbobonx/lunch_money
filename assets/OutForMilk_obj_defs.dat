@@ -1,0 +1,110 @@
+{
+	"mom":{
+		"bored_range": [120,240],
+		"wander_area":1,
+		"holding": ["oWateringCan"],
+		"start_path": "to_gardens",
+		"idleacts": [
+			[ ["and", [
+					["objDist", "oGarden", "lsth", 5 ],
+					["timeSince", "last_watering", "grth", 300 ],
+					0.2 ]
+				],
+			[
+				[ "face", "oGarden", 1 ],
+				[ "use", "carrying", 1 ],
+				[ "wait", [ 120, 240 ] ],
+				[ "use", "carrying", 0 ],
+				[ "set_last", "last_watering" ]
+			] ]
+		],
+		"interacts": [
+			[ "look", 0.01, [
+				[ "sayWfB", "Watch! i can become invisible." ],
+				[ ".setActive", "mom", 0 ],
+				[ "wait", 60 ],
+				[ "sayWfB", "boo!" ],
+				[ "wait", 120 ],
+				[ "sayNB", "i'm back" ],
+			] ],
+			[ "look", ["rando", 9, 10], [
+				[ "conOff" ],
+				[ "saveCurLoc" ],
+				[ "walkTo", 339,54 ],
+				[ "wait", 30 ],
+				[ "sayWfB", "I love to garden." ],
+				[ "walkTo", "saveLoc" ],
+				[ "sayWfB", "Have a flower." ],
+				[ "giveNew", "oFlower", "main", 1],
+				[ "wait",120],
+				[ "conOn" ]
+			] ],
+			[ "look", ["rando", 5, 10], [ "say", "Hi Tem, Nice day." ] ],
+			[ "look", 1, 
+				[ "sayWfB", ["Hello Tem.","Got my milk?"],"actor", 0, -30, [
+						["Yes", ["say","saweeet!","actor"] ],
+						["No", ["say", ["whatevs","don't take forever"], "actor"]  ]
+					]
+				]
+			]
+		]	
+	},
+	"carni_pp":{
+		"interacts": [
+			[ "look", 0.1, ["say","I need a drink"] ],
+			[ "look", 1, [
+				[ "sayWfB", ["Good day sir, \nwould you like to play a game?"],"actor", 0, 0,
+					[						
+						[ "Yes", [ "sayWfB", ["Excellent, which one?"],"actor", 0, 0,
+							[
+								[ "Golf", [ "say", "golf it is!  Grab a putter" ] ],
+								[ "Darts", [ "sayWfB", "Step up to the booth","actor", 0, 0 ] ],
+								[ "Splacko", [ "sayWfB", "What's that now?","actor", 0, 0 ] ]
+					      ] ]
+						],
+						[ "No", ["say","too bad"] ],
+						[ "Chat", [ ["randomOne", [
+								["sayWfB","not too hot today"],
+								["sayWfB","a bit chilly today"],
+								["sayWfB","fine day today"]
+							] ],
+							["say","I could use a drink"] ]
+						]
+					],
+					[ "goto", "0" ]
+				]
+			] ]
+		]		
+	},
+	"billy":{
+		"interacts": [
+			[ "look", 1,  [
+				[".>","restart"],
+				["sayWfB","i like doggies"],				
+				[ "randomOne", [
+					["sayWfB","and kitties"],
+					["if", 0.5, 
+						["sayWfB","and birdies"],
+						["sayWfB","and tweeties"] ],
+					["sayWfB","but not froggies"]
+				] ],
+				["choose",
+					[ 0.5, ["sayWfB","um..."] ],
+					[ 1, [ ["sayWfB","uh..."], ["goto","restart"] ] ]
+				],
+				[".loop", 3, ["sayWfB","er"] ],
+				[".loop", 2, [
+					["sayWfB","er"],
+					["loop", 2, ["sayWfB","oh"] ] ]
+				],
+				[ "sayWfB", ["Do you have any candy?"],"actor", 0, 0, [
+					[ "Yes", [ "say", "Gimme, gimmie!!" ] ],
+					[ "No", [ [ "say", "Waaaaaaaaaa" ], ["wait", 90], ["goto","restart"] ] ]
+				] ],
+				[".goto","restart"],
+				["wait", 120],
+				["sayNB","butthead"],
+			] ]
+		]
+	}
+}

@@ -6,10 +6,27 @@
 // Switching something off is the engine's deactivation: it stops running and colliding,
 // and the layer drawing leaves out whole switched off layers.
 
-// The world file lists the rooms. Without one, the test room is the whole world.
+// The world file lists the rooms. Without one the generated room list stands in for it,
+// and without that the test room is the whole world.
 const WORLD_FILE = "assets/world.dat";
 const ROOM_DIR = "assets/";
 const DEFAULT_WORLD = { rooms: [{ name: "TestDev" }], startroomi: 0 };
+
+// The page cannot list a folder, so a generated list says which room files and which optional
+// world files exist. Another generated list gives every original object's parent.
+const ROOM_LIST_FILE = "assets/rooms.json";
+const OBJECT_TREE_FILE = "assets/object_tree.json";
+
+// The original's name for the world, which names its script and goal files.
+// The goal file keeps the original's spelling.
+const WORLD_NAME = "world";
+const WORLD_SCRIPTS_FILE = ROOM_DIR + WORLD_NAME + "_scripts.dat";
+const WORLD_GOALS_FILE = ROOM_DIR + WORLD_NAME + "_golas.dat";
+const ROOM_OBJECT_DEFS_SUFFIX = "_obj_defs.dat";
+
+// The room play starts in. It overrides the world file's own start room, which is kept as the
+// fallback for a world that has no room of this name.
+const START_ROOM_NAME = "TestDev";
 
 // Names made up for objects count on from the world's last saved number, bumped well clear
 // so things made during play never meet names designed into future levels.
@@ -159,6 +176,8 @@ class Room {
 		this.last_layer_st = null;
 		// the room file's text, read before play so switching rooms needs no waiting
 		this.text = null;
+		// the room's object settings file text, when it has one
+		this.objDefsText = null;
 	}
 }
 
@@ -187,6 +206,12 @@ class World {
 		this.allObjects = Object.create(null);
 		this.obj_groups = Object.create(null);
 		this.cur_areas_inview = [];
+		// scripts from the world's script file, by name
+		this.script_defs = {};
+		// settings for named objects, gathered from each room's object file as rooms are built
+		this.object_defs = {};
+		// the world's goal list, for the goal keeper that comes with a later stage
+		this.goals = [];
 		this.goto_room = null;
 		this.frames = 0;
 		this.loading = 0;
@@ -208,14 +233,33 @@ class World {
 
 	// ------------------------------------------------------------ files
 
-	// Reads the world file, or makes the one room world, then every room's file.
-	// Gives back all the text so the sprites the rooms place can be loaded first.
-	async loadFiles(readText) {
-		let info = DEFAULT_WORLD;
-		try {
-			info = JSON.parse(await readText(WORLD_FILE));
-		} catch (e) {
+	// Reads the world: its room list, the object parents, the world's script and goal files, then
+	// every room's file and object settings, so switching rooms needs no waiting. The generated
+	// room list tells which optional files exist so the page does not ask for ones that are not there.
+	// Gives back the text of the room play starts in so the sprites it places can be loaded first,
+	// every other room's sprites load when it is entered.
+	async loadFiles(readText, startName) {
+		const tryRead = async (path) => {
+			try {
+				return await readText(path);
+			} catch (e) {
+				return null;
+			}
+		};
+
+		const listText = await tryRead(ROOM_LIST_FILE);
+		const list = listText !== null ? JSON.parse(listText) : null;
+
+		const worldText = await tryRead(WORLD_FILE);
+		let info;
+		if (worldText !== null) {
+			info = JSON.parse(worldText);
+		} else if (list !== null) {
+			console.log("no world file, using the room list");
+			info = { rooms: list.rooms.map((r) => ({ name: r.name })), startroomi: 0 };
+		} else {
 			console.log("no world file, playing " + DEFAULT_WORLD.rooms[0].name + " alone");
+			info = DEFAULT_WORLD;
 		}
 		this.worldInfo = info;
 		this.rooms = [];
@@ -225,14 +269,54 @@ class World {
 			this.rooms.push(rm);
 			this.roombyname[r.name] = this.rooms.length - 1;
 		}
+
+		const treeText = await tryRead(OBJECT_TREE_FILE);
+		if (treeText !== null) {
+			standins.load(JSON.parse(treeText));
+		} else {
+			console.log("no object parent list, objects without a class are plain pictures");
+			standins.load(null);
+		}
+
+		// optional files are only asked for when the list says they exist, or when there is no list
+		const listed = (flag) => list === null || list[flag];
+		this.script_defs = {};
+		this.goals = [];
+		const scriptText = listed("world_scripts") ? await tryRead(WORLD_SCRIPTS_FILE) : null;
+		if (scriptText !== null) {
+			const defs = this.parseHandWritten(scriptText, WORLD_SCRIPTS_FILE);
+			if (defs) this.script_defs = defs;
+		}
+		const goalText = listed("world_goals") ? await tryRead(WORLD_GOALS_FILE) : null;
+		if (goalText !== null) {
+			const g = this.parseHandWritten(goalText, WORLD_GOALS_FILE);
+			if (g && Array.isArray(g.goals)) this.goals = g.goals;
+		}
+		this.object_defs = {};
+
 		await Promise.all(this.rooms.map(async (rm) => {
-			try {
-				rm.text = await readText(ROOM_DIR + "room_" + rm.name + ".dat");
-			} catch (e) {
-				console.log("room file missing: " + rm.name);
-			}
+			rm.text = await tryRead(ROOM_DIR + "room_" + rm.name + ".dat");
+			if (rm.text === null) console.log("room file missing: " + rm.name);
+			const entry = list !== null ? list.rooms.find((r) => r.name === rm.name) : null;
+			rm.objDefsText = (entry === null || entry.obj_defs) ? await tryRead(ROOM_DIR + rm.name + ROOM_OBJECT_DEFS_SUFFIX) : null;
 		}));
-		return this.rooms.map((rm) => rm.text || "").join("\n");
+
+		const start = this.rooms[this.findRoomIndex(startName !== undefined ? startName : START_ROOM_NAME)];
+		return start && start.text ? start.text : "";
+	}
+
+	// Every sprite name a room's file places, for loading before the room is entered.
+	roomSpriteNames(rmi) {
+		const rm = this.rooms[rmi];
+		return rm && rm.text ? spriteNamesInRoom(rm.text) : [];
+	}
+
+	// A room by number, by exact name, or failing that by name in any letter case.
+	findRoomIndex(which) {
+		if (typeof which === "number") return which >= 0 && which < this.rooms.length ? which : -1;
+		if (this.roombyname[which] !== undefined) return this.roombyname[which];
+		const lower = String(which).toLowerCase();
+		return this.rooms.findIndex((rm) => rm.name.toLowerCase() === lower);
 	}
 
 	// The room file is JSON except for setup blocks, kept as text and read on their own.
@@ -241,9 +325,10 @@ class World {
 		return JSON.parse(text.replace(/»([\s\S]*?)«/g, (m, body) => JSON.stringify(body)));
 	}
 
-	// Setup blocks are hand written. When strict reading fails, trailing commas and numbers
-	// with a bare leading or trailing dot are fixed outside of strings, then it is tried again.
-	parseObjinit(body, name) {
+	// Setup blocks and the world's script files are hand written. When strict reading fails,
+	// trailing commas and numbers with a bare leading or trailing dot are fixed outside of
+	// strings, then it is tried again. A file that still cannot be read is left out.
+	parseHandWritten(body, name) {
 		try {
 			return JSON.parse(body);
 		} catch (e) {
@@ -257,7 +342,7 @@ class World {
 			try {
 				return JSON.parse(fixed);
 			} catch (e2) {
-				console.log("could not read the setup of " + name + ", it is left out");
+				console.log("could not read " + name + ", it is left out");
 				return null;
 			}
 		}
@@ -265,9 +350,10 @@ class World {
 
 	// ------------------------------------------------------------ start
 
-	// The player start: camera reset with room limits off, the world's start room entered,
-	// a top down stand in made if the room has no player, the player moved into whatever area
-	// they start in, top down players lifted onto what they stand on, and the camera on them.
+	// The player start: camera reset with room limits off, the start room entered, a top down
+	// stand in made if the room has no player, then the player settled into the room.
+	// The start room is given by number or name. With none given it is the set start room,
+	// and when the world has no room of that name, the world file's own.
 	start(startrmi) {
 		const cam = this.cam;
 		cam.reset();
@@ -278,38 +364,126 @@ class World {
 
 		this.loading = 1;
 		const info = this.worldInfo || DEFAULT_WORLD;
-		if (startrmi === undefined) startrmi = info.startroomi !== undefined ? info.startroomi : 0;
 		this.curuid = (info.curuid !== undefined ? hexToDec(info.curuid) : 0) + UID_PLAY_BUMP;
-		this.switchRoom(startrmi);
+		let rmi = this.findRoomIndex(startrmi !== undefined ? startrmi : START_ROOM_NAME);
+		if (rmi < 0 || this.rooms[rmi].text === null) {
+			const fallback = info.startroomi !== undefined ? info.startroomi : 0;
+			console.log("start room not available, using room " + fallback);
+			rmi = fallback;
+		}
+		this.switchRoom(rmi);
 		this.loading = 0;
 		if (this.curroom === null || this.curroom.layers === null) return;
 
-		if (this.guy === null) {
-			const guy = this.createObject(oCharTopd, 0, 0, "main_char", { skin: "char" });
-			const layers = this.curroom.layers;
-			this.layerInsert(layers[layers.length - 1], guy);
-			this.setCharAsGuy(guy);
-			this.curroom.mainchar = guy;
-		}
+		if (this.guy === null) this.placeStandInGuy();
 		Hooks.todo("loading the player's saved state and inventory");
 
+		this.settleGuy();
+		this.frames = 0;
+		// Kept from the original: areas brought into view while starting are forgotten here.
+		this.cur_areas_inview.length = 0;
+		this.last_cp = { x: this.guy.x, y: this.guy.y };
+	}
+
+	// What follows entering a room with the player in it: the camera takes the room's size, the
+	// player moves into whatever area they stand in, top down players are lifted onto what they
+	// stand on, and the camera jumps to them.
+	settleGuy() {
+		const cam = this.cam;
+		const guy = this.guy;
 		// the original takes the size from the room the editor had open, the start room
 		cam.curw = this.curroom.wd;
 		cam.curh = this.curroom.wd * 9 / 16;
 
 		this.findAndGotoAreaAtGuy();
 
-		const guy = this.guy;
 		if (truthy(guy.ch_topd)) {
 			guy.calcOnFloorAtWallTopd();
 			if (guy.onFloorObj !== null && guy.onFloorObj.ht < BIGGEST_INT) guy.z = guy.onFloorObj.ht;
 		}
-
 		cam.setTo(guy.x, guy.y);
-		this.frames = 0;
-		// Kept from the original: areas brought into view while starting are forgotten here.
+	}
+
+	// Gives a room with no player of its own one, as the original's start does: a plain top down
+	// character named as the main one.
+	// The original puts it at the origin in the overlay layer, which only suits the editor.
+	// Guess: here it goes in the topmost room layer that is on, at the middle of the camera
+	// bounds the room was saved with, or at the origin when it has none.
+	placeStandInGuy() {
+		const rm = this.curroom;
+		const guy = this.createObject(oCharTopd, 0, 0, "main_char", { skin: "char" });
+		this.setCharAsGuy(guy);
+		let layer = null;
+		for (const lyr of rm.layers) {
+			if (lyr.name.charAt(0) === "_") continue;
+			if (layer === null || !truthy(lyr.disabled)) layer = lyr;
+		}
+		if (layer === null) layer = rm.layers[rm.layers.length - 1];
+		this.layerInsert(layer, guy);
+		const hasBounds = rm.camx !== undefined && rm.camw !== undefined;
+		guy.x = hasBounds ? Math.floor(rm.camx + rm.camw / 2) : 0;
+		guy.y = hasBounds ? Math.floor(rm.camy + rm.camh / 2) : 0;
+		rm.mainchar = guy;
+	}
+
+	// A port of the original's world clearing, which it runs when play ends: every room's layers
+	// and everything in them destroyed, the shared system layers dropped, the lists of names,
+	// groups and object settings emptied, and the player forgotten. The rooms themselves stay
+	// listed with their files so any of them can be built again. The world's script and goal
+	// files are fixed data, so they stay loaded instead of being read again.
+	clearWorld() {
+		this.guy = null;
+		for (const rm of this.rooms) {
+			if (rm.layers !== null) {
+				for (const lyr of rm.layers) {
+					for (const obj of lyr.lsprites.slice()) this.destroyObject(obj);
+				}
+			}
+			rm.layers = null;
+			rm.mainchar = null;
+			rm.enabled = 1;
+			rm.last_layer_st = null;
+			rm.lastlyr = undefined;
+			rm.lastx = undefined;
+			rm.lasty = undefined;
+		}
+		// whatever was left in no layer, such as masks and objects that never run
+		for (const name of Object.keys(this.allObjects)) this.destroyObject(this.allObjects[name]);
+		this.instances.length = 0;
+		this.allObjects = Object.create(null);
+		this.obj_groups = Object.create(null);
+		this.object_defs = {};
 		this.cur_areas_inview.length = 0;
-		this.last_cp = { x: guy.x, y: guy.y };
+		this.popupLayer = null;
+		this.popupHdLayer = null;
+		this.guiLayer = null;
+		this.etcLayer = null;
+		this.curroom = null;
+		this.curroomi = -1;
+		this.goto_room = null;
+		this.spotOn = false;
+		this.last_cp = null;
+		this.weather.on = false;
+	}
+
+	// Plays from a room the way the editor's play button does: the world cleared, then the
+	// start run again with this room as the start room. The player comes from the room's own
+	// setup, or is made as a stand in if it has none. Starting fresh matters: a player kept from
+	// another room would be of the wrong kind, since players share a name across rooms.
+	// Gives back false when the room has no file, leaving everything as it was.
+	enterRoom(which) {
+		const rmi = this.findRoomIndex(which);
+		if (rmi < 0 || this.rooms[rmi].text === null) return false;
+		this.clearWorld();
+		this.start(rmi);
+		return this.curroom !== null && this.curroom.layers !== null;
+	}
+
+	// Reads a room's object settings file, which adds to the settings of earlier rooms.
+	loadObjectDefs(rm) {
+		if (rm.objDefsText === null || rm.objDefsText === undefined) return;
+		const defs = this.parseHandWritten(rm.objDefsText, rm.name + ROOM_OBJECT_DEFS_SUFFIX);
+		if (defs) Object.assign(this.object_defs, defs);
 	}
 
 	// ------------------------------------------------------------ names and objects
@@ -359,7 +533,7 @@ class World {
 	// Makes an object the way the original's levels do: named, remembering its own visibility
 	// and hidden from the engine, set up from a table and started if one is given, and put in a layer.
 	createObject(cls, x, y, name, initObj, layer, idx) {
-		if (typeof cls === "string") cls = OBJECT_TYPES[cls];
+		if (typeof cls === "string") cls = objectType(cls);
 		const obj = this.instanceCreate(cls, x, y);
 		if (name === 0) name = undefined;
 		obj.name = name !== undefined ? this.uniqueName(name) : this.nextUid();
@@ -616,7 +790,7 @@ class World {
 		const rm = this.rooms[rmi];
 		if (rm.text === null) return;
 		const smap = this.parseRoom(rm.text);
-		Hooks.todo("object definitions from the world's object file");
+		this.loadObjectDefs(rm);
 
 		const layers = [];
 		rm.layers = layers;
@@ -649,7 +823,7 @@ class World {
 			grp.sp_fnum = rec ? rec.frameCount : -1;
 			grp.sp_spd = rec ? rec.imageSpeed : 0;
 			if (typeof grp.grp_init === "string") {
-				const gi = this.parseObjinit(grp.grp_init, key);
+				const gi = this.parseHandWritten(grp.grp_init, key);
 				if (gi) Object.assign(grp, gi);
 				grp.grp_init = undefined;
 			}
@@ -677,10 +851,10 @@ class World {
 			}
 
 			for (const spri of laymap.spriteList) {
-				const oimap = spri.objinit !== undefined ? this.parseObjinit(spri.objinit, spri.name) : null;
+				const oimap = spri.objinit !== undefined ? this.parseHandWritten(spri.objinit, spri.name) : null;
 				const oname = spri.name;
 
-				let cls = spri.isobj !== undefined ? OBJECT_TYPES[spri.isobj] : undefined;
+				let cls = spri.isobj !== undefined ? objectType(spri.isobj) : undefined;
 				let spi = Sprites.exists(spri.spi) ? spri.spi : "sNoSprite";
 				if (spri.isobj !== undefined && cls === undefined) {
 					console.log("unknown object type " + spri.isobj + ", placed as a plain picture");
@@ -690,7 +864,7 @@ class World {
 				let obj;
 				if (cls !== undefined) {
 					if (oimap && oimap.objtype !== undefined) {
-						if (OBJECT_TYPES[oimap.objtype] !== undefined) cls = OBJECT_TYPES[oimap.objtype];
+						if (objectType(oimap.objtype) !== undefined) cls = objectType(oimap.objtype);
 						else console.log("unknown replacement object type " + oimap.objtype);
 					}
 					// Kept from the original: an object of this name that already exists, from another
@@ -733,6 +907,8 @@ class World {
 				obj.image_index = spri.ifr !== undefined ? spri.ifr : 0;
 
 				if (oimap) Object.assign(obj, oimap);
+				// settings kept for this named object in the room's object file come after its own setup
+				if (this.object_defs[oname] !== undefined) Object.assign(obj, this.object_defs[oname]);
 				Hooks.todo("saved object states");
 
 				if (spri.groups !== undefined) {
@@ -856,7 +1032,7 @@ class World {
 		}
 
 		if (typeof smap.room_init === "string") {
-			const ri = this.parseObjinit(smap.room_init, rm.name);
+			const ri = this.parseHandWritten(smap.room_init, rm.name);
 			if (ri) Object.assign(rm, ri);
 		}
 	}

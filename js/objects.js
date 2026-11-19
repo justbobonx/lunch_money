@@ -1391,6 +1391,46 @@ class oChar extends oActor {
 	}
 }
 
+// ---------------------------------------------------------------- stand ins for what is not ported
+
+// Rooms place many objects that have no class here yet. Each still gets a class of its own
+// name, built from the original's list of parents on top of the nearest ported one, so it keeps
+// the parent's collision and drawing and shows as an outlined, labeled stand in.
+// The list of parents is a generated file read with the world.
+const STANDIN_MAX_DEPTH = 40;
+
+class Standins {
+	constructor() {
+		this.parents = {};
+		this.made = {};
+	}
+
+	load(info) {
+		this.parents = info && info.parents ? info.parents : {};
+		this.made = {};
+	}
+
+	// the class for an original object name, or nothing when the name is not an original object
+	classFor(name, depth) {
+		if (this.made[name] !== undefined) return this.made[name];
+		if (!Object.prototype.hasOwnProperty.call(this.parents, name)) return undefined;
+		depth = depth === undefined ? 0 : depth;
+		const parentName = this.parents[name];
+		let base = oBaseObject;
+		if (parentName && depth < STANDIN_MAX_DEPTH) {
+			base = OBJECT_TYPES[parentName] || this.classFor(parentName, depth + 1) || oBaseObject;
+		}
+		// the key names the class, so labels and logs show the original's name
+		const cls = ({ [name]: class extends base {} })[name];
+		cls.ported = false;
+		cls.standin = true;
+		this.made[name] = cls;
+		return cls;
+	}
+}
+
+const standins = new Standins();
+
 // ---------------------------------------------------------------- lookup by name
 
 // Room files name their objects, this maps the names to classes.
@@ -1407,3 +1447,8 @@ const OBJECT_TYPES = {
 	oGroupBounds, oVisBounds, oLayerMask, oLyrDoor,
 	oText, oStarField, oGuyPlacer, oActor, oDoggie, oNpcChar, oChar
 };
+
+// The class for an object name a room file uses: a ported one, else a stand in, else nothing.
+function objectType(name) {
+	return OBJECT_TYPES[name] || standins.classFor(name);
+}

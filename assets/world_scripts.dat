@@ -1,0 +1,37 @@
+{
+	"sparkle":[
+		["say","sparkle!","actor",0,-40],
+		["wait",60],
+		["say","sparkle!!","actor",0,-40],
+		["wait",60],
+		["say","sparkle!!!","actor",0,-40],
+		["wait",60]
+	],
+	"cnj_load":[
+		[ "lockCamTo", 160, 90, 0 ],
+		[ "updateCam" ]
+	],
+	"cnj_br_say_hi":[
+		[ "if", [ "instStateIs", "cnj_backroom_gobby", "saidhi", "equ", 0  ], 
+			[
+				[ "setInstState",  "cnj_backroom_gobby", "saidhi", 1 ],
+				[ "sayWfB",  [
+					"Oh, hello.",
+					"I don't think you're supposed\nto be back here.",	
+					"Eh, I guess it doesn't really matter.",
+					"You look really bored.",
+					"Go try the other side.",
+					"You just have to duck down.",
+					". . . How?\nIt's easy, just press down.",
+				], "cnj_backroom_gobby", 0, -34 ],
+			],
+			[ 
+				[ "sayWfB",  [
+					"Nice day though.",				
+				], "cnj_backroom_gobby", 0, -34 ]
+			]
+		],
+		[ "adjInstVar", "main_char","canCrawl", true ],
+	]
+}
+	

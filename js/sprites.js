@@ -100,7 +100,13 @@ const Sprites = {
 				if (SPRITE_PRELOAD_PREFIXES.some((p) => name.startsWith(p))) eager.add(name);
 			}
 		}
-		await Promise.all([...eager].map((name) => this.fetchLoose(name)));
+		await this.ensure([...eager]);
+	},
+
+	// Waits until the named sprites that are still loose have their pictures,
+	// so a room about to be entered does not flash empty while they arrive.
+	ensure(names) {
+		return Promise.all(names.map((name) => this.fetchLoose(name)));
 	},
 
 	// a record made from index facts, with frames laid out as in the loose strip

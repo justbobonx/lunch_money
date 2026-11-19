@@ -37,10 +37,22 @@ const Hooks = {
 	say(who, text) {
 		this.todo("speech bubbles");
 	},
+	// A script given by name is looked up in the world's script file. Running them is a later stage.
 	runScript(script, who, skippable, skipScript) {
+		if (typeof script === "string" && game.script_defs[script] === undefined) {
+			this.todo("script not in the world's script file: " + script);
+			return;
+		}
 		this.todo("scripts");
 	}
 };
+
+// The room to start in comes from the page address, as a room parameter, when one is given.
+function startRoomFromAddress() {
+	if (typeof location === "undefined") return undefined;
+	const m = /[?&]room=([^&]*)/.exec(location.search || "");
+	return m ? decodeURIComponent(m[1]) : undefined;
+}
 
 const Shell = {
 	lastTime: 0,
@@ -50,6 +62,7 @@ const Shell = {
 		const ctx = canvas.getContext("2d");
 		Draw.attach(ctx);
 		Input.attach(window);
+		roomPicker.attach(canvas);
 
 		const readText = (path) => fetch(path).then((r) => {
 			if (!r.ok) throw new Error(path + " " + r.status);
@@ -63,10 +76,11 @@ const Shell = {
 			img.src = path;
 		});
 
-		const roomText = await game.loadFiles(readText);
+		const startName = startRoomFromAddress();
+		const roomText = await game.loadFiles(readText, startName);
 		await Sprites.load(readJson, loadImage, spriteNamesInRoom(roomText));
 		await Draw.loadFonts(readJson, loadImage);
-		game.start();
+		game.start(startName);
 
 		const stepMs = 1000 / GAME_FPS;
 		const tick = (now) => {
@@ -75,8 +89,10 @@ const Shell = {
 			this.lastTime = now;
 			let steps = 0;
 			while (this.acc >= stepMs && steps < MAX_CATCHUP_STEPS) {
-				game.step();
+				// the room picker pauses the game while it is up
+				if (roomPicker.update()) game.step();
 				game.draw();
+				roomPicker.draw();
 				this.acc -= stepMs;
 				steps++;
 			}
