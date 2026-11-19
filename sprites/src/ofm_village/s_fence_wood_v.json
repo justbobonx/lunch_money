@@ -1,0 +1,16 @@
+{
+ "w": 4,
+ "h": 8,
+ "frames": 1,
+ "ox": 0,
+ "oy": 7,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 3,
+  "x": 0,
+  "y": -2
+ },
+ "image_speed": 0.5,
+ "group": "ofm_village"
+}

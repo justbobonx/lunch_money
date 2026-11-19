@@ -1,0 +1,166 @@
+{
+ "sheets": [
+  {
+   "file": "ar_climb.json",
+   "group": "ar_climb",
+   "sprites": 30,
+   "size": [
+    869,
+    42
+   ]
+  },
+  {
+   "file": "backgrounds.json",
+   "group": "backgrounds",
+   "sprites": 25,
+   "size": [
+    1181,
+    264
+   ]
+  },
+  {
+   "file": "base.json",
+   "group": "base",
+   "sprites": 2,
+   "size": [
+    14,
+    9
+   ]
+  },
+  {
+   "file": "doggie.json",
+   "group": "doggie",
+   "sprites": 4,
+   "size": [
+    120,
+    50
+   ]
+  },
+  {
+   "file": "etc.json",
+   "group": "etc",
+   "sprites": 77,
+   "size": [
+    2040,
+    409
+   ]
+  },
+  {
+   "file": "floors.json",
+   "group": "floors",
+   "sprites": 5,
+   "size": [
+    92,
+    32
+   ]
+  },
+  {
+   "file": "guy.json",
+   "group": "guy",
+   "sprites": 46,
+   "size": [
+    1727,
+    16
+   ]
+  },
+  {
+   "file": "jumpguyarcade.json",
+   "group": "jumpguyarcade",
+   "sprites": 45,
+   "size": [
+    2043,
+    405
+   ]
+  },
+  {
+   "file": "masks.json",
+   "group": "masks",
+   "sprites": 3,
+   "size": [
+    6,
+    2
+   ]
+  },
+  {
+   "file": "mountain.json",
+   "group": "mountain",
+   "sprites": 17,
+   "size": [
+    264,
+    16
+   ]
+  },
+  {
+   "file": "objects.json",
+   "group": "objects",
+   "sprites": 5,
+   "size": [
+    768,
+    16
+   ]
+  },
+  {
+   "file": "objects_effects_spr.json",
+   "group": "objects_effects_spr",
+   "sprites": 13,
+   "size": [
+    616,
+    16
+   ]
+  },
+  {
+   "file": "ofm_carnival.json",
+   "group": "ofm_carnival",
+   "sprites": 10,
+   "size": [
+    109,
+    32
+   ]
+  },
+  {
+   "file": "ofm_tem.json",
+   "group": "ofm_tem",
+   "sprites": 58,
+   "size": [
+    1253,
+    26
+   ]
+  },
+  {
+   "file": "ship.json",
+   "group": "ship",
+   "sprites": 61,
+   "size": [
+    2040,
+    433
+   ]
+  },
+  {
+   "file": "solidpatches.json",
+   "group": "solidpatches",
+   "sprites": 32,
+   "size": [
+    198,
+    18
+   ]
+  },
+  {
+   "file": "weather.json",
+   "group": "weather",
+   "sprites": 10,
+   "size": [
+    309,
+    24
+   ]
+  },
+  {
+   "file": "wynot_jnc.json",
+   "group": "wynot_jnc",
+   "sprites": 18,
+   "size": [
+    880,
+    90
+   ]
+  }
+ ]
+}

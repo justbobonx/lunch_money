@@ -704,6 +704,79 @@ class oCharTopd extends oChar {
 		}
 	}
 
+	// The look box when debugging, the item in hand behind us when facing up, the aim dots,
+	// the drop spot tinted, the presenting sparkle, our shadow, ourselves lifted by our height,
+	// anything drawn over us, and the item in front when facing any other way.
+	onDraw() {
+		if (game.drawStats) {
+			Draw.alpha = 0.3;
+			Draw.color = "#ff3300";
+			const omi = this.mask_index;
+			this.mask_index = this.look_mask;
+			this.x += 4 * this.facing;
+			this.y += 3 * this.facingy;
+			Draw.rectangle(this.bbox_left, this.bbox_top - this.z, this.bbox_right, this.bbox_bottom - this.z, 0);
+			this.x -= 4 * this.facing;
+			this.y -= 3 * this.facingy;
+			this.mask_index = omi;
+			Draw.alpha = 1;
+		}
+
+		const drawCarry = this.carrying && !truthy(this.presenting) && !truthy(this.diving) && !truthy(this.rolling);
+		if (drawCarry && this.facingy < 0) this.drawCarriedAtHeight();
+
+		if (truthy(this.aiming)) {
+			const cx = this.sprite_cx();
+			const cy = this.sprite_cy();
+			const bi = Math.floor(currentTime() / 100) % 4;
+			const aimdisti = Math.floor((this.aimdist - 5) / 3);
+			const aimdists = this.aimdist - aimdisti * 3;
+			for (let i = 0; i < 4; i++) {
+				const d = aimdists + aimdisti * i;
+				Draw.alpha = 0.2 + ((bi + 4 - i) % 4) * 0.2;
+				Draw.sprite("s_aim_dot", i, cx + lengthdirX(d, this.aimdir), cy + lengthdirY(d, this.aimdir));
+			}
+			Draw.alpha = 1;
+		}
+
+		// Approximation: the original paints the drop spot through a tint shader in orange when it can
+		// be given, red when not. Here the picture is multiplied by those colours.
+		if (truthy(this.drop_request) && this.carrying) {
+			const c = this.carrying;
+			const tcol = (this.lookObjs.length > 0 && truthy(this.lookObjs[0].cangive)) ? "#ff9900" : "#ff3300";
+			Draw.spriteExt(c.sprite_index, c.image_index, this.x + this.drop_offx * this.facing, this.y + this.drop_offy * this.facingy,
+				c.image_xscale, c.image_yscale, c.image_angle, tcol, 0.6);
+		}
+
+		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
+
+		const xscale = this.facing === 0 ? 1 : this.facing;
+		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
+		if (this.shadowSprite !== null && !truthy(this.swimming) && !this.riding) {
+			Draw.spriteExt(this.shadowSprite, this.image_index, this.x + xoadj, this.y - this.z + this.haf,
+				xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+		}
+		this.y -= this.z;
+		super.onDraw();
+		this.y += this.z;
+
+		if (this.over_sprite !== null && this.over_sprite !== undefined) {
+			Draw.spriteExt(this.over_sprite, this.image_index, this.x, this.y - this.z + this.haf,
+				xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+		}
+
+		if (drawCarry && (this.facing !== 0 || this.facingy > 0)) this.drawCarriedAtHeight();
+
+		if (this.inv && this.inv.in_inv_sel) this.inv.qp_draw();
+	}
+
+	// the item in hand drawn lifted by our height
+	drawCarriedAtHeight() {
+		this.carrying.y -= this.z;
+		this.carrying.draw();
+		this.carrying.y += this.z;
+	}
+
 	onEndStep() {
 		this.update_sprite();
 	}

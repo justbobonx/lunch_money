@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 13,
+ "frames": 1,
+ "ox": 4,
+ "oy": 12,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 11,
+  "x": -2,
+  "y": -10
+ },
+ "image_speed": 0.5,
+ "group": "ofm_peeps"
+}

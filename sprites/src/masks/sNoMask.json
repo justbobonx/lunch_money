@@ -1,0 +1,17 @@
+{
+ "w": 1,
+ "h": 1,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 1,
+  "h": 1,
+  "x": 0,
+  "y": 0,
+  "gm_kind": "precise"
+ },
+ "image_speed": 0.25,
+ "group": "masks"
+}

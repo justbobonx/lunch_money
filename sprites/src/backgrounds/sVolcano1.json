@@ -1,0 +1,16 @@
+{
+ "w": 48,
+ "h": 32,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 44,
+  "h": 26,
+  "x": 2,
+  "y": 5
+ },
+ "image_speed": 0.25,
+ "group": "backgrounds"
+}

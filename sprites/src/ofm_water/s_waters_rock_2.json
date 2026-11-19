@@ -1,0 +1,16 @@
+{
+ "w": 24,
+ "h": 24,
+ "frames": 4,
+ "ox": 12,
+ "oy": 19,
+ "mask": {
+  "kind": "rect",
+  "w": 14,
+  "h": 13,
+  "x": -7,
+  "y": -7
+ },
+ "image_speed": 0.05,
+ "group": "ofm_water"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 7,
+ "h": 10,
+ "frames": 4,
+ "ox": 3,
+ "oy": 7,
+ "mask": {
+  "kind": "rect",
+  "w": 3,
+  "h": 5,
+  "x": -1,
+  "y": -2
+ },
+ "image_speed": 0.25,
+ "group": "inventory"
+}

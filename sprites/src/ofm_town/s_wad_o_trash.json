@@ -1,0 +1,16 @@
+{
+ "w": 4,
+ "h": 4,
+ "frames": 1,
+ "ox": 2,
+ "oy": 2,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 4,
+  "x": -2,
+  "y": -2
+ },
+ "image_speed": 0.5,
+ "group": "ofm_town"
+}

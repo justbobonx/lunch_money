@@ -1,0 +1,16 @@
+{
+ "w": 9,
+ "h": 9,
+ "frames": 9,
+ "ox": 4,
+ "oy": 4,
+ "mask": {
+  "kind": "rect",
+  "w": 7,
+  "h": 7,
+  "x": -3,
+  "y": -3
+ },
+ "image_speed": 1.0,
+ "group": "objects_effects_spr"
+}

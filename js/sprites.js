@@ -1,123 +1,163 @@
 // Sprite records: size, origin, collision mask, animation speed and sheet frames.
-// The player sheets are real conversions. Level sprites are not converted yet, so
-// their sizes come from the guess table below, worked out from how TestDev places them.
+// Every sprite is a record by name. The facts for all of them come from sprites/src/index.json,
+// so sizes and masks are right from the start. Pictures come from one of two places:
+//   packed: sheets listed in sprites/sheets.json, one per group of related sprites
+//   loose:  one horizontal strip png and one json per sprite under sprites/src/<group>/
+// In packed mode a sprite that is not on a sheet falls back to its loose files.
+// Both ways fill the same record, so nothing outside this file can tell them apart.
 
-const SPRITE_SHEETS = ["sprites/guy_sprites.json", "sprites/tem_sprites.json"];
+// "packed" or "loose", the page address can override it with ?packed or ?loose
+const SPRITE_SOURCE = "packed";
 
-// size used for any level sprite that is neither converted nor guessed
+const SPRITE_DIR = "sprites/";
+
+// Sprites whose names start like this are always loaded before play begins in loose mode,
+// so the characters do not flash as boxes while their poses arrive.
+const SPRITE_PRELOAD_PREFIXES = ["guy_", "tem_"];
+
+// size used for any level sprite that is neither in the index nor guessed
 const UNKNOWN_SPRITE_SIZE = 16;
 
-// Guessed level sprites until the real TestDev sprite sheet arrives.
-// Every size here is a guess from placements in the room, and the mask is the whole image.
-// The ones marked to turn with the angle are the ones TestDev places at an angle as slopes.
+// Sprites the game asks for that are missing from the converted set.
+// The size is a guess from how TestDev places it, and the mask is the whole image.
 const SPRITE_GUESSES = {
-	sFloor:         { w: 32, h: 32, ox: 0, oy: 0, rotates: true },
-	sFloorMid:      { w: 8,  h: 8,  ox: 0, oy: 0, rotates: true },
-	sFloorThru:     { w: 32, h: 4,  ox: 0, oy: 0, rotates: true },
-	sBlankGr:       { w: 2,  h: 2,  ox: 0, oy: 0, rotates: true },
-	sBlankOr:       { w: 2,  h: 2,  ox: 0, oy: 0 },
-	sBlankRd:       { w: 2,  h: 2,  ox: 0, oy: 0 },
-	sSolidWh:       { w: 2,  h: 2,  ox: 0, oy: 0 },
-	sSolidWhRotate: { w: 2,  h: 2,  ox: 0, oy: 0, rotates: true },
-	dk_block_w:     { w: 16, h: 16, ox: 0, oy: 0 },
-	slime:          { w: 16, h: 16, ox: 0, oy: 0 },
-	sWallsh:        { w: 4,  h: 8,  ox: 0, oy: 0 },
-	glass:          { w: 4,  h: 12, ox: 0, oy: 0 },
-	glassv:         { w: 12, h: 16, ox: 0, oy: 0 },
-	sLadder:        { w: 6,  h: 15, ox: 3, oy: 0 },
-	sBox1:          { w: 14, h: 14, ox: 0, oy: 0, rotates: true },
-	s_box_thru:     { w: 14, h: 14, ox: 0, oy: 0 },
-	s_terrace_thru: { w: 16, h: 16, ox: 0, oy: 0 },
-	sCrate:         { w: 7,  h: 7,  ox: 0, oy: 0 },
-	sCrate2:        { w: 7,  h: 7,  ox: 0, oy: 0 },
-	sCrateBg:       { w: 8,  h: 8,  ox: 0, oy: 0 },
-	sCrateMetal:    { w: 5,  h: 5,  ox: 0, oy: 0 },
-	sPlatform:      { w: 24, h: 4,  ox: 0, oy: 0 },
-	sPlank:         { w: 24, h: 3,  ox: 0, oy: 0, rotates: true },
-	sGrWall:        { w: 6,  h: 38, ox: 0, oy: 0 },
-	sGrWall2:       { w: 6,  h: 38, ox: 0, oy: 0 },
-	sGrTechno:      { w: 16, h: 16, ox: 0, oy: 0 },
-	sGrTechnoVoid:  { w: 16, h: 16, ox: 0, oy: 0 },
-	sOneWayDoor:    { w: 4,  h: 16, ox: 0, oy: 0 },
-	sPit:           { w: 16, h: 8,  ox: 0, oy: 0 },
-	sWater:         { w: 16, h: 16, ox: 0, oy: 0 },
-	sWaterFg:       { w: 32, h: 32, ox: 0, oy: 0 },
-	rope:           { w: 3,  h: 18, ox: 1, oy: 0 },
-	sBouncer:       { w: 16, h: 8,  ox: 0, oy: 0 },
-	sChest:         { w: 12, h: 10, ox: 0, oy: 0 },
-	sChest_2:       { w: 12, h: 10, ox: 0, oy: 0 },
-	sChest_egg:     { w: 12, h: 10, ox: 0, oy: 0 },
-	sKey:           { w: 6,  h: 4,  ox: 0, oy: 0 },
-	sDoor:          { w: 12, h: 20, ox: 0, oy: 0 },
-	sDoorway:       { w: 16, h: 24, ox: 0, oy: 0 },
-	sSpot:          { w: 8,  h: 8,  ox: 0, oy: 0 },
-	sBird:          { w: 8,  h: 8,  ox: 4, oy: 8 },
-	sDoggie_stand:  { w: 13, h: 13, ox: 6, oy: 12 },
-	sBall:          { w: 6,  h: 6,  ox: 3, oy: 3 },
-	sAniSpark:      { w: 8,  h: 8,  ox: 4, oy: 4 },
-	sJgHeart:       { w: 16, h: 16, ox: 0, oy: 0 },
-	sJgLogShooter:  { w: 16, h: 16, ox: 0, oy: 0 },
-	sGameBoxV:      { w: 16, h: 24, ox: 0, oy: 0 },
-	s_tank:         { w: 32, h: 24, ox: 0, oy: 0 },
-	bike:           { w: 16, h: 12, ox: 0, oy: 0 },
-	s__ar_bow:      { w: 8,  h: 8,  ox: 4, oy: 8 },
-	s_gun:          { w: 8,  h: 4,  ox: 4, oy: 4 },
-	s_magnet:       { w: 8,  h: 8,  ox: 4, oy: 8 },
-	s_rocketpack:   { w: 8,  h: 8,  ox: 4, oy: 8 },
-	s_sword:        { w: 8,  h: 8,  ox: 4, oy: 8 },
-	s_torch:        { w: 4,  h: 8,  ox: 2, oy: 8 },
-	s_flamer:       { w: 8,  h: 8,  ox: 4, oy: 8 },
-	s_ship_bottle_2:{ w: 8,  h: 8,  ox: 0, oy: 0 },
-	_guy_placer:    { w: 13, h: 13, ox: 6, oy: 12 }
+	sGameBoxV: { w: 16, h: 24, ox: 0, oy: 0 }
 };
 
-// Holds every sprite record by name and the loaded sheet images.
+// picks the source from the page address when there is one
+function spriteSourceFromAddress() {
+	if (typeof location === "undefined") return SPRITE_SOURCE;
+	const q = location.search || "";
+	if (/[?&]loose\b/.test(q)) return "loose";
+	if (/[?&]packed\b/.test(q)) return "packed";
+	return SPRITE_SOURCE;
+}
+
+// Every sprite name a saved room places, found by reading the text, so they can be loaded first.
+function spriteNamesInRoom(text) {
+	const names = new Set();
+	const re = /"spi"\s*:\s*"([^"]+)"/g;
+	let m;
+	while ((m = re.exec(text)) !== null) names.add(m[1]);
+	return [...names];
+}
+
+// Holds every sprite record by name and the loaded pictures.
 const Sprites = {
 	records: {},
+	mode: "packed",
+	readJson: null,
+	loadImage: null,
+	// loose strips already asked for, by group and name, so each is fetched once
+	pending: {},
 
-	// Loads the converted sheets, then fills in the guessed level sprites.
-	// The reader is handed in so the same code runs in the page and in a test harness.
-	async load(readJson, loadImage) {
-		for (const path of SPRITE_SHEETS) {
-			const sheet = await readJson(path);
-			const dir = path.substring(0, path.lastIndexOf("/") + 1);
-			const image = await loadImage(dir + sheet.image_file);
-			for (const name of Object.keys(sheet.sprites)) {
-				const s = sheet.sprites[name];
-				this.records[name] = {
-					name: name, w: s.w, h: s.h, ox: s.ox, oy: s.oy,
-					mask: s.mask, imageSpeed: s.image_speed, frames: s.frames,
-					image: image, guessed: false
-				};
-			}
+	// Reads the index, then in packed mode the sheets, then loads the wanted names that are still loose.
+	// The readers are handed in so the same code runs in the page and in a test harness.
+	async load(readJson, loadImage, wanted, mode) {
+		this.readJson = readJson;
+		this.loadImage = loadImage;
+		this.mode = mode || spriteSourceFromAddress();
+		this.records = {};
+		this.pending = {};
+
+		const index = (await readJson(SPRITE_DIR + "src/index.json")).sprites;
+		for (const name of Object.keys(index)) {
+			const s = index[name];
+			this.records[name] = this.makeRecord(name, s, s.group);
 		}
+
+		if (this.mode === "packed") {
+			const list = (await readJson(SPRITE_DIR + "sheets.json")).sheets;
+			await Promise.all(list.map(async (entry) => {
+				const sheet = await readJson(SPRITE_DIR + entry.file);
+				const image = await loadImage(SPRITE_DIR + sheet.image_file);
+				for (const name of Object.keys(sheet.sprites)) {
+					const rec = this.records[name];
+					if (!rec) continue;
+					const s = sheet.sprites[name];
+					rec.frames = s.frames;
+					rec.image = image;
+					rec.state = "packed";
+				}
+			}));
+		}
+
 		for (const name of Object.keys(SPRITE_GUESSES)) {
 			if (this.records[name]) continue;
 			const g = SPRITE_GUESSES[name];
 			this.records[name] = {
-				name: name, w: g.w, h: g.h, ox: g.ox, oy: g.oy,
-				mask: { kind: "rect", w: g.w, h: g.h, x: -g.ox, y: -g.oy, rotates: !!g.rotates },
-				imageSpeed: 1, frames: null, image: null, guessed: true
+				name: name, w: g.w, h: g.h, ox: 0, oy: 0,
+				mask: { kind: "rect", w: g.w, h: g.h, x: 0, y: 0, rotates: false },
+				imageSpeed: 1, frameCount: 1, frames: null, image: null, state: "guessed", guessed: true
 			};
 		}
 		// the no mask sprite exists so carried things stop colliding
-		this.records.sNoMask = { name: "sNoMask", w: 1, h: 1, ox: 0, oy: 0, mask: null, imageSpeed: 0, frames: null, image: null, guessed: false };
+		this.records.sNoMask = { name: "sNoMask", w: 1, h: 1, ox: 0, oy: 0, mask: null, imageSpeed: 0, frameCount: 1, frames: null, image: null, state: "none", guessed: false };
+
+		const eager = new Set(wanted || []);
+		if (this.mode === "loose") {
+			for (const name of Object.keys(index)) {
+				if (SPRITE_PRELOAD_PREFIXES.some((p) => name.startsWith(p))) eager.add(name);
+			}
+		}
+		await Promise.all([...eager].map((name) => this.fetchLoose(name)));
+	},
+
+	// a record made from index facts, with frames laid out as in the loose strip
+	makeRecord(name, s, group) {
+		const frames = [];
+		for (let i = 0; i < s.frames; i++) frames.push([i * s.w, 0, s.w, s.h]);
+		return {
+			name: name, w: s.w, h: s.h, ox: s.ox, oy: s.oy,
+			mask: s.mask, imageSpeed: s.image_speed, frameCount: s.frames, frames: frames,
+			image: null, group: group, state: "index", guessed: false
+		};
+	},
+
+	// Loads a sprite's loose strip unless it is already packed or loading.
+	// The record is filled in place, so anything holding it sees the picture arrive.
+	fetchLoose(name) {
+		const rec = this.records[name];
+		if (!rec || rec.state !== "index") return Promise.resolve();
+		if (this.pending[name]) return this.pending[name];
+		const base = SPRITE_DIR + "src/" + rec.group + "/" + name;
+		this.pending[name] = (async () => {
+			try {
+				// the json beside the strip wins over the index, so a hand edited sprite shows at once
+				const s = await this.readJson(base + ".json");
+				const fresh = this.makeRecord(name, s, rec.group);
+				rec.image = await this.loadImage(base + ".png");
+				Object.assign(rec, fresh, { image: rec.image, state: "loose" });
+			} catch (e) {
+				rec.state = "failed";
+				console.warn("sprite would not load: " + name, e);
+			}
+		})();
+		return this.pending[name];
 	},
 
 	exists(name) {
 		return name !== null && name !== undefined && this.records[name] !== undefined;
 	},
 
+	// The record if there is one, started loading if it is still waiting. Never invents a record.
+	peek(name) {
+		const rec = this.records[name];
+		if (rec && rec.state === "index") this.fetchLoose(name);
+		return rec;
+	},
+
 	// Every level sprite gets a record, unknown names get the default square so they still collide.
 	get(name) {
 		if (name === null || name === undefined) return null;
-		let s = this.records[name];
+		let s = this.peek(name);
 		if (!s) {
 			const n = UNKNOWN_SPRITE_SIZE;
 			s = this.records[name] = {
 				name: name, w: n, h: n, ox: 0, oy: 0,
 				mask: { kind: "rect", w: n, h: n, x: 0, y: 0 },
-				imageSpeed: 1, frames: null, image: null, guessed: true, unknown: true
+				imageSpeed: 1, frameCount: 1, frames: null, image: null, state: "unknown",
+				guessed: true, unknown: true
 			};
 		}
 		return s;
@@ -126,6 +166,6 @@ const Sprites = {
 	// number of animation frames, one for sprites without a sheet
 	frameCount(name) {
 		const s = this.records[name];
-		return (s && s.frames) ? s.frames.length : 1;
+		return s ? s.frameCount : 1;
 	}
 };

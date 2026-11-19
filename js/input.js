@@ -40,7 +40,7 @@ const Input = {
 				this.anyPressed = true;
 			}
 			this.down[e.code] = true;
-			if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
+			if (e.code.startsWith("Arrow") || e.code === "Space" || e.code === "Tab") e.preventDefault();
 		});
 		target.addEventListener("keyup", (e) => {
 			this.down[e.code] = false;

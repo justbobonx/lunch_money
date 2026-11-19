@@ -1,0 +1,16 @@
+{
+ "w": 28,
+ "h": 25,
+ "frames": 1,
+ "ox": 14,
+ "oy": 12,
+ "mask": {
+  "kind": "rect",
+  "w": 35,
+  "h": 27,
+  "x": -17,
+  "y": -16
+ },
+ "image_speed": 0.333333,
+ "group": "ship_doors"
+}

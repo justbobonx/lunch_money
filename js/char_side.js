@@ -876,6 +876,31 @@ class oCharSide extends oChar {
 		}
 	}
 
+	// The held item's drop spot shown faint red while dropping, the presenting sparkle,
+	// ourselves, the item in hand, and the aim dots.
+	onDraw() {
+		if (truthy(this.drop_request) && this.carrying) {
+			const c = this.carrying;
+			Draw.spriteExt(c.sprite_index, c.image_index, this.x + this.drop_offx * this.facing, this.y + this.drop_offy,
+				c.image_xscale, c.image_yscale, c.image_angle, "#ff2222", 0.5);
+		}
+		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
+		super.onDraw();
+		if (this.carrying && !truthy(this.presenting)) this.carrying.draw();
+		if (truthy(this.aiming)) {
+			const cx = this.sprite_cx();
+			const cy = this.sprite_cy();
+			const bi = Math.floor(currentTime() / 100) % 4;
+			for (let i = 0; i < 4; i++) {
+				const d = 5 + 4 * i;
+				Draw.alpha = 0.1 + ((bi + 4 - i) % 4) * 0.2;
+				Draw.sprite("s_aim_dot", i, cx + 2 * this.facing + lengthdirX(d, this.aimdir), cy + lengthdirY(d, this.aimdir));
+			}
+			Draw.alpha = 1;
+		}
+		if (this.inv.in_inv_sel) this.inv.qp_draw();
+	}
+
 	// end of frame: the sprite again, in case collisions changed our state
 	onEndStep() {
 		this.update_sprite();

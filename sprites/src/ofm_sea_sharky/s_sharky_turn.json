@@ -1,0 +1,16 @@
+{
+ "w": 20,
+ "h": 18,
+ "frames": 1,
+ "ox": 14,
+ "oy": 10,
+ "mask": {
+  "kind": "rect",
+  "w": 18,
+  "h": 16,
+  "x": -13,
+  "y": -10
+ },
+ "image_speed": 0.066667,
+ "group": "ofm_sea_sharky"
+}

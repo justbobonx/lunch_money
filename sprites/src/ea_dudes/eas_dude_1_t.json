@@ -1,0 +1,16 @@
+{
+ "w": 10,
+ "h": 12,
+ "frames": 2,
+ "ox": 4,
+ "oy": 11,
+ "mask": {
+  "kind": "rect",
+  "w": 6,
+  "h": 7,
+  "x": -3,
+  "y": -6
+ },
+ "image_speed": 0.083333,
+ "group": "ea_dudes"
+}

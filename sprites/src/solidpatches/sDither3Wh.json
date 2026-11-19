@@ -1,0 +1,16 @@
+{
+ "w": 12,
+ "h": 6,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 16,
+  "h": 18,
+  "x": 0,
+  "y": 0
+ },
+ "image_speed": 0.25,
+ "group": "solidpatches"
+}

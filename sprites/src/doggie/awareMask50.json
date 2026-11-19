@@ -1,0 +1,16 @@
+{
+ "w": 50,
+ "h": 50,
+ "frames": 1,
+ "ox": 25,
+ "oy": 25,
+ "mask": {
+  "kind": "rect",
+  "w": 50,
+  "h": 50,
+  "x": -25,
+  "y": -25
+ },
+ "image_speed": 0.25,
+ "group": "doggie"
+}

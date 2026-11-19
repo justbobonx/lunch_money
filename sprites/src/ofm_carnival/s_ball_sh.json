@@ -1,0 +1,16 @@
+{
+ "w": 4,
+ "h": 1,
+ "frames": 1,
+ "ox": 2,
+ "oy": -1,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 1,
+  "x": -2,
+  "y": 1
+ },
+ "image_speed": 0.5,
+ "group": "ofm_carnival"
+}

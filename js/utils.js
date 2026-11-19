@@ -7,6 +7,15 @@ const REAL_EPSILON = 0.00001;
 // the original used this as its "infinitely tall" height
 const BIGGEST_INT = 2147483643;
 
+// steps per second, which is also the rate sprite speeds are given in
+const GAME_FPS = 60;
+
+// Milliseconds since the page started, the engine's clock that some drawing wobbles by.
+// Nothing that moves the game reads it.
+function currentTime() {
+	return (typeof performance !== "undefined") ? performance.now() : Date.now();
+}
+
 // a value counts as true only above one half, so minus one and small fractions are false
 function truthy(v) {
 	if (typeof v === "number") return v > 0.5;

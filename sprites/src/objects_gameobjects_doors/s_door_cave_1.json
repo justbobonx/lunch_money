@@ -1,0 +1,16 @@
+{
+ "w": 18,
+ "h": 21,
+ "frames": 2,
+ "ox": 9,
+ "oy": 20,
+ "mask": {
+  "kind": "rect",
+  "w": 12,
+  "h": 17,
+  "x": -6,
+  "y": -16
+ },
+ "image_speed": 0.5,
+ "group": "objects_gameobjects_doors"
+}

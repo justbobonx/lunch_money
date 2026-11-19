@@ -1,0 +1,16 @@
+{
+ "w": 28,
+ "h": 16,
+ "frames": 6,
+ "ox": 14,
+ "oy": 8,
+ "mask": {
+  "kind": "rect",
+  "w": 28,
+  "h": 11,
+  "x": -14,
+  "y": -5
+ },
+ "image_speed": 0.25,
+ "group": "ea_terrain"
+}

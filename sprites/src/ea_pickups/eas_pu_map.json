@@ -1,0 +1,16 @@
+{
+ "w": 14,
+ "h": 14,
+ "frames": 1,
+ "ox": 7,
+ "oy": 12,
+ "mask": {
+  "kind": "rect",
+  "w": 10,
+  "h": 12,
+  "x": -5,
+  "y": -11
+ },
+ "image_speed": 0.5,
+ "group": "ea_pickups"
+}

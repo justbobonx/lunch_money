@@ -1,0 +1,16 @@
+{
+ "w": 96,
+ "h": 96,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 93,
+  "h": 81,
+  "x": 0,
+  "y": 6
+ },
+ "image_speed": 0.5,
+ "group": "ship"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 5,
+ "h": 8,
+ "frames": 5,
+ "ox": 2,
+ "oy": 8,
+ "mask": {
+  "kind": "rect",
+  "w": 3,
+  "h": 6,
+  "x": -1,
+  "y": -6
+ },
+ "image_speed": 0.133333,
+ "group": "ar_climb"
+}

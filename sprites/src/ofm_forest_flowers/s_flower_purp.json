@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 10,
+ "frames": 1,
+ "ox": 4,
+ "oy": 8,
+ "mask": {
+  "kind": "rect",
+  "w": 8,
+  "h": 10,
+  "x": -4,
+  "y": -8
+ },
+ "image_speed": 0.016667,
+ "group": "ofm_forest_flowers"
+}

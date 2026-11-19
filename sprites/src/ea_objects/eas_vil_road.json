@@ -1,0 +1,16 @@
+{
+ "w": 24,
+ "h": 24,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 20,
+  "h": 13,
+  "x": 2,
+  "y": 6
+ },
+ "image_speed": 0.5,
+ "group": "ea_objects"
+}

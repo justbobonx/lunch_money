@@ -1,0 +1,16 @@
+{
+ "w": 12,
+ "h": 8,
+ "frames": 1,
+ "ox": 6,
+ "oy": 5,
+ "mask": {
+  "kind": "rect",
+  "w": 10,
+  "h": 6,
+  "x": -5,
+  "y": -4
+ },
+ "image_speed": 0.5,
+ "group": "ea_keys_locks"
+}

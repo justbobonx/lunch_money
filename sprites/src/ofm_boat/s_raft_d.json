@@ -1,0 +1,17 @@
+{
+ "w": 16,
+ "h": 16,
+ "frames": 1,
+ "ox": 8,
+ "oy": 8,
+ "mask": {
+  "kind": "rect",
+  "w": 10,
+  "h": 9,
+  "x": -5,
+  "y": -4,
+  "rotates": true
+ },
+ "image_speed": 0.333333,
+ "group": "ofm_boat"
+}

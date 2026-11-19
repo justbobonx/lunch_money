@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 6,
+ "frames": 11,
+ "ox": 3,
+ "oy": 5,
+ "mask": {
+  "kind": "rect",
+  "w": 7,
+  "h": 4,
+  "x": -3,
+  "y": -3
+ },
+ "image_speed": 0.166667,
+ "group": "ofm_inv_items"
+}

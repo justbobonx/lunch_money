@@ -1,0 +1,16 @@
+{
+ "w": 32,
+ "h": 8,
+ "frames": 1,
+ "ox": 16,
+ "oy": 4,
+ "mask": {
+  "kind": "rect",
+  "w": 30,
+  "h": 5,
+  "x": -15,
+  "y": -2
+ },
+ "image_speed": 0.5,
+ "group": "ofm_desert_crabby"
+}

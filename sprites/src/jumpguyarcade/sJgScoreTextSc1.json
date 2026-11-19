@@ -1,0 +1,17 @@
+{
+ "w": 40,
+ "h": 8,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 38,
+  "h": 6,
+  "x": 1,
+  "y": 1,
+  "rotates": true
+ },
+ "image_speed": 0.2,
+ "group": "jumpguyarcade"
+}

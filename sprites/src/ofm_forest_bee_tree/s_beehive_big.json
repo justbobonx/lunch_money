@@ -1,0 +1,16 @@
+{
+ "w": 28,
+ "h": 28,
+ "frames": 1,
+ "ox": 14,
+ "oy": 22,
+ "mask": {
+  "kind": "rect",
+  "w": 20,
+  "h": 18,
+  "x": -10,
+  "y": -18
+ },
+ "image_speed": 0.5,
+ "group": "ofm_forest_bee_tree"
+}

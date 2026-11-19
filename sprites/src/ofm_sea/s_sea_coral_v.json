@@ -1,0 +1,16 @@
+{
+ "w": 32,
+ "h": 32,
+ "frames": 1,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 26,
+  "h": 32,
+  "x": 3,
+  "y": 0
+ },
+ "image_speed": 0.5,
+ "group": "ofm_sea"
+}

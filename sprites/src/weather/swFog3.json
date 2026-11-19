@@ -1,0 +1,16 @@
+{
+ "w": 96,
+ "h": 24,
+ "frames": 1,
+ "ox": 48,
+ "oy": 12,
+ "mask": {
+  "kind": "rect",
+  "w": 95,
+  "h": 21,
+  "x": -48,
+  "y": -10
+ },
+ "image_speed": 0.25,
+ "group": "weather"
+}

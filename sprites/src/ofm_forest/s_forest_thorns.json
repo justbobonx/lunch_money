@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 8,
+ "frames": 1,
+ "ox": 4,
+ "oy": 4,
+ "mask": {
+  "kind": "rect",
+  "w": 8,
+  "h": 8,
+  "x": -4,
+  "y": -4
+ },
+ "image_speed": 0.5,
+ "group": "ofm_forest"
+}

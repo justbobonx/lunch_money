@@ -1,0 +1,16 @@
+{
+ "w": 16,
+ "h": 26,
+ "frames": 1,
+ "ox": 0,
+ "oy": 26,
+ "mask": {
+  "kind": "rect",
+  "w": 24,
+  "h": 14,
+  "x": 0,
+  "y": -22
+ },
+ "image_speed": 0.5,
+ "group": "ship_walls"
+}

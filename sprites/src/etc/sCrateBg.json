@@ -1,0 +1,17 @@
+{
+ "w": 15,
+ "h": 15,
+ "frames": 1,
+ "ox": 7,
+ "oy": 13,
+ "mask": {
+  "kind": "rect",
+  "w": 13,
+  "h": 13,
+  "x": -6,
+  "y": -12,
+  "rotates": true
+ },
+ "image_speed": 0.066667,
+ "group": "etc"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 12,
+ "frames": 1,
+ "ox": 4,
+ "oy": 10,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 10,
+  "x": -2,
+  "y": -8
+ },
+ "image_speed": 0.025,
+ "group": "ofm_tem"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 10,
+ "h": 8,
+ "frames": 2,
+ "ox": 5,
+ "oy": 7,
+ "mask": {
+  "kind": "rect",
+  "w": 9,
+  "h": 6,
+  "x": -4,
+  "y": -6
+ },
+ "image_speed": 0.133333,
+ "group": "ofm_forest_birds"
+}

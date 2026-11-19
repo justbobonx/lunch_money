@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 12,
+ "frames": 1,
+ "ox": 0,
+ "oy": 12,
+ "mask": {
+  "kind": "rect",
+  "w": 2,
+  "h": 12,
+  "x": 3,
+  "y": -12
+ },
+ "image_speed": 0.5,
+ "group": "ofm_buildings_exterior"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 64,
+ "h": 32,
+ "frames": 1,
+ "ox": 31,
+ "oy": 27,
+ "mask": {
+  "kind": "rect",
+  "w": 61,
+  "h": 25,
+  "x": -29,
+  "y": -23
+ },
+ "image_speed": 0.5,
+ "group": "autumn"
+}

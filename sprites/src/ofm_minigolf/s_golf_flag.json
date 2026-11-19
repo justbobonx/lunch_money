@@ -1,0 +1,16 @@
+{
+ "w": 11,
+ "h": 9,
+ "frames": 8,
+ "ox": 1,
+ "oy": 2,
+ "mask": {
+  "kind": "rect",
+  "w": 10,
+  "h": 7,
+  "x": -1,
+  "y": -1
+ },
+ "image_speed": 0.15,
+ "group": "ofm_minigolf"
+}

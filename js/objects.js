@@ -1,8 +1,9 @@
 // The object class tree, following the original parents one to one, plus the two
 // classic mixins every interactive or pickupable object shares.
-// Stage one ports what the player's physics touches: solids, one way floors, ladders,
-// water and the loose crates. Everything else is a placeholder that keeps its parent
-// and its collision flags, and draws as a labeled box.
+// Ported so far: what the player's physics touches (solids, one way floors, ladders, water,
+// the loose crates), how each of those draws, the triggers, text signs, layer doors and masks.
+// Everything else is a placeholder that keeps its parent, its collision flags and its
+// parent's drawing, and gets a labeled outline.
 
 // ---------------------------------------------------------------- mixins
 
@@ -80,6 +81,10 @@ class Inventory {
 	qp_handle_ui(con) {
 		return false;
 	}
+	// the quick pick wheel is never open until the real one exists
+	get in_inv_sel() {
+		return false;
+	}
 	pickup(obj, pos, noSwitch) {
 		Hooks.todo("inventory pickup of " + obj.constructor.name);
 	}
@@ -95,6 +100,34 @@ class Inventory {
 }
 
 // ---------------------------------------------------------------- base
+
+// Sets a sprite and works out what drawing needs from it: odd sizes for flipped drawing,
+// and for tiled things the tile size, flips and where tiling starts so the stretched area is
+// covered from the origin out. Shared by objects and plain room pictures.
+function setSpritePlus(o, spri) {
+	o.spi = spri;
+	o.sprite_index = spri;
+	// the default mask, for things that swap masks
+	o.dmi = o.mask_index;
+	o.xodd = o.sprite_width % 2 !== 0;
+	o.yodd = o.sprite_height % 2 !== 0;
+	o.tiled = o.tiledx || o.tiledy;
+	const rec = Sprites.get(spri);
+	const tw = rec ? rec.w : 0;
+	const th = rec ? rec.h : 0;
+	if (truthy(o.tiled)) {
+		o.t_flipx = sign(o.image_xscale);
+		o.t_flipy = sign(o.image_yscale);
+		const ofx = rec ? rec.ox : 0;
+		const ofy = rec ? rec.oy : 0;
+		o.t_stx = ofx * (Math.abs(o.image_xscale) - 1) * o.t_flipx + (o.t_flipx < 0 ? (Math.abs(o.image_xscale) - 1) * tw : 0);
+		o.t_sty = ofy * (Math.abs(o.image_yscale) - 1) * o.t_flipy + (o.t_flipy < 0 ? (Math.abs(o.image_yscale) - 1) * th : 0);
+		o.t_spw = Math.abs(tw * o.image_xscale);
+		o.t_sph = Math.abs(th * o.image_yscale);
+	}
+	o.t_w = tw;
+	o.t_h = th;
+}
 
 // The shared base of almost everything placed in a room.
 class oBaseObject {
@@ -191,15 +224,25 @@ class oBaseObject {
 		return Math.floor((this.bbox_bottom + this.bbox_top + 1) / 2);
 	}
 
-	// Sets the sprite and remembers the default mask and odd sizes.
-	// The tiling numbers are only needed for drawing and come in a later stage.
 	set_sprite(spri) {
-		this.spi = spri;
-		this.sprite_index = spri;
-		this.dmi = this.mask_index;
-		this.xodd = this.sprite_width % 2 !== 0;
-		this.yodd = this.sprite_height % 2 !== 0;
-		this.tiled = this.tiledx || this.tiledy;
+		setSpritePlus(this, spri);
+	}
+
+	// The layer drawing calls this. It runs the object's own draw events in order,
+	// begin, main and end, the way the original fired them by hand.
+	draw() {
+		if (typeof this.onDrawBegin === "function") this.onDrawBegin();
+		this.onDraw();
+		if (typeof this.onDrawEnd === "function") this.onDrawEnd();
+	}
+
+	// By default the sprite at its spot less the draw offset.
+	// Guess: the original skips sprite number zero here too, which names cannot express.
+	onDraw() {
+		if (this.sprite_index) {
+			Draw.spriteExt(this.sprite_index, this.image_index, this.x - Math.floor(this.exoffx), this.y - Math.floor(this.exoffy),
+				this.image_xscale, this.image_yscale, this.image_angle, this.image_blend, this.image_alpha);
+		}
 	}
 }
 Object.assign(oBaseObject.prototype, Collision);
@@ -223,11 +266,21 @@ class oGround extends oObject {
 	}
 }
 
+// Stretchable ground: an edge strip along the top and a fill stretched over the rest.
+// Both pieces are eight pixels square with no origin.
 class oFloor extends oGround {
 	constructor(x, y) {
 		super(x, y);
 		this.hangable = true;
 		this.landed = true;
+		this.top_spr = "sFloorTop";
+		this.mid_spr = "sFloorMid";
+	}
+	onDraw() {
+		Draw.spriteExt(this.top_spr, this.image_index, this.x, this.y, this.sprite_width / 8, 1,
+			this.image_angle, this.image_blend, this.image_alpha);
+		Draw.spriteExt(this.mid_spr, this.image_index, this.x, this.y + 8, this.sprite_width / 8, (this.sprite_height - 8) / 8,
+			this.image_angle, this.image_blend, this.image_alpha);
 	}
 }
 
@@ -293,10 +346,15 @@ class oPlatform extends oGround {
 class oPlank extends oGround {}
 class oBox extends oGround {}
 
+// Ground drawn repeated over its size when tiled, else stretched.
 class oSolidGr extends oGround {
 	constructor(x, y) {
 		super(x, y);
 		this.tiled = false;
+	}
+	onDraw() {
+		if (truthy(this.tiled)) Draw.spriteTiled(this);
+		else Draw.self(this);
 	}
 }
 
@@ -572,6 +630,105 @@ oLogEater.ported = false;
 class oAniSpark extends oBgObject {}
 oAniSpark.ported = false;
 
+// A door into other layers or another room. It is a picture with a separate invisible wall
+// that comes and goes as it opens and closes. Walking into an open one switches the view
+// to the layers it leads to, or goes to the room it connects to. It can open by itself when
+// something stands at its sensor, and be locked.
+class oLyrDoor extends oIaBgObject {
+	constructor(x, y) {
+		super(x, y);
+		this.image_speed = 0;
+		this.image_index = 0;
+		this.open = false;
+		this.locked = false;
+		this.connected = -1;
+		this.wall_obj = null;
+		this.enter_lyrs = "";
+		this.enter_clyr = "";
+		this.locked_message = "locked";
+		this.conRoom = undefined;
+		this.conRoomEnter = undefined;
+		this.entering = -1;
+		// for coming in from other rooms
+		this.inTrigger = 0;
+		this.triggered = 0;
+		this.no_trig_on_reenter = 1;
+		this.open_sensor = undefined;
+		this.sense_on = null;
+		this.manual_override = 0;
+	}
+
+	init() {
+		this.wall_obj = game.instanceCreate(oBlankGr, this.x, this.y);
+		this.wall_obj.mask_index = this.sprite_index;
+		this.wall_obj.visible = false;
+		this.open_sensor = game.lookupInst(this.open_sensor, this);
+		this.set_open(this.open, 0, 1);
+	}
+
+	// Opens or closes, playing the animation or jumping to its end. A lock stops it unless overridden.
+	set_open(open, animate, lockOverride) {
+		if (truthy(this.locked) && !truthy(lockOverride)) return false;
+		this.open = open;
+		this.wall_obj.mask_index = truthy(open) ? "sNoMask" : this.sprite_index;
+		if (truthy(animate)) {
+			this.image_speed = 1;
+		} else {
+			this.image_index = truthy(open) ? Math.ceil(Sprites.frameCount(this.sprite_index) / 2) : 0;
+		}
+		return true;
+	}
+
+	acton(action, who) {
+		const didit = this.set_open(!truthy(this.open), 1);
+		if (!didit && truthy(this.locked)) Hooks.say(who, this.locked_message);
+		// working an automatic door by hand keeps it as left until the sensor clears
+		if (this.open_sensor !== undefined && this.sense_on !== null) this.manual_override = 1;
+	}
+
+	onStep() {
+		const frames = Sprites.frameCount(this.sprite_index);
+		if (this.image_speed > 0) {
+			if ((truthy(this.open) && Math.floor(this.image_index) === Math.ceil(frames / 2))
+				|| (!truthy(this.open) && Math.floor(this.image_index) === 0)) {
+				this.image_speed = 0;
+			} else {
+				return;
+			}
+		}
+
+		// coming in from another room, wait until we are clear before entering again
+		if (truthy(this.inTrigger)) {
+			this.inTrigger = this.instancePlace(this.x, this.y, oChar) !== null;
+		} else if (truthy(this.open)) {
+			const entering = this.instancePlace(this.x, this.y, oChar);
+			if (entering !== null && this.enter_lyrs !== "") {
+				game.saveLayersState();
+				game.layerViz("*", 0);
+				game.layerViz(this.enter_lyrs, 1);
+				game.moveObjToLayer(entering, this.enter_clyr);
+			}
+			if (entering !== null && this.conRoom !== undefined) {
+				game.gotoRoom(this.conRoom, this, this.conRoomEnter, 1, 1);
+			}
+			this.inTrigger = entering !== null;
+		}
+
+		if (this.open_sensor && !truthy(this.locked)) {
+			this.sense_on = this.open_sensor.instancePlace(this.open_sensor.x, this.open_sensor.y, oActor);
+			if (!truthy(this.manual_override)) {
+				if (this.sense_on !== null && !truthy(this.open)) this.set_open(1, 1);
+				else if (this.sense_on === null && truthy(this.open)) this.set_open(0, 1);
+			}
+			this.manual_override = truthy(this.manual_override) && this.sense_on !== null;
+		}
+	}
+
+	onDestroy() {
+		game.destroyObject(this.wall_obj);
+	}
+}
+
 class oChest extends oIaBgObject {}
 oChest.ported = false;
 class oDoor extends oIaBgObject {}
@@ -680,7 +837,23 @@ oBall.ported = false;
 // ---------------------------------------------------------------- others under the base
 
 class oWater extends oBaseObject {}
-class oSpriteTiler extends oBaseObject {}
+// Repeats its sprite at unit size over its stretched area.
+class oSpriteTiler extends oBaseObject {
+	init() {
+		const rec = Sprites.get(this.sprite_index);
+		this.w = rec ? rec.w : 0;
+		this.h = rec ? rec.h : 0;
+	}
+	onDraw() {
+		// a zero size would never finish
+		if (!(this.w > 0) || !(this.h > 0)) return;
+		for (let i = 0; i < this.sprite_width; i += this.w) {
+			for (let k = 0; k < this.sprite_height; k += this.h) {
+				Draw.spriteExt(this.sprite_index, this.image_index, this.x + i, this.y + k, 1, 1, 0, this.image_blend, this.image_alpha);
+			}
+		}
+	}
+}
 class oWaterFg extends oSpriteTiler {}
 oWaterFg.ported = false;
 
@@ -693,18 +866,212 @@ class oFloorEffect extends oBaseObject {
 	effect_obj(obj, acc, maxspd) {}
 }
 
+// An area that fires when a player character enters it and again when they leave.
+// It can need the player wholly inside, under its height, or other conditions first,
+// can wait some frames before firing, and can fire only once.
 class oTrigger extends oBaseObject {
 	constructor(x, y) {
 		super(x, y);
 		this.visible = false;
+		// was on by default once, it almost never should be
+		this.trigOnce = 0;
+		this.only_inside = false;
+		this.check_height = undefined;
+		this.trigEvent = "none";
+		this.trigReqs = 0;
+		this.triggerer = oChar;
+		this.whotriggered = null;
+		this.inTrigger = false;
+		this.triggered = false;
+		this.no_trig_on_reenter = 0;
+		this.offsetToTriggerer = false;
+		this.offx = 0;
+		this.offy = -10;
+		this.trigtimes = 0;
+		this.step = 0;
+		this.triggerWaitToStart = 0;
+		this.eventListStep = 0;
+	}
+
+	on_trigger() {
+		console.log("triggered");
+	}
+	off_trigger() {
+		console.log("off trigger");
+	}
+
+	onStep() {
+		let tr = this.instancePlace(this.x, this.y, this.triggerer);
+		// wholly inside means every edge of its box within ours
+		if (tr !== null && truthy(this.only_inside) && !(tr.bbox_left >= this.bbox_left && tr.bbox_right <= this.bbox_right
+			&& tr.bbox_top >= this.bbox_top && tr.bbox_bottom <= this.bbox_bottom)) tr = null;
+		if (tr !== null && this.check_height !== undefined && tr.z > this.ht) tr = null;
+
+		if (!truthy(this.inTrigger) && tr !== null && (!truthy(this.trigOnce) || this.trigtimes < 1)) {
+			// Guess: the named thing in a requirement is looked up by name.
+			let trigGo = true;
+			if (Array.isArray(this.trigReqs)) {
+				for (const req of this.trigReqs) {
+					if (req[0] === "checkExists") {
+						const who = game.lookupInst(req[1], this);
+						if ((!!who && !who.destroyed) !== truthy(req[2])) {
+							trigGo = false;
+							break;
+						}
+					} else if (req[0] === "checkInstValEqu") {
+						const who = game.lookupInst(req[1], this);
+						if (!who || !eq(who[req[2]], req[3])) {
+							trigGo = false;
+							break;
+						}
+					}
+				}
+			}
+			if (trigGo) {
+				this.inTrigger = true;
+				this.whotriggered = tr;
+				this.triggered = false;
+				this.step = 0;
+			}
+		}
+
+		if (truthy(this.inTrigger) && !truthy(this.triggered) && this.step++ === this.triggerWaitToStart) {
+			this.on_trigger();
+			this.triggered = true;
+			this.trigtimes++;
+		}
+
+		if (truthy(this.inTrigger) && tr === null) {
+			this.off_trigger();
+			this.inTrigger = false;
+			this.whotriggered = tr;
+		}
 	}
 }
-oTrigger.ported = false;
-class oTrigScript extends oTrigger {}
-class oTrigKid extends oTrigger {}
 
-class oText extends oBaseObject {}
-oText.ported = false;
+// A trigger that runs a script on entering, and another on leaving if it has one.
+class oTrigScript extends oTrigger {
+	constructor(x, y) {
+		super(x, y);
+		this.triggerScript = [["say", "triggered", "actor", 0, -20, 50]];
+		this.skippable = false;
+		this.skipScript = [];
+		this.trigOffScript = -1;
+	}
+	on_trigger() {
+		Hooks.runScript(this.triggerScript, this.whotriggered, this.skippable, this.skipScript);
+	}
+	off_trigger() {
+		if (this.trigOffScript !== -1) Hooks.runScript(this.trigOffScript, this.whotriggered);
+	}
+}
+
+// An extra area for another trigger, passing on who entered and taking its settings.
+class oTrigKid extends oTrigger {
+	constructor(x, y) {
+		super(x, y);
+		this.trigDad = undefined;
+	}
+	init() {
+		if (typeof this.trigDad === "string") this.trigDad = game.allObjects[this.trigDad];
+		this.trigOnce = this.trigDad.trigOnce;
+		this.check_height = this.trigDad.check_height;
+	}
+	on_trigger() {
+		if (this.trigDad !== undefined) {
+			this.trigDad.whotriggered = this.whotriggered;
+			this.trigDad.on_trigger();
+		}
+	}
+	off_trigger() {
+		if (this.trigDad !== undefined) this.trigDad.off_trigger();
+	}
+}
+
+// An area's bounds. Walking wholly inside a connected area moves the player into it.
+class oGroupBounds extends oTrigScript {
+	constructor(x, y) {
+		super(x, y);
+		this.group = null;
+		this.only_inside = 1;
+	}
+	on_trigger() {
+		if (this.group.type === LGT_CONNECTED) game.enterArea(this.group.name);
+	}
+}
+
+// Brings an area into view while the player is inside it, and takes it out after.
+class oVisBounds extends oTrigScript {
+	constructor(x, y) {
+		super(x, y);
+		this.group = null;
+		this.only_inside = 0;
+	}
+	on_trigger() {
+		game.areaSetVis(this.group, 1);
+	}
+	off_trigger() {
+		game.areaSetVis(this.group, 0);
+	}
+}
+
+// A shape that limits what some layers show to where it covers. It sits in no layer and never runs.
+// It has no parent in the original, it sits on the base here only to share engine state.
+class oLayerMask extends oBaseObject {
+	constructor(x, y) {
+		super(x, y);
+		this._mask = true;
+		this.layer_list = [];
+	}
+}
+
+// A sign: text in one of the pixel fonts, centred or placed by an offset, shadowed,
+// and blinking when asked.
+class oText extends oBaseObject {
+	constructor(x, y) {
+		super(x, y);
+		this.step = 0;
+		this.font = "ftSmall";
+		this.color = "#ffffff";
+		this.alphac = 1;
+		this.text = "";
+		this.blinkr = 0;
+		this.xoffset = "c";
+		this.yoffset = 0;
+		this.shadow = true;
+		this.alphash = 1;
+		this.center = 1;
+		this.twidth = -1;
+		this.linesep = -1;
+	}
+
+	// Kept from the original: the width for centring is measured before this sign's font is set,
+	// so it uses whichever font was drawn last.
+	onDraw() {
+		if (truthy(this.blinkr)) {
+			this.step = (this.step + 1) % (this.blinkr * 2);
+			if (this.step > this.blinkr) return;
+		}
+		let xo;
+		if (this.xoffset === "c") xo = -Math.floor(Draw.stringWidth(this.text)) / 2;
+		else if (this.xoffset < 0) xo = -Math.floor(Draw.stringWidth(this.text));
+		else xo = this.xoffset;
+		const yo = this.yoffset;
+
+		Draw.setFont(this.font);
+		if (truthy(this.shadow)) {
+			Draw.color = "#000000";
+			Draw.alpha = this.alphac * this.alphash;
+			Draw.textTransformed(this.x - this.exoffx + xo + 1, this.y - this.exoffy + yo + 1, this.text,
+				this.linesep, this.twidth, 1, 1, this.image_angle);
+		}
+		Draw.color = this.color;
+		Draw.alpha = this.alphac;
+		Draw.textTransformed(this.x - this.exoffx + xo, this.y - this.exoffy + yo, this.text,
+			this.linesep, this.twidth, 1, 1, this.image_angle);
+		Draw.alpha = 1;
+	}
+}
 class oStarField extends oBaseObject {}
 oStarField.ported = false;
 
@@ -798,6 +1165,25 @@ class oActor extends oBaseObject {
 	// override for behavior
 	acton(action, who) {}
 
+	// The sprite flipped by facing, nudged a pixel when an odd width is flipped,
+	// with the mask box and origin shown when the debug overlay is on.
+	onDraw() {
+		if (game.drawStats) {
+			Draw.alpha = 0.5;
+			Draw.color = "#00ff00";
+			Draw.rectangle(this.bbox_left, this.bbox_top + this.z, this.bbox_right, this.bbox_bottom + this.z, 1);
+			Draw.alpha = 1;
+		}
+		const xscale = this.facing === 0 ? 1 : this.facing;
+		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
+		Draw.spriteExt(this.sprite_index, this.image_index, this.x + xoadj, this.y, xscale, this.image_yscale,
+			this.image_angle, this.image_blend, this.image_alpha);
+		if (game.drawStats) {
+			Draw.color = truthy(this.facing) ? "#ff0000" : "#ff00ff";
+			Draw.rectangle(this.x, this.y + this.z, this.x, this.y + this.z, 0);
+		}
+	}
+
 	pose(pose_sk) {
 		this.in_pose = (typeof pose_sk === "string") ? pose_sk : null;
 	}
@@ -861,6 +1247,14 @@ class oChar extends oActor {
 
 	// do anything when the inventory closes
 	inv_done() {}
+
+	// Three turning sparkles over our head and the held item shown above them, twice for a glow.
+	drawPresenting() {
+		Draw.spriteExt("s_presenting", 0, this.x, this.y - 6, 1, 1, -Math.sin(currentTime() / 360) * 15, "#bbbbff", 0.4);
+		Draw.spriteExt("s_presenting", 0, this.x, this.y - 8, 1, 1, Math.sin(currentTime() / 180) * 30, "#bbffbb", 0.4);
+		Draw.spriteExt("s_presenting", 0, this.x, this.y - 8, 1, 1, Math.cos(currentTime() / 180) * 30, "#bbbbff", 0.4);
+		Hooks.todo("inventory pictures of held items");
+	}
 
 	// Dies once: halves the speeds, sprays blood, and can vanish.
 	// The spray itself is a later stage effect.
@@ -1010,5 +1404,6 @@ const OBJECT_TYPES = {
 	oChest, oDoor, oRatDoor, oGameBoxV, oBike, oPickupObj, oHoldObject,
 	oKey, oGun, oFlamer, oArBow, oMagnet, oRocketpack, oSword, oBall,
 	oWater, oSpriteTiler, oWaterFg, oFloorEffect, oTrigger, oTrigScript, oTrigKid,
+	oGroupBounds, oVisBounds, oLayerMask, oLyrDoor,
 	oText, oStarField, oGuyPlacer, oActor, oDoggie, oNpcChar, oChar
 };

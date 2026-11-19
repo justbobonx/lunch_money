@@ -1,0 +1,16 @@
+{
+ "w": 16,
+ "h": 10,
+ "frames": 1,
+ "ox": 8,
+ "oy": 9,
+ "mask": {
+  "kind": "rect",
+  "w": 14,
+  "h": 5,
+  "x": -7,
+  "y": -4
+ },
+ "image_speed": 0.5,
+ "group": "ofm_buildings"
+}

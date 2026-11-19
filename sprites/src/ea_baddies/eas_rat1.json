@@ -1,0 +1,16 @@
+{
+ "w": 11,
+ "h": 6,
+ "frames": 4,
+ "ox": 6,
+ "oy": 5,
+ "mask": {
+  "kind": "rect",
+  "w": 5,
+  "h": 3,
+  "x": -2,
+  "y": -2
+ },
+ "image_speed": 0.25,
+ "group": "ea_baddies"
+}

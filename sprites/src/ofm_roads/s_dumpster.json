@@ -1,0 +1,16 @@
+{
+ "w": 20,
+ "h": 12,
+ "frames": 1,
+ "ox": 10,
+ "oy": 11,
+ "mask": {
+  "kind": "rect",
+  "w": 18,
+  "h": 12,
+  "x": -9,
+  "y": -11
+ },
+ "image_speed": 0.5,
+ "group": "ofm_roads"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 20,
+ "h": 30,
+ "frames": 1,
+ "ox": 10,
+ "oy": 25,
+ "mask": {
+  "kind": "rect",
+  "w": 12,
+  "h": 6,
+  "x": -6,
+  "y": 0
+ },
+ "image_speed": 0.5,
+ "group": "ofm_caves"
+}

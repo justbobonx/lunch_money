@@ -1,0 +1,16 @@
+{
+ "w": 24,
+ "h": 12,
+ "frames": 8,
+ "ox": 12,
+ "oy": 10,
+ "mask": {
+  "kind": "rect",
+  "w": 18,
+  "h": 2,
+  "x": -8,
+  "y": -2
+ },
+ "image_speed": 0.166667,
+ "group": "wynot_jnc"
+}

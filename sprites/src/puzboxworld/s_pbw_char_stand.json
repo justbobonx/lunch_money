@@ -1,0 +1,16 @@
+{
+ "w": 16,
+ "h": 16,
+ "frames": 1,
+ "ox": 8,
+ "oy": 16,
+ "mask": {
+  "kind": "rect",
+  "w": 16,
+  "h": 16,
+  "x": -8,
+  "y": -16
+ },
+ "image_speed": 0.5,
+ "group": "puzboxworld"
+}

@@ -1,0 +1,16 @@
+{
+ "w": 8,
+ "h": 16,
+ "frames": 1,
+ "ox": 4,
+ "oy": 15,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 5,
+  "x": -2,
+  "y": -4
+ },
+ "image_speed": 0.25,
+ "group": "chars"
+}

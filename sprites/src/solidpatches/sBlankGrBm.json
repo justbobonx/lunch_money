@@ -1,0 +1,17 @@
+{
+ "w": 4,
+ "h": 4,
+ "frames": 1,
+ "ox": 2,
+ "oy": 4,
+ "mask": {
+  "kind": "rect",
+  "w": 4,
+  "h": 4,
+  "x": -2,
+  "y": -4,
+  "rotates": true
+ },
+ "image_speed": 0.25,
+ "group": "solidpatches"
+}

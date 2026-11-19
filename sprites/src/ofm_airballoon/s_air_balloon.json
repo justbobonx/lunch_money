@@ -1,0 +1,16 @@
+{
+ "w": 20,
+ "h": 33,
+ "frames": 1,
+ "ox": 10,
+ "oy": 28,
+ "mask": {
+  "kind": "rect",
+  "w": 12,
+  "h": 8,
+  "x": -6,
+  "y": -3
+ },
+ "image_speed": 0.5,
+ "group": "ofm_airballoon"
+}

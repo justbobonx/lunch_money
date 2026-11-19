@@ -1,0 +1,16 @@
+{
+ "w": 16,
+ "h": 13,
+ "frames": 1,
+ "ox": 8,
+ "oy": 11,
+ "mask": {
+  "kind": "rect",
+  "w": 12,
+  "h": 6,
+  "x": -6,
+  "y": -5
+ },
+ "image_speed": 0.5,
+ "group": "ofm_desert"
+}

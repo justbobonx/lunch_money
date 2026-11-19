@@ -1,0 +1,16 @@
+{
+ "w": 21,
+ "h": 4,
+ "frames": 1,
+ "ox": 10,
+ "oy": 2,
+ "mask": {
+  "kind": "rect",
+  "w": 12,
+  "h": 7,
+  "x": -5,
+  "y": 10
+ },
+ "image_speed": 0.033333,
+ "group": "ea_baddies_wolf"
+}

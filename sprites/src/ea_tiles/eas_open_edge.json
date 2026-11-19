@@ -1,0 +1,16 @@
+{
+ "w": 44,
+ "h": 11,
+ "frames": 1,
+ "ox": 22,
+ "oy": 50,
+ "mask": {
+  "kind": "rect",
+  "w": 44,
+  "h": 11,
+  "x": -22,
+  "y": -50
+ },
+ "image_speed": 0.5,
+ "group": "ea_tiles"
+}
