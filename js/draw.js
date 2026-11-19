@@ -809,7 +809,7 @@ const Draw = {
 		const f2 = (v) => Number(v).toFixed(2);
 		const on = (v) => (truthy(v) ? 1 : 0);
 		const lines = [
-			this.fpsHist + "  T:" + f1(g.frames / GAME_FPS) + "  s:" + this.totSpriteCnt + "/" + this.totSpriteDrwn
+			round(this.fpsHist) + "  T:" + f1(g.frames / GAME_FPS) + "  s:" + this.totSpriteCnt + "/" + this.totSpriteDrwn
 				+ " (i:" + g.instances.length + ")"
 		];
 		if (guy) {
