@@ -53,7 +53,8 @@ const Sprites = {
 
 	// Reads the index, then in packed mode the sheets, then loads the wanted names that are still loose.
 	// The readers are handed in so the same code runs in the page and in a test harness.
-	async load(readJson, loadImage, wanted, mode) {
+	// When a progress is given, each sheet counts on it as it arrives.
+	async load(readJson, loadImage, wanted, mode, progress) {
 		this.readJson = readJson;
 		this.loadImage = loadImage;
 		this.mode = mode || spriteSourceFromAddress();
@@ -68,6 +69,7 @@ const Sprites = {
 
 		if (this.mode === "packed") {
 			const list = (await readJson(SPRITE_DIR + "sheets.json")).sheets;
+			if (progress) progress.expect(list.length);
 			await Promise.all(list.map(async (entry) => {
 				const sheet = await readJson(SPRITE_DIR + entry.file);
 				const image = await loadImage(SPRITE_DIR + sheet.image_file);
@@ -79,6 +81,7 @@ const Sprites = {
 					rec.image = image;
 					rec.state = "packed";
 				}
+				if (progress) progress.done();
 			}));
 		}
 

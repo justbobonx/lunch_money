@@ -17,6 +17,11 @@ const DEFAULT_WORLD = { rooms: [{ name: "TestDev" }], startroomi: 0 };
 const ROOM_LIST_FILE = "assets/rooms.json";
 const OBJECT_TREE_FILE = "assets/object_tree.json";
 
+// The world file names the object folders it uses. A generated list says which files each folder
+// under the object directory holds, since the page cannot list a folder either.
+const OBJECT_DIR = "objects/";
+const OBJECT_FILE_LIST = OBJECT_DIR + "files.json";
+
 // The original's name for the world, which names its script and goal files.
 // The goal file keeps the original's spelling.
 const WORLD_NAME = "world";
@@ -145,6 +150,8 @@ class World {
 		// made before anything in a room, so it runs ahead of them
 		this.controller = new Controller();
 		this.cam = new oCamera();
+		this.cam.configure({});
+		this.cam.init();
 		this.allObjects = Object.create(null);
 		this.obj_groups = Object.create(null);
 		this.cur_areas_inview = [];
@@ -157,6 +164,8 @@ class World {
 		this.goto_room = null;
 		this.frames = 0;
 		this.loading = 0;
+		// on while a room's own objects are being placed, so their setup waits until all of them exist
+		this.placingRoom = false;
 		// play paused stops every update, drawing paused stops animation, either way the frame still draws
 		this.simPaused = false;
 		this.drawPaused = false;
@@ -179,12 +188,13 @@ class World {
 
 	// ------------------------------------------------------------ files
 
-	// Reads the world: its room list, the object parents, the world's script and goal files, then
-	// every room's file and object settings, so switching rooms needs no waiting. The generated
-	// room list tells which optional files exist so the page does not ask for ones that are not there.
+	// Reads the world: its room list, every file in its object folders, the object parents, the world's
+	// script and goal files, then every room's file and object settings, so switching rooms needs no
+	// waiting. The generated room list tells which optional files exist so the page does not ask for
+	// ones that are not there. Each object file counts on the progress as it arrives.
 	// Gives back the text of the room play starts in so the sprites it places can be loaded first,
 	// every other room's sprites load when it is entered.
-	async loadFiles(readText, startName) {
+	async loadFiles(readText, startName, loadScript, progress) {
 		const tryRead = async (path) => {
 			try {
 				return await readText(path);
@@ -214,6 +224,32 @@ class World {
 			const rm = new (ROOM_TYPES[r.name] || Room)(r.name);
 			this.rooms.push(rm);
 			this.roombyname[r.name] = this.rooms.length - 1;
+		}
+
+		// Every file in the world's object folders, all at once. They only build on the two base files,
+		// so the order they arrive in does not matter. Classes still missing get stand ins later.
+		const folders = Array.isArray(info.object_folders) ? info.object_folders : [];
+		if (folders.length > 0) {
+			const filesText = await tryRead(OBJECT_FILE_LIST);
+			const fileList = filesText !== null ? JSON.parse(filesText) : null;
+			if (fileList === null) console.log("no object file list " + OBJECT_FILE_LIST + ", object folders not loaded");
+			const paths = [];
+			for (const folder of fileList !== null ? folders : []) {
+				if (!Array.isArray(fileList[folder])) {
+					console.log("object folder " + folder + " is not in " + OBJECT_FILE_LIST + ", run tools/build_object_list.js");
+					continue;
+				}
+				for (const file of fileList[folder]) paths.push(OBJECT_DIR + folder + "/" + file);
+			}
+			progress.expect(paths.length);
+			await Promise.all(paths.map(async (path) => {
+				try {
+					await loadScript(path);
+				} catch (e) {
+					console.log("object file would not load: " + path);
+				}
+				progress.done();
+			}));
 		}
 
 		const treeText = await tryRead(OBJECT_TREE_FILE);
@@ -373,7 +409,6 @@ class World {
 	placeStandInGuy() {
 		const rm = this.curroom;
 		const guy = this.createObject(oCharTopd, { x: 0, y: 0, name: "main_char", skin: "char" });
-		guy.init();
 		this.setCharAsGuy(guy);
 		let layer = null;
 		for (const lyr of rm.layers) {
@@ -492,15 +527,18 @@ class World {
 		}
 	}
 
-	// The one way objects are made: from a class or an object name and one config, joining the frame
-	// in creation order, and put in a layer when one is given. A name asked for is made unique.
-	// The object's own setup is left to the caller, since rooms run it once everything exists.
+	// The one way objects are made: from a class or an object name and one config, made with its
+	// defaults, the config laid on, joining the frame in creation order, put in a layer when one is
+	// given, then set up. A name asked for is made unique. While a room places its own objects their
+	// setup waits, since the room runs it once everything exists.
 	createObject(cls, cfg, layer, idx) {
 		if (typeof cls === "string") cls = objectType(cls);
-		const obj = new cls(cfg);
+		const obj = new cls();
+		obj.configure(cfg === undefined ? {} : cfg);
 		if (obj.name !== undefined) obj.name = this.uniqueName(obj.name);
 		this.instances.push(obj);
 		if (layer !== undefined) this.layerInsert(layer, obj, idx);
+		if (!this.placingRoom) obj.init();
 		return obj;
 	}
 
@@ -778,6 +816,7 @@ class World {
 			}
 		}
 
+		this.placingRoom = true;
 		for (const laymap of smap.layers) {
 			let lyr;
 			// a name starting with a caret adds to the layer before it
@@ -886,6 +925,8 @@ class World {
 				}
 			}
 		}
+
+		this.placingRoom = false;
 
 		// setup runs once everything exists, so it can find things in other layers
 		for (const lyr of layers) {

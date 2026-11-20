@@ -15,6 +15,18 @@ const SAVE_EVERY_UPDATES = 300;
 // adding this to the page address clears the save and neither reads nor writes it that visit
 const NO_SAVE_PARAM = "nosave";
 
+// The loading screen on the page canvas while the object files and sprite sheets arrive: its
+// background, text and bar colours, the text's font and gap above the bar, and the bar's size,
+// all in display pixels.
+const LOADING_BG_COLOR = "#101018";
+const LOADING_TEXT_COLOR = "#ffffff";
+const LOADING_BAR_COLOR = "#6688cc";
+const LOADING_BAR_BACK_COLOR = "#303040";
+const LOADING_FONT = "16px monospace";
+const LOADING_TEXT_GAP = 12;
+const LOADING_BAR_W = 320;
+const LOADING_BAR_H = 8;
+
 // Debug keys, held with control (or command). The browser's own meaning of them is blocked.
 // The first restarts the room fresh with the player alive at its start spot, the second brings
 // the player back alive where they stand with everything else about them reset.
@@ -58,6 +70,47 @@ const Hooks = {
 			return;
 		}
 		this.todo("scripts");
+	}
+};
+
+// Counts the files still to arrive and draws the loading screen each time the count changes.
+// The first frame of play draws over it, so it is gone once the first room is built.
+const Loading = {
+	total: 0,
+	loaded: 0,
+
+	expect(count) {
+		this.total += count;
+		this.draw();
+	},
+	done() {
+		this.loaded++;
+		this.draw();
+	},
+
+	draw() {
+		const ctx = Draw.ctx;
+		// kept apart from the game's own draw state
+		ctx.save();
+		ctx.setTransform(Draw.screenScale, 0, 0, Draw.screenScale, 0, 0);
+		ctx.globalAlpha = 1;
+		ctx.fillStyle = LOADING_BG_COLOR;
+		ctx.fillRect(0, 0, DISPLAY_W, DISPLAY_H);
+
+		const barx = Math.floor((DISPLAY_W - LOADING_BAR_W) / 2);
+		const bary = Math.floor((DISPLAY_H - LOADING_BAR_H) / 2);
+		ctx.fillStyle = LOADING_TEXT_COLOR;
+		ctx.font = LOADING_FONT;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "bottom";
+		ctx.fillText("Loading", DISPLAY_W / 2, bary - LOADING_TEXT_GAP);
+
+		ctx.fillStyle = LOADING_BAR_BACK_COLOR;
+		ctx.fillRect(barx, bary, LOADING_BAR_W, LOADING_BAR_H);
+		ctx.fillStyle = LOADING_BAR_COLOR;
+		const share = this.total > 0 ? Math.min(this.loaded / this.total, 1) : 0;
+		ctx.fillRect(barx, bary, Math.round(LOADING_BAR_W * share), LOADING_BAR_H);
+		ctx.restore();
 	}
 };
 
@@ -177,13 +230,22 @@ const Shell = {
 			img.onerror = reject;
 			img.src = path;
 		});
+		const loadScript = (path) => new Promise((resolve, reject) => {
+			const script = document.createElement("script");
+			script.onload = resolve;
+			script.onerror = () => reject(new Error(path));
+			script.src = path;
+			document.head.appendChild(script);
+		});
+
+		Loading.draw();
 
 		// a room asked for in the address wins over the save
 		let startName = startRoomFromAddress();
 		const saved = startName === undefined ? Save.read() : null;
 		if (saved !== null) startName = saved.room;
-		const roomText = await game.loadFiles(readText, startName);
-		await Sprites.load(readJson, loadImage, spriteNamesInRoom(roomText));
+		const roomText = await game.loadFiles(readText, startName, loadScript, Loading);
+		await Sprites.load(readJson, loadImage, spriteNamesInRoom(roomText), undefined, Loading);
 		await Draw.loadFonts(readJson, loadImage);
 		game.start(startName);
 		// back to where they were, unless the saved room was not there to start in

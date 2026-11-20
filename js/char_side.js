@@ -10,9 +10,8 @@ const SIDE_CLIMB_SPEED = 0.5;
 const SIDE_SHORT_JUMP_FRAMES = 7;
 
 class oCharSide extends oChar {
-	defaults(cfg) {
-		super.defaults(cfg);
-
+	constructor() {
+		super();
 		this.skin = "guy";
 		this.skin_hang_wch = "guy_hang_wch";
 
@@ -92,10 +91,6 @@ class oCharSide extends oChar {
 
 		this.dead = false;
 
-		// last spot we stood still, for saving and restoring
-		this.lastsx = this.x;
-		this.lastsy = this.y;
-
 		this.lookObjs = [];
 		this.curlooki = -1;
 
@@ -122,9 +117,12 @@ class oCharSide extends oChar {
 		this.cur_held_i = -1;
 	}
 
-	// sets the stand sprite, then the hang check mask for this skin
+	// sets the stand sprite, the last spot stood still to where it was placed, then the hang check mask for this skin
 	init() {
 		super.init();
+		// last spot we stood still, for saving and restoring
+		this.lastsx = this.x;
+		this.lastsy = this.y;
 		this.skin_hang_wch = Sprites.exists(this.skin + "_hang_wch") ? this.skin + "_hang_wch" : null;
 	}
 
@@ -906,4 +904,3 @@ class oCharSide extends oChar {
 	}
 }
 oCharSide.defaultSprite = "guy_stand";
-OBJECT_TYPES.oCharSide = oCharSide;

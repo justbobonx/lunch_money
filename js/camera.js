@@ -27,8 +27,8 @@ const CAM_ON_ME_PAN_TIME = 50;
 const CAM_ON_ME_BACK_TIME = 20;
 
 class oCamera extends oBaseObject {
-	defaults(cfg) {
-		super.defaults(cfg);
+	constructor() {
+		super();
 		this.initMoveable();
 		this.spi = "sBlankGrCtr";
 
@@ -332,16 +332,16 @@ class oCamera extends oBaseObject {
 
 // Keeps the camera out. Never drawn.
 class oCamBox extends oBaseObject {
-	defaults(cfg) {
-		super.defaults(cfg);
+	constructor() {
+		super();
 		this.pvis = false;
 	}
 }
 
 // A trigger area that pans the camera onto itself, zooming to fit, and back to the player on leaving.
 class oCamOnMe extends oTrigScript {
-	defaults(cfg) {
-		super.defaults(cfg);
+	constructor() {
+		super();
 		this.group = null;
 		this.only_inside = 1;
 		this.andzoom = 1;
@@ -366,7 +366,3 @@ class oCamOnMe extends oTrigScript {
 		game.cam.switchZoom(1, CAM_ON_ME_BACK_TIME);
 	}
 }
-
-OBJECT_TYPES.oCamera = oCamera;
-OBJECT_TYPES.oCamBox = oCamBox;
-OBJECT_TYPES.oCamOnMe = oCamOnMe;

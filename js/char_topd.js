@@ -19,9 +19,8 @@ const TOPD_LADDER_JUMP_BOOST = 0.7;
 const TOPD_RUN_SPRITE_SPEED = 1.4;
 
 class oCharTopd extends oChar {
-	defaults(cfg) {
-		super.defaults(cfg);
-
+	constructor() {
+		super();
 		this.skin = "guy";
 
 		this.ch_side = 0;
@@ -50,8 +49,6 @@ class oCharTopd extends oChar {
 
 		this.jumping = 0;
 		this.jumped = 1;
-		this.prejumpx = this.x;
-		this.prejumpy = this.y;
 
 		this.maxjumph = 1.0;
 		this.jumpRunBoost = 0.2;
@@ -105,10 +102,6 @@ class oCharTopd extends oChar {
 		this.deadXspd = 0;
 		this.deadYspd = 0;
 
-		this.lastsx = this.x;
-		this.lastsy = this.y;
-		this.lastsz = this.z;
-
 		this.xmoving = 0;
 		this.ymoving = 0;
 		this.moving = 0;
@@ -135,9 +128,14 @@ class oCharTopd extends oChar {
 		this.shadowSprite = null;
 	}
 
-	// sets the stand sprite, then the special top down mask and the reach mask
+	// sets the stand sprite, the jump and still spots to where it was placed, then the top down mask and the reach mask
 	init() {
 		super.init();
+		this.prejumpx = this.x;
+		this.prejumpy = this.y;
+		this.lastsx = this.x;
+		this.lastsy = this.y;
+		this.lastsz = this.z;
 		this.mask = Sprites.exists(this.skin + "_topd_mask") ? this.skin + "_topd_mask" : null;
 		this.look_mask = Sprites.exists(this.skin + "_ia_bb") ? this.skin + "_ia_bb" : null;
 	}
@@ -782,4 +780,3 @@ class oCharTopd extends oChar {
 	}
 }
 oCharTopd.defaultSprite = "guy_stand";
-OBJECT_TYPES.oCharTopd = oCharTopd;
