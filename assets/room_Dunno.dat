@@ -153,7 +153,7 @@
 				{
 					"spd":"0",
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 0,
 						"triggerScript": [
 							[ "switchCam", 1, 0 ],
@@ -613,7 +613,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":28,
 					"x_sc":0.15625,
@@ -666,7 +666,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":28,
 					"x_sc":0.15625,
@@ -719,7 +719,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":28,
 					"x_sc":0.15625,
@@ -888,7 +888,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 0,
 						"triggerScript": [
 							[ "lockCamTo", 18, 37, 20 ],
@@ -1355,7 +1355,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":193,
 					"x_sc":0.15625,
@@ -1366,7 +1366,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":121,
 					"x_sc":0.15625,
@@ -1377,7 +1377,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":193,
 					"x_sc":0.15625,
@@ -1388,7 +1388,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":122,
 					"x_sc":0.15625,
@@ -1399,7 +1399,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":184,
 					"x_sc":0.15625,
@@ -1813,7 +1813,7 @@
 				{
 					"spd":"0",
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 1,
 						"triggerScript": [
 							[ "adjInstVar", "arClimb","skore", 500 ],
@@ -2155,7 +2155,7 @@
 			"plx_y":1,
 			"visible":true,
 			"spriteList":[{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":384,
 				"y":155,
@@ -2222,14 +2222,14 @@
 				"spi":"dk_block_front_black",
 				"name":"18B613"
 			},{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":392,
 				"y":156,
 				"spi":"dk_block_front_black",
 				"name":"18B6DD"
 			},{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":400,
 				"y":155,

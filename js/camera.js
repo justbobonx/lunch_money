@@ -334,7 +334,7 @@ class oCamera extends oBaseObject {
 class oCamBox extends oBaseObject {
 	constructor() {
 		super();
-		this.pvis = false;
+		this.visible = false;
 	}
 }
 

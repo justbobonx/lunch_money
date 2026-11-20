@@ -751,7 +751,7 @@ class oCharTopd extends oChar {
 		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
 		if (this.shadowSprite !== null && !truthy(this.swimming) && !this.riding) {
 			Draw.spriteExt(this.shadowSprite, this.ifr, this.x + xoadj, this.y - this.z + this.haf,
-				xscale, this.y_sc, this.ang, this.col, this.alph);
+				xscale, this.y_sc, this.ang, this.col, this.alpha);
 		}
 		this.y -= this.z;
 		super.draw();
@@ -759,7 +759,7 @@ class oCharTopd extends oChar {
 
 		if (this.over_sprite !== null && this.over_sprite !== undefined) {
 			Draw.spriteExt(this.over_sprite, this.ifr, this.x, this.y - this.z + this.haf,
-				xscale, this.y_sc, this.ang, this.col, this.alph);
+				xscale, this.y_sc, this.ang, this.col, this.alpha);
 		}
 
 		if (drawCarry && (this.facing !== 0 || this.facingy > 0)) this.drawCarriedAtHeight();

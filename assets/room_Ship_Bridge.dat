@@ -144,7 +144,7 @@
 				},
 				{
 					"objinit":»{
-					  "pvis": 1
+					  "visible": 1
 					} «,
 					"x":159,
 					"isobj":"oEmptyObject",
@@ -176,7 +176,7 @@
 					"name":"5AE37"
 				},
 				{
-					"alph":0.3,
+					"alpha":0.3,
 					"x":159,
 					"col":"00AA00",
 					"y_sc":3.875,

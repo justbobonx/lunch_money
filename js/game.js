@@ -1,7 +1,7 @@
 // The game shell: loads the world, the sprites and the fonts, then runs the world at a fixed
 // rate whatever the display rate. Each browser frame runs the updates that are due, then draws
 // once if any ran, telling the drawing how many it covers so animation keeps update pace.
-// Sound, scripts, effects and the inventory are stand ins here that log
+// Sound, effects and the inventory are stand ins here that log
 // once what was asked of them, until their own stages exist.
 
 // the most steps run to catch up after a slow frame
@@ -91,14 +91,36 @@ const Hooks = {
 	say(who, text) {
 		this.todo("speech bubbles");
 	},
-	// A script given by name is looked up in the world's script file. Running them is a later stage.
-	// When done is given, it is called once the script finishes.
-	runScript(script, who, skippable, skipScript, done) {
-		if (typeof script === "string" && game.script_defs[script] === undefined) {
-			this.todo("script not in the world's script file: " + script);
-			return;
+	// Starts a script running for someone, the actor, and takes its first step now. A script or a
+	// skip script given by name is looked up in the world's script file. The caller is whoever
+	// started it, usually a trigger, and is what the script means by itself. When done is given,
+	// it is called once the script finishes. Gives back the runner.
+	runScript(script, who, skippable, skipScript, done, caller) {
+		if (typeof script === "string") {
+			if (game.script_defs[script] === undefined) {
+				this.todo("script not in the world's script file: " + script);
+				return undefined;
+			}
+			script = game.script_defs[script];
 		}
-		this.todo("scripts");
+		if (!Array.isArray(script)) return undefined;
+		if (typeof skipScript === "string") skipScript = game.script_defs[skipScript];
+		// a single action stands for a script of one
+		if (script.length > 0 && !Array.isArray(script[0])) script = [script];
+
+		// kept in the system layer no room switches off, so it carries on through a room change
+		const runner = game.createObject(oScripty, {
+			x: caller && typeof caller.x === "number" ? caller.x : 0,
+			y: caller && typeof caller.y === "number" ? caller.y : 0,
+			trigger: caller !== undefined ? caller : null,
+			script: script,
+			actor: game.lookupInst(who, caller) || null,
+			skippable: truthy(skippable),
+			skipScript: Array.isArray(skipScript) ? skipScript : -1,
+			onDone: done !== undefined ? done : null
+		}, game.etcLayer !== null ? game.etcLayer : undefined);
+		runner.update();
+		return runner;
 	}
 };
 

@@ -2060,7 +2060,7 @@
 					"name":"9AF6D"
 				},
 				{
-					"alph":0.3,
+					"alpha":0.3,
 					"x":10,
 					"col":"00AA00",
 					"y_sc":4,
@@ -2071,7 +2071,7 @@
 					"name":"ship_main_ent_bridge"
 				},
 				{
-					"alph":0.3,
+					"alpha":0.3,
 					"x":713,
 					"col":"00AA00",
 					"y_sc":4,
@@ -5818,7 +5818,7 @@
 				{
 					"exoffx":-1,
 					"objinit":»{
-					  "pvis": 0
+					  "visible": 0
 					}«,
 					"x":842,
 					"exoffy":-6,
@@ -5836,7 +5836,7 @@
 									[ "conOff" ],
 									[ "setVis", "ship_tel_1_speck", 1 ],
 									[ "wait", 60 ],
-									[ "obj_fade", "main_char", "image_alpha", 0, 90 ],
+									[ "obj_fade", "main_char", "alpha", 0, 90 ],
 									[ "wait", 120 ],
 									[ "setVis", "ship_tel_1_speck", 0 ],
 									[ "wait", 30 ],
@@ -5844,19 +5844,19 @@
 									[ "layerViz", "bdrop", 1 ],
 									[ "layerViz", "planets", 1 ],
 									[ "wait", 10 ],
-									[ "obj_fade", "ship_bg_starfield_top", "image_alpha", 0, 30 ],
+									[ "obj_fade", "ship_bg_starfield_top", "alpha", 0, 30 ],
 									[ "obj_fade", "ship_bg_starfield", "velox", 0, 60 ],
 									[ "wait", 180 ],
 									[ "layerViz", "*", 0 ],
 									[ "wait", 30 ],
 									[ "goto_room", "Pl_Autumn", "tele_in_1", 0, 0 ],						
 									[ "lockCamTo", "actor", 1 ],
-									[ "setInstVar", "main_char", "image_alpha", 0 ],									
+									[ "setInstVar", "main_char", "alpha", 0 ],									
 									[ "setVis", "pla_tele_in_speck", 0 ],
 									[ "wait", 60 ],
 									[ "setVis", "pla_tele_in_speck", 1 ],									
 									[ "wait", 60 ],
-									[ "obj_fade", "main_char", "image_alpha", 1, 90 ],
+									[ "obj_fade", "main_char", "alpha", 1, 90 ],
 									[ "wait", 120 ],
 									[ "setVis", "pla_tele_in_speck", 0 ],
 									[ "conOn" ]
@@ -5887,7 +5887,7 @@
 				{
 					"exoffx":7,
 					"objinit":»{
-						"pvis": 0
+						"visible": 0
 					}«,
 					"x":836,
 					"y_sc":9.5,

@@ -765,12 +765,12 @@
 							[ "sayWfB","Teleport?","actor",0,-40,
 								[ ["Yes" , [
 									[ "conOff" ],									
-									[ "obj_fade", "main_char", "image_alpha", 0, 90 ],
+									[ "obj_fade", "main_char", "alpha", 0, 90 ],
 									[ "wait", 120 ],
 									[ "goto_room", "TestDev", "main_char" ],
 									[ ".destroy", "main_char" ],
-									[ ".setInstVar", "main_char", "image_alpha", 0 ],									
-									[ ".obj_fade", "main_char", "image_alpha", 1, 90 ],
+									[ ".setInstVar", "main_char", "alpha", 0 ],									
+									[ ".obj_fade", "main_char", "alpha", 1, 90 ],
 									[ ".wait", 120 ],									
 									[ "conOn" ]
 								  ]],
@@ -791,7 +791,7 @@
 				{
 					"exoffx":-1,
 					"objinit":»{
-					  "pvis": 1
+					  "visible": 1
 					}«,
 					"x":220,
 					"exoffy":-6,
@@ -820,14 +820,14 @@
 							[ "sayWfB","Teleport?","actor",0,-40,
 								[ ["Yes" , [
 									[ "conOff" ],									
-									[ "obj_fade", "main_char", "image_alpha", 0, 90 ],
+									[ "obj_fade", "main_char", "alpha", 0, 90 ],
 									[ "wait", 120 ],
 									[ "goto_room", "Ship", "ship_tele_in_1", 0, 1 ],
 									[ "layerViz", "cur", "*", 0 ],
 									[ "layerViz", "cur", "bdrop", 1 ],
 									[ "layerViz", "cur", "eng*", 1 ],
-									[ "setInstVar", "main_char", "image_alpha", 0 ],									
-									[ "obj_fade", "main_char", "image_alpha", 1, 90 ],
+									[ "setInstVar", "main_char", "alpha", 0 ],									
+									[ "obj_fade", "main_char", "alpha", 1, 90 ],
 									[ "wait", 120 ],									
 									[ "conOn" ]
 								  ]],
@@ -907,7 +907,7 @@
 				{
 					"exoffx":5,
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":263,
 					"y_sc":11,
@@ -979,11 +979,11 @@
 							[ "sayWfB","Teleport?","actor",0,-40,
 								[ ["Yes" , [
 									[ "conOff" ],									
-									[ "obj_fade", "main_char", "image_alpha", 0, 90 ],
+									[ "obj_fade", "main_char", "alpha", 0, 90 ],
 									[ "wait", 120 ],
 									[ "goto_room", "BitWorld", "main_char" ],
-									[ "setInstVar", "main_char", "image_alpha", 0 ],									
-									[ "obj_fade", "main_char", "image_alpha", 1, 90 ],
+									[ "setInstVar", "main_char", "alpha", 0 ],									
+									[ "obj_fade", "main_char", "alpha", 1, 90 ],
 									[ "wait", 120 ],									
 									[ "conOn" ]
 								  ]],

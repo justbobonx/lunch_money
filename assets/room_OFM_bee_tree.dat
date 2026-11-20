@@ -78,7 +78,7 @@
 				"spi":"sSolidWh",
 				"name":"18BBF5"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"tiledx":1,
 				"x":1.000366,
 				"col":"005500",
@@ -221,25 +221,25 @@
 				"spi":"sSolidWh",
 				"name":"18D424"
 			},{
-				"alph":0.8,
+				"alpha":0.8,
 				"x":59,
 				"y":9.59991,
 				"spi":"aut_cloud_1",
 				"name":"18D446"
 			},{
-				"alph":0.8,
+				"alpha":0.8,
 				"x":164,
 				"y":-23.400037,
 				"spi":"aut_cloud_1",
 				"name":"18D447"
 			},{
-				"alph":0.8,
+				"alpha":0.8,
 				"x":307,
 				"y":13.599902,
 				"spi":"aut_cloud_1",
 				"name":"18D448"
 			},{
-				"alph":0.7,
+				"alpha":0.7,
 				"x":117,
 				"y_sc":0.5,
 				"x_sc":0.5,
@@ -247,7 +247,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D449"
 			},{
-				"alph":0.7,
+				"alpha":0.7,
 				"x":269,
 				"y_sc":0.5,
 				"x_sc":0.5,
@@ -255,7 +255,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44A"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":61,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -263,7 +263,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44B"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":114,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -271,7 +271,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44C"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":185,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -279,7 +279,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44D"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":223,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -287,7 +287,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44E"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":257,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -295,7 +295,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D44F"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":315,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -303,7 +303,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D450"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"x":12,
 				"y_sc":0.25,
 				"x_sc":0.25,
@@ -311,7 +311,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D451"
 			},{
-				"alph":0.7,
+				"alpha":0.7,
 				"x":3,
 				"y_sc":0.5,
 				"x_sc":0.5,
@@ -319,7 +319,7 @@
 				"spi":"aut_cloud_1",
 				"name":"18D452"
 			},{
-				"alph":0.7,
+				"alpha":0.7,
 				"x":202,
 				"y_sc":0.5,
 				"x_sc":0.5,
@@ -343,7 +343,7 @@
 				"name":"18BBEF",
 				"tiledy":1
 			},{
-				"alph":0.1,
+				"alpha":0.1,
 				"x":-33,
 				"col":"000000",
 				"y_sc":0.5,

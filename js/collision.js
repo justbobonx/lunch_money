@@ -1,7 +1,7 @@
 // Overlap tests between object masks, the family of place and position checks the movers use.
 // Masks come from the sprite record: a rectangle with an offset from the origin, or a circle.
 // Bounding boxes are whole pixels and include both edges, like the original.
-// Objects that are deactivated or destroyed never collide, and an object never hits itself.
+// Objects that are not active or are destroyed never collide, and an object never hits itself.
 
 // Turns an object's mask at a given spot into a shape: a whole pixel box,
 // plus a polygon when a turning mask is rotated, or a circle.
@@ -186,7 +186,7 @@ const Collision = {
 		const me = maskShape(this, x, y);
 		if (!me) return null;
 		for (const o of game.instances) {
-			if (o === this || o.deactivated || o.destroyed || !matchesType(o, what)) continue;
+			if (o === this || !o.active || o.destroyed || !matchesType(o, what)) continue;
 			const s = maskShape(o, o.x, o.y);
 			if (s && shapesOverlap(me, s)) return o;
 		}
@@ -200,7 +200,7 @@ const Collision = {
 		if (!me) return 0;
 		const found = [];
 		for (const o of game.instances) {
-			if (o === this || o.deactivated || o.destroyed || !matchesType(o, what)) continue;
+			if (o === this || !o.active || o.destroyed || !matchesType(o, what)) continue;
 			const s = maskShape(o, o.x, o.y);
 			if (s && shapesOverlap(me, s)) found.push(o);
 		}
@@ -214,7 +214,7 @@ const Collision = {
 	// First object of the type covering a point, optionally skipping the asker.
 	collisionPoint(px, py, what, precise, notme) {
 		for (const o of game.instances) {
-			if ((truthy(notme) && o === this) || o.deactivated || o.destroyed || !matchesType(o, what)) continue;
+			if ((truthy(notme) && o === this) || !o.active || o.destroyed || !matchesType(o, what)) continue;
 			const s = maskShape(o, o.x, o.y);
 			if (s && pointInShape(s, px, py)) return o;
 		}

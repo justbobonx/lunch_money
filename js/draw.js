@@ -106,7 +106,7 @@ class lpSprite {
 		this.y_sc = 1;
 		this.ang = 0;
 		this.col = NO_TINT;
-		this.alph = 1;
+		this.alpha = 1;
 
 		// repeated instead of stretched, one way or both, and sliding with the camera to look endless
 		this.tiledx = 0;
@@ -127,8 +127,8 @@ class lpSprite {
 		this.t_flipy = 1;
 
 		// shown in play, and switched off by itself or with its group
-		this.pvis = true;
-		this.pdis = 0;
+		this.visible = true;
+		this.disabled = 0;
 
 		// its name in the room, the layer it sits in, and whether it is gone
 		this.name = undefined;
@@ -146,7 +146,7 @@ class lpSprite {
 const LP_SPRITE_DEFAULTS = new lpSprite();
 
 // What a room file saves for everything it places. A missing one takes the default.
-const LP_SAVED_FIELDS = ["spi", "ifr", "spd", "x", "y", "exoffx", "exoffy", "x_sc", "y_sc", "ang", "col", "alph",
+const LP_SAVED_FIELDS = ["spi", "ifr", "spd", "x", "y", "exoffx", "exoffy", "x_sc", "y_sc", "ang", "col", "alpha",
 	"tiledx", "tiledy", "tile_loop"];
 
 const Draw = {
@@ -348,7 +348,7 @@ const Draw = {
 		let xo = -this.curdrawoffx;
 		let yo = -this.curdrawoffy;
 		if (!truthy(s.tiled)) {
-			this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alph);
+			this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alpha);
 			return;
 		}
 		const tx = truthy(s.tiledx);
@@ -368,7 +368,7 @@ const Draw = {
 		for (let j = 0; j < s.t_spw; j += jinc) {
 			for (let k = 0; k < s.t_sph; k += kinc) {
 				this.spriteRaw(s.spi, s.ifr, bx + snap(j - stx + xo), by + snap(k - sty + yo),
-					flipx, flipy, s.ang, s.col, s.alph);
+					flipx, flipy, s.ang, s.col, s.alpha);
 			}
 		}
 	},
@@ -789,7 +789,7 @@ const Draw = {
 				if (truthy(loopY)) obj.y = lpSty + ((obj.y - lpSty + loopY) % loopY);
 
 				// hidden objects count too, so triggers and markers can be found
-				if (inspecting && obj instanceof oBaseObject && !obj.deactivated && !obj.destroyed) {
+				if (inspecting && obj instanceof oBaseObject && obj.active && !obj.destroyed) {
 					let shape = maskShape(obj, obj.x, obj.y - obj.z);
 					const rec = shape ? null : Sprites.peek(obj.spi);
 					if (rec) {
@@ -807,7 +807,7 @@ const Draw = {
 					if (shape && pointInShape(shape, mlx, mly)) hits.push({ obj: obj, layer: lyr, shape: shape });
 				}
 
-				if (!truthy(obj.pvis) || truthy(obj.pdis)) continue;
+				if (!truthy(obj.visible) || truthy(obj.disabled)) continue;
 				this.totSpriteDrwn++;
 				// objects draw themselves, by default through the same sprite draw as pictures
 				if (obj instanceof oBaseObject) obj.draw();

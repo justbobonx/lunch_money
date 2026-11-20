@@ -1,5 +1,5 @@
 // Basic building blocks any game can use: floors, walls, one way floors, ladders, ropes, crates,
-// doors, triggers, signs, masks and one time effects.
+// doors, triggers, signs, masks, one time effects and value faders.
 
 // Stretchable ground: an edge strip along the top and a fill stretched over the rest, each eight pixels square.
 class oFloor extends oGround {
@@ -12,9 +12,9 @@ class oFloor extends oGround {
 	}
 	draw() {
 		Draw.spriteExt(this.top_spr, this.ifr, this.x, this.y, this.sprite_width / 8, 1,
-			this.ang, this.col, this.alph);
+			this.ang, this.col, this.alpha);
 		Draw.spriteExt(this.mid_spr, this.ifr, this.x, this.y + 8, this.sprite_width / 8, (this.sprite_height - 8) / 8,
-			this.ang, this.col, this.alph);
+			this.ang, this.col, this.alpha);
 	}
 }
 
@@ -83,7 +83,7 @@ class oBox extends oGround {}
 class oBlankGr extends oGround {
 	constructor() {
 		super();
-		this.pvis = false;
+		this.visible = false;
 	}
 }
 
@@ -129,7 +129,7 @@ class oFxOneShot extends oBaseObject {
 		this.yspd = 0;
 		// how much it fades per update
 		this.aspd = 0;
-		this.pvis = false;
+		this.visible = false;
 		this.spd = 0;
 		this.onAnimEnd = (self) => self.destroy();
 	}
@@ -138,13 +138,39 @@ class oFxOneShot extends oBaseObject {
 		if (this.delaystart > 0) {
 			this.delaystart--;
 		} else {
-			this.pvis = true;
+			this.visible = true;
 			this.spd = this.ispeed;
 
 			this.x += this.xspd;
 			this.y += this.yspd;
-			this.alph -= this.aspd;
+			this.alpha -= this.aspd;
 		}
+	}
+}
+
+// Eases one value of an object to a new one in equal steps over a number of updates, then is gone.
+class oFader extends oBaseObject {
+	constructor() {
+		super();
+		this.visible = false;
+		this.obj = null;
+		this.obj_var = "";
+		this.cur_val = 0;
+		this.final_val = 0;
+		this.val_inc = 0;
+		this.time = 0;
+	}
+
+	init() {
+		super.init();
+		this.cur_val = this.obj[this.obj_var];
+		this.val_inc = (this.final_val - this.cur_val) / this.time;
+	}
+
+	update() {
+		this.cur_val += this.val_inc;
+		this.obj[this.obj_var] = this.cur_val;
+		if (eq(this.cur_val, this.final_val)) this.destroy();
 	}
 }
 
@@ -401,7 +427,7 @@ class oSign extends oIaBgObject {
 		this.step = 0;
 
 		if (truthy(this.lookScript)) {
-			Hooks.runScript(this.lookScript, this, this.skippable, this.skipScript);
+			Hooks.runScript(this.lookScript, this, this.skippable, this.skipScript, undefined, this);
 		}
 	}
 
@@ -429,7 +455,7 @@ class oSpriteTiler extends oBaseObject {
 		if (!(this.w > 0) || !(this.h > 0)) return;
 		for (let i = 0; i < this.sprite_width; i += this.w) {
 			for (let k = 0; k < this.sprite_height; k += this.h) {
-				Draw.spriteExt(this.spi, this.ifr, this.x + i, this.y + k, 1, 1, 0, this.col, this.alph);
+				Draw.spriteExt(this.spi, this.ifr, this.x + i, this.y + k, 1, 1, 0, this.col, this.alpha);
 			}
 		}
 	}
@@ -476,7 +502,6 @@ class oText extends oBaseObject {
 		this.step = 0;
 		this.font = "ftSmall";
 		this.color = "#ffffff";
-		this.alphac = 1;
 		this.text = "";
 		this.blinkr = 0;
 		this.xoffset = "c";
@@ -504,12 +529,12 @@ class oText extends oBaseObject {
 		Draw.setFont(this.font);
 		if (truthy(this.shadow)) {
 			Draw.color = "#000000";
-			Draw.alpha = this.alphac * this.alphash;
+			Draw.alpha = this.alpha * this.alphash;
 			Draw.textTransformed(this.x - this.exoffx + xo + 1, this.y - this.exoffy + yo + 1, this.text,
 				this.linesep, this.twidth, 1, 1, this.ang);
 		}
 		Draw.color = this.color;
-		Draw.alpha = this.alphac;
+		Draw.alpha = this.alpha;
 		Draw.textTransformed(this.x - this.exoffx + xo, this.y - this.exoffy + yo, this.text,
 			this.linesep, this.twidth, 1, 1, this.ang);
 		Draw.alpha = 1;
@@ -542,7 +567,6 @@ class oPuMsg extends oBaseObject {
 		this.choicePickedColor = "#ffff00";
 		this.shadowColor = "#000000";
 
-		this.alpha = 1;
 		this.alphac = this.alpha;
 		// updates held before fading, and updates the fade takes
 		this.fadestart = 30;
@@ -675,7 +699,7 @@ class oPuMsg extends oBaseObject {
 								this.call_script.enter_subscript(choice[1]);
 							} else {
 								// run on its own, and whoever waits on this message now waits on that
-								Hooks.runScript(choice[1], this.sayer !== null ? this.sayer : this, undefined, undefined, this.onDone);
+								Hooks.runScript(choice[1], this.sayer !== null ? this.sayer : this, undefined, undefined, this.onDone, this);
 								this.onDone = null;
 							}
 						}

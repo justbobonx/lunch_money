@@ -69,7 +69,7 @@ class oRocketpack extends oIaBgObject {
 	constructor() {
 		super();
 		this.initPickupable();
-		this.active = 0;
+		this.itemOn = 0;
 	}
 }
 mixin(oRocketpack, Pickupable);

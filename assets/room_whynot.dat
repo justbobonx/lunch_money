@@ -286,7 +286,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":193,
 					"x_sc":0.15625,
@@ -297,7 +297,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":121,
 					"x_sc":0.15625,
@@ -308,7 +308,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":193,
 					"x_sc":0.15625,
@@ -319,7 +319,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":122,
 					"x_sc":0.15625,
@@ -330,7 +330,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":184,
 					"x_sc":0.15625,
@@ -598,7 +598,7 @@
 				{
 					"spd":"0",
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 1,
 						"triggerScript": [
 							[ "adjInstVar", "arClimb","skore", 500 ],
@@ -884,7 +884,7 @@
 				{
 					"spd":"0",
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 1,
 						"triggerScript": [
 							[ "adjInstVar", "arClimb","skore", 500 ],
@@ -1527,35 +1527,35 @@
 			"wd":320,
 			"visible":0,
 			"spriteList":[{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":375,
 				"y":155,
 				"spi":"dk_block_front_black",
 				"name":"18B5E4"
 			},{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":387,
 				"y":155,
 				"spi":"dk_block_front_black",
 				"name":"18B6DD"
 			},{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":396,
 				"y":155,
 				"spi":"dk_block_front_black",
 				"name":"18B6DE"
 			},{
-				"alph":0.6,
+				"alpha":0.6,
 				"tiledx":1,
 				"x":404,
 				"y":155,
 				"spi":"dk_block_front_black",
 				"name":"18B8EC"
 			},{
-				"alph":0.8,
+				"alpha":0.8,
 				"tiledx":1,
 				"x":411,
 				"y":155,
@@ -1848,7 +1848,7 @@
 							[ "conOff" ],
 							[ "lockCamTo", 0 ],
 							[ ".say", "Uh oh...", "actor", 0, -19, 50 ],
-							[ "setInstVar", "main_char", "pvis", 0 ],
+							[ "setInstVar", "main_char", "visible", 0 ],
 							[ "add_onefx", "sGrGrSplash", "actor" ],
 							[ "wait", 60 ],
 							[ "lockCamTo", 350, 280, 30 ],

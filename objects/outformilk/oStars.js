@@ -96,7 +96,7 @@ class oStarField extends oBaseObject {
 			Draw.color = this.covercolor;
 			Draw.alpha = this.coveralpha;
 			Draw.rectangle(this.x, this.y, this.x + this.starfw, this.y + this.starfh, 0);
-			Draw.alpha = this.alph;
+			Draw.alpha = this.alpha;
 		}
 
 		for (const star of this.starfield) {
@@ -108,7 +108,7 @@ class oStarField extends oBaseObject {
 			const br = this.brightnessBase + this.brightnessSwing * Math.abs(Math.sin(star.arot));
 			Draw.spriteExt(star.sprite, 0, ox + star.x, oy + star.y,
 				1 + this.velox * star.depth, 1 + this.veloy * star.depth,
-				0, star.color, br * this.alph);
+				0, star.color, br * this.alpha);
 		}
 
 		if (this.shooterFreq > 0 && currentTime() > this.nextShot) {
@@ -135,7 +135,7 @@ class oStarField extends oBaseObject {
 		for (let i = 0; i < this.shooters.length; i++) {
 			const shoot = this.shooters[i];
 
-			Draw.spriteExt(shoot.sprite, 0, ox + shoot.x, oy + shoot.y, shoot.warpw, 1, 0, "#ffffff", shoot.a * this.alph);
+			Draw.spriteExt(shoot.sprite, 0, ox + shoot.x, oy + shoot.y, shoot.warpw, 1, 0, "#ffffff", shoot.a * this.alpha);
 
 			shoot.a += shoot.aspd;
 

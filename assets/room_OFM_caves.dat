@@ -218,7 +218,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"no_trig_on_reenter":1,
 						"triggerScript": [
 							[ "goto_room", "OutForMilk", "beach_cave_1", 1,1 ],

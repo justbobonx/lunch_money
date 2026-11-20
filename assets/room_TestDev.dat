@@ -795,7 +795,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis": 0
+						"visible": 0
 					}«,
 					"x":270,
 					"x_sc":0.15625,
@@ -3753,7 +3753,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":225,
 					"x_sc":0.15625,
@@ -4399,7 +4399,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis": 1,
+						"visible": 1,
 						"trigOnce": 0,
 						"only_inside": 1,
 						"triggerScript": [
@@ -4416,18 +4416,18 @@
 				},
 				{
 					"objinit":»{
-						"pvis": 1,
+						"visible": 1,
 						"trigOnce": 0,
 						"only_inside": 1,
 						"triggerScript": [
 							[ "sayWfB","Teleport?","actor",0,-40,
 								[ ["Yes" , [
 									[ "conOff" ],
-									[ ".obj_fade", "main_char", "image_alpha", 0, 90 ],
+									[ ".obj_fade", "main_char", "alpha", 0, 90 ],
 									[ ".wait", 120 ],
 									[ "goto_room", "NextRoom", "door_next_to_test" ],
-									[ ".setInstVar", "main_char", "image_alpha", 0 ],
-									[ ".obj_fade", "main_char", "image_alpha", 1, 90 ],
+									[ ".setInstVar", "main_char", "alpha", 0 ],
+									[ ".obj_fade", "main_char", "alpha", 1, 90 ],
 									[ ".wait", 120 ],
 									[ "conOn" ]
 								]],
@@ -4498,7 +4498,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"hangable":false
 					}«,
 					"tiledx":1,
@@ -4662,7 +4662,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0
+						"visible":0
 					}«,
 					"x":359,
 					"y_sc":2.041667,
@@ -4734,7 +4734,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce": 0,
 						"triggerScript": [
 							[ "lockCamTo", "actor", 20 ],
@@ -5416,21 +5416,21 @@
 					"name":"18BF3F"
 				},
 				{
-					"alph":0.5,
+					"alpha":0.5,
 					"x":511,
 					"y":21,
 					"spi":"sTree1",
 					"name":"29C38"
 				},
 				{
-					"alph":0.5,
+					"alpha":0.5,
 					"x":499,
 					"y":27,
 					"spi":"sTree1",
 					"name":"1B9F9"
 				},
 				{
-					"alph":0.5,
+					"alpha":0.5,
 					"x":482,
 					"y":31,
 					"spi":"sTree1",
@@ -5445,7 +5445,7 @@
 			"spriteList":[
 				{
 					"objinit":»{
-						"pvis":0,
+						"visible":0,
 						"trigOnce": 0,
 						"only_inside": 1,
 						"triggerScript": [
@@ -5468,7 +5468,7 @@
 					"name":"0456B"
 				},
 				{
-					"alph":0.5,
+					"alpha":0.5,
 					"x":446,
 					"y":2,
 					"spi":"sTree1",
@@ -5488,7 +5488,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0,
+						"visible":0,
 						"trigOnce": 0,
 						"only_inside": 1,
 						"triggerScript": [

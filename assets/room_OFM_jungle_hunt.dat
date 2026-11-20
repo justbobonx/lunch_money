@@ -476,7 +476,7 @@
 				"spi":"road_dirt_gr_lr",
 				"name":"18CD2F"
 			},{
-				"alph":0.2,
+				"alpha":0.2,
 				"x":331,
 				"col":"FFFFCC",
 				"y_sc":10,
@@ -489,7 +489,7 @@
 				"spi":"s_stone_sm",
 				"name":"18CD0E"
 			},{
-				"alph":0.2,
+				"alpha":0.2,
 				"x":333,
 				"col":"000000",
 				"y_sc":15.5,

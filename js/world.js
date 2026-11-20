@@ -108,7 +108,7 @@ class Room {
 		this.name = name;
 		this.layers = null;
 		this.wd = DEFAULT_ROOM_W;
-		this.enabled = 1;
+		this.disabled = 0;
 		this.lastscrox = 0;
 		this.lastscroy = 0;
 		this.last_layer_st = null;
@@ -161,6 +161,10 @@ class World {
 		this.cur_areas_inview = [];
 		// scripts from the world's script file, by name
 		this.script_defs = {};
+		// what scripts remember while playing: values by name, and values kept per object name.
+		// Only in memory until saving comes along.
+		this.gameState = {};
+		this.objState = {};
 		// settings for named objects, gathered from each room's object file as rooms are built
 		this.object_defs = {};
 		// the world's goal list, for the goal keeper that comes with a later stage
@@ -433,9 +437,9 @@ class World {
 
 	// A port of the original's world clearing, which it runs when play ends: every room's layers
 	// and everything in them destroyed, the shared system layers dropped, the lists of names,
-	// groups and object settings emptied, and the player forgotten. The rooms themselves stay
-	// listed with their files so any of them can be built again. The world's script and goal
-	// files are fixed data, so they stay loaded instead of being read again.
+	// groups, object settings and what scripts remembered emptied, and the player forgotten.
+	// The rooms themselves stay listed with their files so any of them can be built again. The
+	// world's script and goal files are fixed data, so they stay loaded instead of being read again.
 	clearWorld() {
 		this.guy = null;
 		// objects are destroyed, so they take what they own with them, pictures are just dropped
@@ -452,7 +456,7 @@ class World {
 			}
 			rm.layers = null;
 			rm.mainchar = null;
-			rm.enabled = 1;
+			rm.disabled = 0;
 			rm.last_layer_st = null;
 			rm.lastlyr = undefined;
 			rm.lastx = undefined;
@@ -465,6 +469,8 @@ class World {
 		this.allObjects = Object.create(null);
 		this.obj_groups = Object.create(null);
 		this.object_defs = {};
+		this.gameState = {};
+		this.objState = {};
 		this.cur_areas_inview.length = 0;
 		this.popupLayer = null;
 		this.popupHdLayer = null;
@@ -574,8 +580,36 @@ class World {
 		this.cam.follow = this.guy;
 	}
 
+	// The state scripts keep for an object, by the object or its name, made empty the first time.
+	objStateOf(obj) {
+		const key = typeof obj === "string" ? obj : String(obj.name);
+		if (this.objState[key] === undefined) this.objState[key] = {};
+		return this.objState[key];
+	}
+
+	// Brings the player back to life where they are: switched on, alive, shown, standing, still,
+	// with their controls back and their sprite picked again.
 	reviveGuy() {
-		Hooks.todo("reviving the player");
+		const guy = this.guy;
+		this.setObjEnabled(guy, 1);
+		guy.dead = false;
+		guy.hit = 0;
+		guy.hit_dead = 0;
+		guy.visible = true;
+		guy.paused = 0;
+		guy.con.conOff = 0;
+		guy.diving = false;
+		guy.crawling = false;
+		guy.rolling = 0;
+		guy.xspd = 0;
+		guy.rx = 0;
+		guy.yspd = 0;
+		guy.ry = 0;
+		guy.zspd = 0;
+		guy.z = 0;
+		guy.drawSprite = null;
+		guy.spd = 1;
+		guy.otherstate = false;
 	}
 
 	// ------------------------------------------------------------ layers
@@ -590,7 +624,7 @@ class World {
 		obj.mylayer = lyr;
 		if (obj.name === undefined || obj.name === 0) obj.name = this.nextUid();
 		this.allObjects[obj.name] = obj;
-		if (obj instanceof oBaseObject) obj.deactivated = truthy(lyr.disabled);
+		this.updateActive(obj);
 	}
 
 	layerRemove(lyr, obj) {
@@ -621,12 +655,10 @@ class World {
 	// Triggers coming back on forget who was standing in them, unless told not to.
 	layerSetEnabled(lyr, enabled) {
 		if (enabled !== undefined) lyr.disabled = truthy(enabled) ? 0 : 1;
-		const on = truthy(this.curroom.enabled) && !truthy(lyr.disabled);
 		for (const spr of lyr.lsprites) {
 			if (!(spr instanceof oBaseObject)) continue;
-			const oenabled = on && !truthy(spr.pdis);
-			spr.deactivated = !oenabled;
-			if (oenabled && spr.inTrigger !== undefined && !truthy(spr.no_trig_on_reenter)) {
+			this.updateActive(spr);
+			if (spr.active && spr.inTrigger !== undefined && !truthy(spr.no_trig_on_reenter)) {
 				spr.inTrigger = 0;
 				spr.triggered = 0;
 			}
@@ -651,20 +683,28 @@ class World {
 
 	// A whole room on or off, its one shot effects cleared first.
 	roomSetEnabled(rm, enabled) {
-		rm.enabled = enabled;
+		rm.disabled = truthy(enabled) ? 0 : 1;
 		Hooks.todo("clearing one shot effects on a room change");
 		for (const lyr of rm.layers) this.layerSetEnabled(lyr);
 	}
 
 	// One object on or off. Off also takes it out of its layer's order, on puts it back on top.
 	setObjEnabled(obj, enabled) {
-		if (obj instanceof oBaseObject) obj.deactivated = !truthy(enabled);
-		const pdis = !truthy(enabled);
-		if (truthy(obj.pdis) !== pdis && obj.mylayer) {
-			if (pdis) this.layerRemove(obj.mylayer, obj);
+		const disabled = !truthy(enabled);
+		if (truthy(obj.disabled) !== disabled && obj.mylayer) {
+			if (disabled) this.layerRemove(obj.mylayer, obj);
 			else obj.mylayer.lsprites.push(obj);
 		}
-		obj.pdis = pdis ? 1 : 0;
+		obj.disabled = disabled ? 1 : 0;
+		this.updateActive(obj);
+	}
+
+	// The one place an object's active comes from: on only when the current room, its layer and
+	// the object itself are all switched on. Out of any layer it is never on.
+	updateActive(obj) {
+		if (!(obj instanceof oBaseObject)) return;
+		const lyr = obj.mylayer;
+		obj.active = !!lyr && !truthy(this.curroom.disabled) && !truthy(lyr.disabled) && !truthy(obj.disabled);
 	}
 
 	groupSetEnabled(grp, enabled) {
@@ -928,7 +968,7 @@ class World {
 					this.layerInsert(lyr, obj);
 				} else {
 					// in no layer means never on
-					obj.deactivated = true;
+					obj.active = false;
 					this.allObjects[obj.name] = obj;
 				}
 			}
@@ -1052,7 +1092,7 @@ class World {
 
 		this.weather.set_weather(0);
 		this.spotOn = false;
-		if (this.curroom.enter_script !== undefined) Hooks.runScript(this.curroom.enter_script, this);
+		if (this.curroom.enter_script !== undefined) Hooks.runScript(this.curroom.enter_script, this, undefined, undefined, undefined, this);
 		this.cam.fastjump = 1;
 	}
 
@@ -1110,7 +1150,7 @@ class World {
 
 		this.switchRoom(toroom);
 		guy = this.guy;
-		guy.deactivated = false;
+		guy.active = true;
 
 		let enterato;
 		if (enterat === "last_spot" && this.curroom.lastlyr !== undefined) {
@@ -1182,7 +1222,7 @@ class World {
 			// a copy, so objects made or destroyed during the step do not upset the walk
 			const live = this.instances.slice();
 			for (const o of live) {
-				if (o.deactivated || o.destroyed) continue;
+				if (!o.active || o.destroyed) continue;
 				if (o.timers !== null) o.countDownTimers();
 				if (o.destroyed) continue;
 				// every mover remembers where it started the frame, so anything riding it can copy its move
@@ -1193,7 +1233,7 @@ class World {
 				o.update();
 			}
 			for (const o of live) {
-				if (o.deactivated || o.destroyed || o.afterUpdate === undefined) continue;
+				if (!o.active || o.destroyed || o.afterUpdate === undefined) continue;
 				o.afterUpdate();
 			}
 		}

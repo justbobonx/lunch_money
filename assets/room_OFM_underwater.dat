@@ -117,7 +117,7 @@
 					"field_loop":1,
 					"st_per_sqp": 0.001
 				}«,
-				"alph":0.4,
+				"alpha":0.4,
 				"x":-5,
 				"col":"9999FF",
 				"y_sc":96.5,
@@ -217,7 +217,7 @@
 					"field_loop":1,
 					"st_per_sqp": 0.002
 				}«,
-				"alph":0.7,
+				"alpha":0.7,
 				"x":-4,
 				"col":"9999FF",
 				"y_sc":96.5,
@@ -1493,7 +1493,7 @@
 					"field_loop":1,
 					"st_per_sqp": 0.001	
 				}«,
-				"alph":0.4,
+				"alpha":0.4,
 				"x":-4,
 				"col":"9999FF",
 				"y_sc":96.5,
@@ -1512,7 +1512,7 @@
 			"wd":320,
 			"visible":1,
 			"spriteList":[{
-				"alph":0.5,
+				"alpha":0.5,
 				"tiledx":1,
 				"x":231,
 				"col":"5064FB",
@@ -1522,7 +1522,7 @@
 				"name":"18C5F0",
 				"tiledy":1
 			},{
-				"alph":0.5,
+				"alpha":0.5,
 				"x":231,
 				"col":"5064FB",
 				"x_sc":578,

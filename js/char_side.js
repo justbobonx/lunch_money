@@ -306,7 +306,7 @@ class oCharSide extends oChar {
 
 		// won or dead: still falls and rides moving things while visible
 		if (truthy(this.otherstate) || truthy(this.dead)) {
-			if (truthy(this.pvis)) {
+			if (truthy(this.visible)) {
 				// a dead fall already has its contact flags cleared
 				this.applyFrictionGravity();
 				if (truthy(this.deadfall)) {

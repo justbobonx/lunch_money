@@ -33,7 +33,7 @@ const Interactive = {
 	// by default say the description if there is one
 	acton(action, who, pars) {
 		if (this.description !== undefined) {
-			Hooks.runScript([["sayWfB", this.description, "actor", 0, -10, 0, 0]], this);
+			Hooks.runScript([["sayWfB", this.description, "actor", 0, -10, 0, 0]], this, undefined, undefined, undefined, this);
 		}
 	},
 
@@ -51,7 +51,7 @@ const Pickupable = {
 		this.holdable = false;
 		this.over_con = false;
 		// an item's own on or off switch, minus one when it has none
-		this.active = -1;
+		this.itemOn = -1;
 		this.carriedBy = null;
 		this.can_jump = 1;
 		this.can_diveroll = 1;
@@ -112,8 +112,9 @@ class oBaseObject {
 		this.dmi = null;
 		// comes along when the player changes rooms
 		this.persistent = false;
-		// switched off with its layer, then it neither runs, collides nor draws
-		this.deactivated = false;
+		// on only while its room, its layer and the object itself are all switched on; off, it
+		// neither runs nor collides. Only the world sets it.
+		this.active = true;
 		// functions waiting a number of updates
 		this.timers = null;
 
@@ -264,7 +265,7 @@ class oSolidGr extends oGround {
 		for (let j = 0; j < this.t_spw; j += this.t_w) {
 			for (let k = 0; k < this.t_sph; k += this.t_h) {
 				Draw.spriteExt(this.spi, this.ifr, this.x + j - this.t_stx, this.y + k - this.t_sty,
-					this.t_flipx, this.t_flipy, this.ang, this.col, this.alph);
+					this.t_flipx, this.t_flipy, this.ang, this.col, this.alpha);
 			}
 		}
 	}
@@ -293,7 +294,7 @@ function killGuy(amount, time, xminmax, yminmax, leavevis, soundfx) {
 	if (time === undefined) time = 1;
 
 	// only if they are still there
-	if (truthy(guy.pvis)) {
+	if (truthy(guy.visible)) {
 		Hooks.particles("death spray", guy, guy.x, guy.y, {
 			amount: amount / time, time: time,
 			xminmax: (xminmax !== undefined && xminmax !== 0) ? xminmax : [-1, 1],
@@ -302,7 +303,7 @@ function killGuy(amount, time, xminmax, yminmax, leavevis, soundfx) {
 			colors: ["#ff0000", "#990000", "#cc0000"]
 		});
 
-		guy.pvis = truthy(leavevis);
+		guy.visible = truthy(leavevis);
 
 		if (soundfx !== undefined) Hooks.sound(soundfx);
 	}
@@ -359,7 +360,7 @@ class oWater extends oBaseObject {}
 class oFloorEffect extends oBaseObject {
 	constructor() {
 		super();
-		this.pvis = false;
+		this.visible = false;
 	}
 	// called by whoever stands on it so it can change their movement
 	effect_obj(obj, acc, maxspd) {}
@@ -369,7 +370,7 @@ class oFloorEffect extends oBaseObject {
 class oTrigger extends oBaseObject {
 	constructor() {
 		super();
-		this.pvis = false;
+		this.visible = false;
 		// was on by default once, it almost never should be
 		this.trigOnce = 0;
 		this.only_inside = false;
@@ -456,10 +457,10 @@ class oTrigScript extends oTrigger {
 		this.trigOffScript = -1;
 	}
 	on_trigger() {
-		Hooks.runScript(this.triggerScript, this.whotriggered, this.skippable, this.skipScript);
+		Hooks.runScript(this.triggerScript, this.whotriggered, this.skippable, this.skipScript, undefined, this);
 	}
 	off_trigger() {
-		if (this.trigOffScript !== -1) Hooks.runScript(this.trigOffScript, this.whotriggered);
+		if (this.trigOffScript !== -1) Hooks.runScript(this.trigOffScript, this.whotriggered, undefined, undefined, undefined, this);
 	}
 }
 
@@ -616,7 +617,7 @@ class oActor extends oBaseObject {
 		const xscale = this.facing === 0 ? 1 : this.facing;
 		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
 		Draw.spriteExt(this.spi, this.ifr, this.x + xoadj, this.y, xscale, this.y_sc,
-			this.ang, this.col, this.alph);
+			this.ang, this.col, this.alpha);
 		if (game.drawStats) {
 			Draw.color = truthy(this.facing) ? "#ff0000" : "#ff00ff";
 			Draw.rectangle(this.x, this.y + this.z, this.x, this.y + this.z, 0);
@@ -727,9 +728,9 @@ class oChar extends oActor {
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
 		let deathSpray = null;
-		if (truthy(this.pvis)) {
+		if (truthy(this.visible)) {
 			deathSpray = Hooks.particles("death spray", this, this.x, this.y);
-			this.pvis = leavevis === true || leavevis === 1;
+			this.visible = leavevis === true || leavevis === 1;
 			if (soundfx !== undefined) Hooks.sound(soundfx);
 		}
 		return deathSpray;
@@ -741,9 +742,9 @@ class oChar extends oActor {
 		this.dead = true;
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
-		if (truthy(this.pvis)) {
+		if (truthy(this.visible)) {
 			Hooks.particles("death spray, two bursts", this, this.x, this.y);
-			this.pvis = leavevis === true || leavevis === 1;
+			this.visible = leavevis === true || leavevis === 1;
 			if (soundfx !== undefined) Hooks.sound(soundfx);
 		}
 	}

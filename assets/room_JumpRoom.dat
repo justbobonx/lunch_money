@@ -512,7 +512,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis": 1,
+						"visible": 1,
 						"trigOnce": 0,
 						"only_inside": 1,
 						"triggerScript": [
@@ -544,7 +544,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":0,
+						"visible":0,
 						"trigOnce": 0,
 						"only_inside": 0,
 						"triggerScript": [
@@ -613,7 +613,7 @@
 				},
 				{
 					"objinit":»{
-						"pvis":1,
+						"visible":1,
 						"trigOnce":0,
 					  "triggerScript": [
 					    [ "say", "a bush", "actor", 0, -19, 50 ]
