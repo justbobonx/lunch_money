@@ -188,6 +188,9 @@ class oCrateBg extends oIaObject {
 			this.yspd += 0.05;
 		}
 		this.moveThroughObjects(this.xspd, this.yspd);
+    
+    this.lastx = this.x;
+    this.lasty = this.y;
 	}
 }
 
