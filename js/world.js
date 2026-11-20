@@ -20,7 +20,7 @@ const OBJECT_TREE_FILE = "assets/object_tree.json";
 // The world file names the object folders it uses. A generated list says which files each folder
 // under the object directory holds, since the page cannot list a folder either.
 const OBJECT_DIR = "objects/";
-const OBJECT_FILE_LIST = OBJECT_DIR + "files.json";
+const OBJECT_FILE_LIST = OBJECT_DIR + "object_file_map.json";
 
 // The original's name for the world, which names its script and goal files.
 // The goal file keeps the original's spelling.

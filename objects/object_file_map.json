@@ -1,0 +1,14 @@
+{
+	"outformilk": [
+		"goItems.js",
+		"goJungle.js",
+		"goPlaceholders.js",
+		"goRats.js",
+		"goTechno.js",
+		"oBird.js",
+		"oBoxfall.js",
+		"oDoggie.js",
+		"oSnow.js",
+		"oStars.js"
+	]
+}
