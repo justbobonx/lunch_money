@@ -32,6 +32,8 @@ const LOADING_BAR_H = 8;
 // the player back alive where they stand with everything else about them reset.
 const DEBUG_KEY_RESTART_ROOM = "KeyR";
 const DEBUG_KEY_REVIVE_PLAYER = "KeyE";
+// With the arrows, the player hops this far that way, straight through anything in the way.
+const DEBUG_HOP_DIST = 30;
 
 // Calls out to systems that come in later stages. Each one logs the first time it is asked.
 const Hooks = {
@@ -185,6 +187,10 @@ const Debug = {
 			if (!(e.ctrlKey || e.metaKey)) return;
 			if (e.code === DEBUG_KEY_RESTART_ROOM) this.pending = "restart";
 			else if (e.code === DEBUG_KEY_REVIVE_PLAYER) this.pending = "revive";
+			else if (e.code === "ArrowLeft") this.pending = "hop_left";
+			else if (e.code === "ArrowRight") this.pending = "hop_right";
+			else if (e.code === "ArrowUp") this.pending = "hop_up";
+			else if (e.code === "ArrowDown") this.pending = "hop_down";
 			else return;
 			e.preventDefault();
 			e.stopImmediatePropagation();
@@ -199,7 +205,22 @@ const Debug = {
 		if (what === "restart") {
 			// the world cleared and the room started again, as the room picker does
 			if (game.enterRoom(game.curroomi)) Save.write();
-		} else if (game.guy !== null) {
+		} else if (game.guy === null) {
+			return;
+		} else if (what.startsWith("hop")) {
+			// a plain jump to the new spot with all motion dropped, so the movers see no travel
+			const guy = game.guy;
+			if (what === "hop_left") guy.x -= DEBUG_HOP_DIST;
+			else if (what === "hop_right") guy.x += DEBUG_HOP_DIST;
+			else if (what === "hop_up") guy.y -= DEBUG_HOP_DIST;
+			else guy.y += DEBUG_HOP_DIST;
+			guy.xspd = 0;
+			guy.yspd = 0;
+			guy.rx = 0;
+			guy.ry = 0;
+			guy.lastx = guy.x;
+			guy.lasty = guy.y;
+		} else {
 			game.guy.reviveInPlace();
 			game.settleGuy();
 			Save.write();

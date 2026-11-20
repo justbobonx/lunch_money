@@ -27,6 +27,8 @@ const OBJECT_FILE_LIST = OBJECT_DIR + "files.json";
 const WORLD_NAME = "world";
 const WORLD_SCRIPTS_FILE = ROOM_DIR + WORLD_NAME + "_scripts.dat";
 const WORLD_GOALS_FILE = ROOM_DIR + WORLD_NAME + "_golas.dat";
+// where the debug overlay remembers being on or off between visits
+const DEBUG_OVERLAY_KEY = "lunch_money_debug_overlay";
 const ROOM_OBJECT_DEFS_SUFFIX = "_obj_defs.dat";
 
 // The room play starts in. It overrides the world file's own start room, which is kept as the
@@ -172,7 +174,10 @@ class World {
 		// objects that come along when the player changes rooms, waiting to be placed in the new one
 		this.carryOver = [];
 		this.curuid = 0;
-		this.drawStats = DRAW_STATS_AT_START;
+		// the overlay comes back the way it was last left, the starting setting only counts the first time
+		let kept = null;
+		try { kept = localStorage.getItem(DEBUG_OVERLAY_KEY); } catch (e) { /* nothing kept */ }
+		this.drawStats = kept === null ? DRAW_STATS_AT_START : kept === "1";
 		this.popupLayer = null;
 		this.popupHdLayer = null;
 		this.guiLayer = null;
@@ -1161,7 +1166,10 @@ class World {
 		}
 
 		this.frames++;
-		if (Input.pressed.Tab) this.drawStats = !this.drawStats;
+		if (Input.pressed.Tab) {
+			this.drawStats = !this.drawStats;
+			try { localStorage.setItem(DEBUG_OVERLAY_KEY, this.drawStats ? "1" : "0"); } catch (e) { /* nothing kept */ }
+		}
 
 		Hooks.lines.length = 0;
 
