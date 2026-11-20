@@ -32,8 +32,14 @@ const Input = {
 	pad: null,
 	padPrev: {},
 	padNow: {},
+	// The mouse over the game's canvas, in display pixels, and a click caught since the last read.
+	// The click is cleared by whoever reads it, since the overlay that reads it draws after the step.
+	mouseX: 0,
+	mouseY: 0,
+	mouseIn: false,
+	mouseClicked: false,
 
-	attach(target) {
+	attach(target, canvas) {
 		target.addEventListener("keydown", (e) => {
 			if (!this.down[e.code]) {
 				this.pressed[e.code] = true;
@@ -48,6 +54,23 @@ const Input = {
 		});
 		target.addEventListener("blur", () => {
 			this.down = {};
+		});
+		if (!canvas) return;
+		// the canvas is shown at a whole multiple of the display, so its shown size maps straight
+		// to display pixels whatever its real pixel count for the screen's density
+		const track = (e) => {
+			const r = canvas.getBoundingClientRect();
+			this.mouseX = (e.clientX - r.left) / r.width * DISPLAY_W;
+			this.mouseY = (e.clientY - r.top) / r.height * DISPLAY_H;
+			this.mouseIn = true;
+		};
+		canvas.addEventListener("mousemove", track);
+		canvas.addEventListener("mousedown", (e) => {
+			track(e);
+			if (e.button === 0) this.mouseClicked = true;
+		});
+		canvas.addEventListener("mouseleave", () => {
+			this.mouseIn = false;
 		});
 	},
 

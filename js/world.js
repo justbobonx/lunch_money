@@ -151,6 +151,8 @@ class World {
 		this.guy = null;
 		// made before anything in a room, so it runs ahead of them
 		this.controller = new Controller();
+		// the one messages and menus read, never switched off, so they answer while the player's is
+		this.uiController = new Controller();
 		this.cam = new oCamera();
 		this.cam.configure({});
 		this.cam.init();
@@ -349,6 +351,7 @@ class World {
 		this.drawPaused = false;
 		cam.fastjump = 1;
 		this.controller.conOff = false;
+		this.uiController.conOff = false;
 
 		this.loading = 1;
 		const info = this.worldInfo || DEFAULT_WORLD;
@@ -1158,6 +1161,7 @@ class World {
 		Input.pollPad();
 		// the controller is read ahead of everyone so characters see this frame's buttons
 		this.controller.poll();
+		this.uiController.poll();
 
 		if (this.goto_room !== null) {
 			const g = this.goto_room;

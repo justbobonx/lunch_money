@@ -1,7 +1,7 @@
 // The game shell: loads the world, the sprites and the fonts, then runs the world at a fixed
 // rate whatever the display rate. Each browser frame runs the updates that are due, then draws
 // once if any ran, telling the drawing how many it covers so animation keeps update pace.
-// Sound, scripts, effects, pop up messages and the inventory are stand ins here that log
+// Sound, scripts, effects and the inventory are stand ins here that log
 // once what was asked of them, until their own stages exist.
 
 // the most steps run to catch up after a slow frame
@@ -59,14 +59,41 @@ const Hooks = {
 	sound(name) {
 		this.todo("sound " + name);
 	},
-	popMessage(who, text, offx, offy) {
-		this.todo("pop up message");
+	// A pop up message above someone, or at a room spot when who is 0, by default a little above
+	// the top of their sprite. Text that is a list shows one after another. The options can set its
+	// fade start and time, float speeds, backing and its colour, text colour, fade, and quick print,
+	// which shows the whole text at once. Gives back the message.
+	popMessage(who, text, offx, offy, opts) {
+		if (who === undefined || who === null || text === undefined) return undefined;
+		const o = opts || {};
+		let mx = 0;
+		let my = 0;
+		if (who !== 0) {
+			const rec = who.spi ? Sprites.peek(who.spi) : null;
+			mx = who.x;
+			my = who.y - (rec ? rec.oy : 0) - 2;
+		}
+		mx += offx !== undefined ? offx : 0;
+		my += offy !== undefined ? offy : -10;
+
+		const cfg = { x: mx, y: my, sayer: who, center: true };
+		if (Array.isArray(text)) cfg.text_list = text;
+		else cfg.text = text;
+		for (const k of ["fadestart", "fadetime", "floatspdx", "floatspdy", "drawbg", "bgcolor", "alpha"]) {
+			if (o[k] !== undefined) cfg[k] = o[k];
+		}
+		if (o.textcolor !== undefined) cfg.color = o.textcolor;
+
+		const msg = game.createObject(oPuMsg, cfg, game.popupLayer);
+		if (o.quick_print) msg.endTexting();
+		return msg;
 	},
 	say(who, text) {
 		this.todo("speech bubbles");
 	},
 	// A script given by name is looked up in the world's script file. Running them is a later stage.
-	runScript(script, who, skippable, skipScript) {
+	// When done is given, it is called once the script finishes.
+	runScript(script, who, skippable, skipScript, done) {
 		if (typeof script === "string" && game.script_defs[script] === undefined) {
 			this.todo("script not in the world's script file: " + script);
 			return;
@@ -236,7 +263,7 @@ const Shell = {
 		const ctx = canvas.getContext("2d");
 		Draw.attach(ctx);
 		Debug.attach(window);
-		Input.attach(window);
+		Input.attach(window, canvas);
 		Save.attach(window);
 		roomPicker.attach(canvas);
 

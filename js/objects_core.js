@@ -96,6 +96,16 @@ class oGrWall extends oGround {
 }
 class oGrWall2 extends oGrWall {}
 
+// Grass ground: can't be hung from.
+class oGrGrass extends oGround {
+	constructor() {
+		super();
+		this.hangable = false;
+		this.landed = true;
+	}
+}
+oGrGrass.defaultSprite = "sGrGrass";
+
 class oOneWayDoor extends oGround {
 	constructor() {
 		super();
@@ -353,6 +363,59 @@ class oDoor extends oIaBgObject {
 }
 oDoor.defaultSprite = "sDoor";
 
+// A sign that shows its message when looked at, and hides it on a second look or once out of view.
+class oSign extends oIaBgObject {
+	constructor() {
+		super();
+		this.spd = 0;
+		this.step = 0;
+		this.message = "HI!";
+		this.xoffset = 0;
+		this.yoffset = -30;
+		this.lookScript = 0;
+		this.skippable = false;
+		this.skipScript = [];
+		this.center = 1;
+		this.popupMsg = null;
+		// how its message shows: long before fading, then a slow fade, on a backing
+		this.msgFadeStart = 300;
+		this.msgFadeTime = 60;
+		this.msgBgColor = "#996633";
+		this.msgTextColor = "#ffffff";
+		// how quickly the message fades once out of view
+		this.outOfViewFade = 20;
+	}
+
+	acton(action, who) {
+		if (this.popupMsg !== null && !this.popupMsg.destroyed) {
+			this.popupMsg.destroy();
+			this.popupMsg = null;
+			return;
+		}
+
+		this.popupMsg = Hooks.popMessage(this, this.message, this.xoffset, this.yoffset,
+			{ fadestart: this.msgFadeStart, fadetime: this.msgFadeTime, floatspdx: 0, floatspdy: 0,
+				drawbg: true, bgcolor: this.msgBgColor, textcolor: this.msgTextColor, quick_print: true }) || null;
+		if (this.popupMsg !== null) this.popupMsg.tx_center = this.center;
+
+		this.step = 0;
+
+		if (truthy(this.lookScript)) {
+			Hooks.runScript(this.lookScript, this, this.skippable, this.skipScript);
+		}
+	}
+
+	// once out of view, the message jumps to its fade
+	update() {
+		if (!truthy(this.inview) && this.popupMsg !== null && !this.popupMsg.destroyed) {
+			this.popupMsg.step = this.popupMsg.fadestart;
+			this.popupMsg.fadetime = this.outOfViewFade;
+			this.popupMsg = null;
+		}
+	}
+}
+oSign.defaultSprite = "sSign";
+
 // Repeats its sprite at unit size over its stretched area.
 class oSpriteTiler extends oBaseObject {
 	init() {
@@ -450,6 +513,253 @@ class oText extends oBaseObject {
 		Draw.textTransformed(this.x - this.exoffx + xo, this.y - this.exoffy + yo, this.text,
 			this.linesep, this.twidth, 1, 1, this.ang);
 		Draw.alpha = 1;
+	}
+}
+
+// A pop up message: text typed out above whoever said it, or a list of texts one after another,
+// then held, faded and floated away. A fade time of zero waits for a button instead, and a choice
+// list then lets the player pick one. A negative fade time leaves it up until someone else ends it.
+// Typing is counted in updates, from the original's milliseconds, so it pauses with the game.
+class oPuMsg extends oBaseObject {
+	constructor() {
+		super();
+		// updates per millisecond, for the waits below
+		const perMs = GAME_FPS / 1000;
+		this.font = "ftTiny";
+		// who said it, 0 for a room spot
+		this.sayer = null;
+		// the text showing, or null to take the next from the list
+		this.text = null;
+		this.text_list = null;
+		this.text_li = -1;
+
+		// each choice is its label, then the script it runs when picked
+		this.choice_list = null;
+		this.cur_ch_i = 0;
+		this.choosing = false;
+		this.color = "#eeeeee";
+		this.choiceColor = "#aaaabb";
+		this.choicePickedColor = "#ffff00";
+		this.shadowColor = "#000000";
+
+		this.alpha = 1;
+		this.alphac = this.alpha;
+		// updates held before fading, and updates the fade takes
+		this.fadestart = 30;
+		this.fadetime = 30;
+		// how quickly it fades once a button has dismissed it
+		this.dismissFade = 10;
+
+		this.drawbg = false;
+		this.bgcolor = "#332288";
+		this.alphabg = 0.8;
+		this.bgSprite = "sBgBlox3";
+		this.choiceBgSprite = "sBgBlox_btm_out";
+
+		// centred on its spot, or starting just right of it
+		this.center = true;
+		// each line centred within the box
+		this.tx_center = 0;
+		this.max_width = 180;
+		// lines are this share of the font's height apart
+		this.lineShare = 0.9;
+		// how wide a choice can be before it wraps, so in practice never
+		this.choiceMaxWidth = 1000;
+
+		this.floatspdx = 0;
+		this.floatspdy = 0;
+
+		this.step = 0;
+
+		this.texting = true;
+		this.curtext = "";
+		this.curtextpos = 0;
+		// waits in updates before the first letter, after each letter, after a space, a comma,
+		// and the end of a sentence
+		this.typeStartWait = 100 * perMs;
+		this.typeLetterWait = 10 * perMs;
+		this.typeSpaceWait = 40 * perMs;
+		this.typeCommaWait = 70 * perMs;
+		this.typeSentenceWait = 170 * perMs;
+		this.textWait = this.typeStartWait;
+
+		// the flashing arrow that says a button moves on, and how long each of its frames shows
+		this.button_sp = "s_msg_done";
+		this.buttonFrameUpdates = 300 * perMs;
+
+		// whether the player's controls were already off, so they go back as they were
+		this.conwasoff = false;
+		// called once it is gone, so whoever is waiting on it can carry on
+		this.onDone = null;
+		// the script that showed it, which runs a picked choice as part of itself
+		this.call_script = null;
+	}
+
+	init() {
+		super.init();
+		this.alphac = this.alpha;
+	}
+
+	newText(newtext) {
+		this.text = newtext;
+		this.endTexting();
+	}
+
+	// shows the whole text at once
+	endTexting() {
+		if (this.text === null) return;
+		this.curtext = this.text;
+		this.curtextpos = this.text.length;
+	}
+
+	update() {
+		const con = game.uiController;
+
+		// nothing showing and a list, so the next one comes out
+		if (this.text === null && this.text_list !== null) {
+			this.text_li++;
+			this.text = this.text_list[this.text_li];
+			this.curtext = "";
+			this.curtextpos = 0;
+			this.textWait = this.typeStartWait;
+		}
+		this.textWait--;
+
+		const len = this.text === null ? 0 : this.text.length;
+		this.texting = this.curtextpos < len;
+
+		if (this.texting && con.iBtnA) this.endTexting();
+
+		// still typing, so one more letter when its wait is up and nothing else
+		if (this.texting) {
+			if (this.textWait <= 0) {
+				this.curtextpos++;
+				this.curtext = this.text.substring(0, this.curtextpos);
+				const ch = this.text.charAt(this.curtextpos - 1);
+				if (ch === " ") this.textWait = this.typeSpaceWait;
+				else if (ch === ",") this.textWait = this.typeCommaWait;
+				else if (ch === "!" || ch === "." || ch === "?") this.textWait = this.typeSentenceWait;
+				else this.textWait = this.typeLetterWait;
+			}
+			return;
+		}
+
+		// the wait after the last letter
+		if (this.textWait > 0) return;
+
+		const moreTexts = this.text_list !== null && this.text_li < this.text_list.length - 1;
+		this.choosing = !moreTexts && this.choice_list !== null;
+
+		// the original could step one past the last choice, here it stops on it
+		if (this.choosing) {
+			if (con.iLeftP || con.iUpP) this.cur_ch_i = Math.max(this.cur_ch_i - 1, 0);
+			if (con.iRightP || con.iDownP) this.cur_ch_i = Math.min(this.cur_ch_i + 1, this.choice_list.length - 1);
+		}
+
+		// someone else is in control
+		if (this.fadetime < 0) return;
+
+		if (this.fadetime === 0) {
+			if (con.iBtnA || con.iBtnX || (!this.choosing && con.iDownP)) {
+				if (moreTexts) {
+					this.text = null;
+				} else {
+					// controls back first, in case the choice's script turns them off again
+					game.controller.conOff = this.conwasoff;
+
+					if (this.choosing) {
+						const choice = this.choice_list[this.cur_ch_i];
+						if (choice.length > 1 && Array.isArray(choice[1])) {
+							// shown by a script, so the choice runs as part of that script, the usual case
+							if (this.call_script !== null) {
+								this.call_script.enter_subscript(choice[1]);
+							} else {
+								// run on its own, and whoever waits on this message now waits on that
+								Hooks.runScript(choice[1], this.sayer !== null ? this.sayer : this, undefined, undefined, this.onDone);
+								this.onDone = null;
+							}
+						}
+					}
+
+					this.fadetime = this.dismissFade;
+					this.fadestart = this.step;
+				}
+			}
+			return;
+		}
+
+		this.step++;
+		if (this.step > this.fadestart) {
+			this.alphac = this.alpha * ((this.fadestart + this.fadetime) - this.step) / this.fadetime;
+		}
+
+		this.x += this.floatspdx;
+		this.y += this.floatspdy;
+
+		if (this.step > this.fadestart + this.fadetime) {
+			if (this.onDone !== null) this.onDone();
+			this.destroy();
+		}
+	}
+
+	draw() {
+		if (this.text === null) return;
+
+		Draw.setFont(this.font);
+		const fht = Draw.stringHeight("M") * this.lineShare;
+		Draw.halign = truthy(this.tx_center) ? "center" : "left";
+		const twd = Draw.stringWidthExt(this.text, fht, this.max_width);
+		let tht = Draw.stringHeightExt(this.text, fht, this.max_width);
+
+		let tx = truthy(this.center) ? this.x - Math.floor(twd / 2) : this.x + 1;
+		const ty = this.y - tht - (this.choosing ? Draw.stringHeightExt(this.choice_list[0][0], fht, this.max_width) - 2 : 0);
+		const txwo = tx + (truthy(this.tx_center) ? Math.floor(twd / 2) : 0);
+		const buttonFrame = Math.floor(game.frames / this.buttonFrameUpdates) % 3;
+
+		if (truthy(this.drawbg)) {
+			Draw.alpha = this.alphac * this.alphabg;
+			Draw.color = this.bgcolor;
+			Draw.bgSquare(tx - 3, ty + 2, twd + 5, tht - 2, this.bgSprite);
+		}
+
+		Draw.alpha = this.alphac;
+		Draw.color = this.shadowColor;
+		Draw.textTransformed(txwo + 1, ty + 1, this.curtext, fht, twd, 1, 1, 0);
+		Draw.color = this.color;
+		Draw.textTransformed(txwo, ty, this.curtext, fht, twd, 1, 1, 0);
+
+		if (this.fadetime === 0 && !this.texting && !this.choosing) {
+			Draw.sprite(this.button_sp, buttonFrame, tx + twd, ty + tht);
+		}
+
+		// the choices in a row under the text, the picked one bright with the arrow under it
+		if (this.choosing) {
+			tx += 3;
+			tht -= 2;
+			let totchwd = 0;
+			for (let chi = 0; chi < this.choice_list.length; chi++) {
+				const choice = this.choice_list[chi][0];
+				const chwd = Draw.stringWidthExt(choice, fht, this.choiceMaxWidth);
+				const chht = Draw.stringHeightExt(choice, fht, this.choiceMaxWidth);
+
+				Draw.alpha = this.alphac * this.alphabg;
+				Draw.color = this.bgcolor;
+				Draw.bgSquare(tx + totchwd - 3, ty + tht + 2, chwd + 5, chht - 2, this.choiceBgSprite);
+
+				Draw.alpha = this.alphac;
+				Draw.color = this.shadowColor;
+				Draw.textTransformed(tx + totchwd + 1, ty + tht + 1, choice, fht, this.choiceMaxWidth, 1, 1, 0);
+				Draw.color = this.cur_ch_i === chi ? this.choicePickedColor : this.choiceColor;
+				Draw.textTransformed(tx + totchwd, ty + tht, choice, fht, this.choiceMaxWidth, 1, 1, 0);
+				totchwd += chwd + 7;
+
+				if (this.cur_ch_i === chi) Draw.sprite(this.button_sp, buttonFrame, tx + totchwd - 7, ty + tht + chht);
+			}
+		}
+
+		Draw.alpha = 1;
+		Draw.color = "#ffffff";
+		Draw.halign = "left";
 	}
 }
 

@@ -36,7 +36,7 @@ const NO_TINT = "#ffffff";
 
 // fonts read at start, each a json glyph table and a png beside it
 const FONT_DIR = "sprites/fonts/";
-const FONT_NAMES = ["ftSmall", "ftTiny"];
+const FONT_NAMES = ["ftSmall", "ftTiny", "ftTinyer", "ftArcade2"];
 
 // rooms ask for fonts that were never converted, those draw with this one instead
 const FONT_FALLBACK = "ftSmall";
@@ -62,6 +62,19 @@ const STATS_ALPHA_OFF = 0.3;
 const STATS_X = 6;
 const STATS_Y = -2;
 const STATS_LINE = 10;
+
+// With the debug overlay on, everything under the mouse is outlined and listed by the cursor.
+// The label's font, its gap from the cursor and its backing, in overlay pixels,
+// the fields shown when an object has them, and how long a shown value may run.
+const INSPECT_FONT = "ftTiny";
+const INSPECT_OFFSET_X = 8;
+const INSPECT_OFFSET_Y = 8;
+const INSPECT_PAD = 2;
+const INSPECT_TEXT_COLOR = "#ffffff";
+const INSPECT_BACK_COLOR = "#000000";
+const INSPECT_BACK_ALPHA = 0.6;
+const INSPECT_FIELDS = ["triggerScript", "trigOffScript", "lookScript", "enter_script", "conRoom", "message"];
+const INSPECT_VALUE_MAX = 40;
 
 // ---------------------------------------------------------------- placed sprites
 
@@ -170,6 +183,9 @@ const Draw = {
 	// smoothed frames per second for the overlay
 	fpsHist: 0,
 	lastFrameTime: 0,
+	// what the mouse was over in the last frame, top first, for the debug overlay
+	inspectHits: [],
+	inspectAreas: [],
 
 	attach(ctx) {
 		this.ctx = ctx;
@@ -407,6 +423,42 @@ const Draw = {
 
 	// ------------------------------------------------------------ shapes
 
+	// A box of any size built from a small sprite: its corners stay as they are, the single pixel
+	// row and column through its middle stretch to fill the edges and the inside. In the draw
+	// colour and fade, at a room position. A box smaller than the sprite draws nothing.
+	bgSquare(fx, fy, fw, fh, sprite) {
+		if (sprite === undefined) sprite = "sBgBlox";
+		const rec = Sprites.peek(sprite);
+		if (!rec) return;
+		const sprw = rec.w;
+		const sprh = rec.h;
+		if (fw < sprw || fh < sprh) return;
+
+		const cornw = Math.floor(sprw / 2);
+		const cornw1 = cornw + 1;
+		const cornwx2 = cornw * 2;
+		const cornh = Math.floor(sprh / 2);
+		const cornh1 = cornh + 1;
+		const cornhx2 = cornh * 2;
+		const cc = this.color;
+		const ca = this.alpha;
+
+		// corners: top left, top right, bottom left, bottom right
+		this.spritePartExt(sprite, 0, 0, 0, cornw, cornh, fx, fy, 1, 1, cc, ca);
+		this.spritePartExt(sprite, 0, cornw1, 0, cornw, cornh, fx + fw - cornw, fy, 1, 1, cc, ca);
+		this.spritePartExt(sprite, 0, 0, cornh1, cornw, cornh, fx, fy + fh - cornh, 1, 1, cc, ca);
+		this.spritePartExt(sprite, 0, cornw1, cornh1, cornw, cornh, fx + fw - cornw, fy + fh - cornh, 1, 1, cc, ca);
+
+		// edges: top, bottom, left, right
+		this.spritePartExt(sprite, 0, cornw, 0, 1, cornh, fx + cornw, fy, fw - cornwx2, 1, cc, ca);
+		this.spritePartExt(sprite, 0, cornw, cornh1, 1, cornh, fx + cornw, fy + fh - cornh, fw - cornwx2, 1, cc, ca);
+		this.spritePartExt(sprite, 0, 0, cornh, cornw, 1, fx, fy + cornh, 1, fh - cornhx2, cc, ca);
+		this.spritePartExt(sprite, 0, cornw1, cornh, cornw, 1, fx + fw - cornw, fy + cornh, 1, fh - cornhx2, cc, ca);
+
+		// inside
+		this.spritePartExt(sprite, 0, cornw, cornh, 1, 1, fx + cornw, fy + cornh, fw - cornwx2, fh - cornhx2, cc, ca);
+	},
+
 	// A box between two corners, both included, in the draw colour and fade.
 	rectangle(x1, y1, x2, y2, outline) {
 		const l = Math.floor(x1) - Math.floor(this.curdrawoffx);
@@ -486,6 +538,24 @@ const Draw = {
 	stringHeight(text) {
 		const font = this.currentFont();
 		return font ? String(text).split("\n").length * font.lineHeight : 0;
+	},
+
+	// The size of text as the full text draw lays it out: lines a given distance apart, or the
+	// font's own line height when that is minus one, wrapped at a width unless it is minus one.
+	// Guess: the height is the line count times the distance, the same as the text draw uses.
+	stringWidthExt(text, sep, width) {
+		const font = this.currentFont();
+		if (!font) return 0;
+		let w = 0;
+		for (const line of this.textLines(font, text, width)) w = Math.max(w, this.lineWidth(font, line));
+		return w;
+	},
+
+	stringHeightExt(text, sep, width) {
+		const font = this.currentFont();
+		if (!font) return 0;
+		const lh = sep === undefined || sep < 0 ? font.lineHeight : sep;
+		return this.textLines(font, text, width).length * lh;
 	},
 
 	// The engine's full text draw in target pixels: lines a given distance apart, or the font's
@@ -608,6 +678,12 @@ const Draw = {
 		this.totSpriteCnt = 0;
 		this.totSpriteDrwn = 0;
 
+		// The mouse is found on every layer by the same stretch and scroll the layer draws with,
+		// so parallax layers line up. Its spot on each layer is kept for the area test after.
+		const inspecting = g.drawStats && Input.mouseIn && !roomPicker.open;
+		const hits = [];
+		const mouseOnLayer = new Map();
+
 		for (const lyr of rm.layers) {
 			if (truthy(lyr.disabled)) continue;
 
@@ -691,6 +767,11 @@ const Draw = {
 				}
 			}
 
+			const mlx = (Input.mouseX - destx) * lyrw / destw + this.curdrawoffx;
+			const mly = (Input.mouseY - desty) * lyrh / desth + this.curdrawoffy;
+			mouseOnLayer.set(lyr, { x: mlx, y: mly });
+			const lyrHitsFrom = hits.length;
+
 			const loopX = lyr.loop_x;
 			const loopY = lyr.loop_y;
 			const lpStx = cam.x - loopX / 2;
@@ -706,6 +787,25 @@ const Draw = {
 				}
 				if (truthy(loopX)) obj.x = lpStx + ((obj.x - lpStx + loopX) % loopX);
 				if (truthy(loopY)) obj.y = lpSty + ((obj.y - lpSty + loopY) % loopY);
+
+				// hidden objects count too, so triggers and markers can be found
+				if (inspecting && obj instanceof oBaseObject && !obj.deactivated && !obj.destroyed) {
+					let shape = maskShape(obj, obj.x, obj.y - obj.z);
+					const rec = shape ? null : Sprites.peek(obj.spi);
+					if (rec) {
+						// no mask, so the sprite's box, turning ignored
+						const x0 = -rec.ox * obj.x_sc;
+						const x1 = (rec.w - rec.ox) * obj.x_sc;
+						const y0 = -rec.oy * obj.y_sc;
+						const y1 = (rec.h - rec.oy) * obj.y_sc;
+						shape = {
+							l: Math.floor(obj.x + Math.min(x0, x1)), t: Math.floor(obj.y - obj.z + Math.min(y0, y1)),
+							r: Math.ceil(obj.x + Math.max(x0, x1)) - 1, b: Math.ceil(obj.y - obj.z + Math.max(y0, y1)) - 1,
+							poly: null, circle: null
+						};
+					}
+					if (shape && pointInShape(shape, mlx, mly)) hits.push({ obj: obj, layer: lyr, shape: shape });
+				}
 
 				if (!truthy(obj.pvis) || truthy(obj.pdis)) continue;
 				this.totSpriteDrwn++;
@@ -739,8 +839,37 @@ const Draw = {
 				ctx.drawImage(lyr.layerSurf, destx, desty, destw, desth);
 			}
 
+			// outlines over everything the layer drew, at the layer's stretch even when it was buffered
+			if (hits.length > lyrHitsFrom) {
+				this.base = { sx: destw / lyrw, sy: desth / lyrh, ox: destx, oy: desty };
+				this.resetTransform();
+				ctx.globalAlpha = 1;
+				ctx.strokeStyle = UNPORTED_COLOR;
+				ctx.lineWidth = 1;
+				for (let i = lyrHitsFrom; i < hits.length; i++) {
+					const s = hits[i].shape;
+					ctx.strokeRect(s.l - Math.floor(this.curdrawoffx) + 0.5, s.t - Math.floor(this.curdrawoffy) + 0.5, s.r - s.l, s.b - s.t);
+				}
+			}
+
 			if (g.weather.on) Hooks.todo("weather");
 		}
+
+		// Areas whose bounds hold the mouse, tested on the layer their bounds sit in,
+		// or the player's when that layer did not draw.
+		const areas = [];
+		if (inspecting && rm.layer_groups) {
+			const guyLayer = g.guy ? g.guy.mylayer : null;
+			for (const key of Object.keys(rm.layer_groups)) {
+				const grp = rm.layer_groups[key];
+				const b = grp.bounds;
+				if (!b) continue;
+				const m = mouseOnLayer.get(b.mylayer) || mouseOnLayer.get(guyLayer);
+				if (m && m.x >= b.bbox_left && m.x <= b.bbox_right && m.y >= b.bbox_top && m.y <= b.bbox_bottom) areas.push(grp);
+			}
+		}
+		this.inspectHits = hits.reverse();
+		this.inspectAreas = areas;
 
 		this.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
 		this.subpixel = false;
@@ -775,6 +904,10 @@ const Draw = {
 			this.fpsHist = this.fpsHist * 0.975 + Math.min(fps, GAME_FPS) * 0.025;
 		}
 		this.lastFrameTime = now;
+
+		// a click is used up here whether or not anything is under it
+		const clicked = Input.mouseClicked;
+		Input.mouseClicked = false;
 
 		const ctx = this.ctx;
 		this.base = { sx: DISPLAY_W / GUI_W, sy: DISPLAY_H / GUI_H, ox: 0, oy: 0 };
@@ -831,5 +964,55 @@ const Draw = {
 			this.textRaw(STATS_X, STATS_Y + i * STATS_LINE, lines[i], -1, -1, 1, 1, 0);
 		}
 		this.alpha = 1;
+
+		// The mouse inspector: a line for each object under the mouse, then each area it is in,
+		// by the cursor and kept on screen. A click logs them in full.
+		const hits = this.inspectHits;
+		const areas = this.inspectAreas;
+		if (hits.length === 0 && areas.length === 0) return;
+		if (clicked) console.log("under the mouse", hits.map((h) => h.obj), areas);
+
+		// a list of lists is a script, anything else is shortened json
+		const show = (v) => {
+			if (Array.isArray(v) && v.length > 0 && v.every(Array.isArray)) return "script[" + v.length + "]";
+			let t = v;
+			if (typeof v === "object" && v !== null) {
+				try { t = JSON.stringify(v); } catch (e) { t = Array.isArray(v) ? "[...]" : "{...}"; }
+			}
+			t = String(t);
+			return t.length > INSPECT_VALUE_MAX ? t.substring(0, INSPECT_VALUE_MAX) + "..." : t;
+		};
+		const rows = [];
+		for (const h of hits) {
+			const o = h.obj;
+			let row = o.constructor.name + (o.name !== undefined && o.name !== null ? " " + o.name : "")
+				+ "  L:" + h.layer.name + "  S:" + o.spi;
+			for (const f of INSPECT_FIELDS) {
+				if (o[f] !== undefined && o[f] !== null && o[f] !== "") row += "  " + f + ":" + show(o[f]);
+			}
+			rows.push(row);
+		}
+		for (const grp of areas) {
+			rows.push("area " + grp.name + (grp.enter_script !== undefined ? "  enter_script:" + show(grp.enter_script) : ""));
+		}
+		const text = rows.join("\n");
+
+		this.setFont(INSPECT_FONT);
+		const w = this.stringWidth(text) + INSPECT_PAD * 2;
+		const h = this.stringHeight(text) + INSPECT_PAD * 2;
+		const mx = Input.mouseX * GUI_W / DISPLAY_W;
+		const my = Input.mouseY * GUI_H / DISPLAY_H;
+		// flipped to the cursor's other side when it would run off, then pinned inside
+		let lx = mx + INSPECT_OFFSET_X;
+		let ly = my + INSPECT_OFFSET_Y;
+		if (lx + w > GUI_W) lx = mx - INSPECT_OFFSET_X - w;
+		if (ly + h > GUI_H) ly = my - INSPECT_OFFSET_Y - h;
+		lx = Math.floor(Math.max(0, Math.min(lx, GUI_W - w)));
+		ly = Math.floor(Math.max(0, Math.min(ly, GUI_H - h)));
+		this.resetTransform();
+		ctx.globalAlpha = INSPECT_BACK_ALPHA;
+		ctx.fillStyle = INSPECT_BACK_COLOR;
+		ctx.fillRect(lx, ly, w, h);
+		this.guiText(lx + INSPECT_PAD, ly + INSPECT_PAD, text, INSPECT_TEXT_COLOR, 1, INSPECT_FONT);
 	}
 };

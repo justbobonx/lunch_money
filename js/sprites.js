@@ -15,6 +15,10 @@ const SPRITE_DIR = "sprites/";
 // so the characters do not flash as boxes while their poses arrive.
 const SPRITE_PRELOAD_PREFIXES = ["guy_", "tem_"];
 
+// The engine's own interface sprites. No room places them, so they are always loaded before play
+// begins, from a sheet when one has them and loose otherwise.
+const SPRITE_ALWAYS_LOAD = ["sBgBlox3", "sBgBlox_btm_out", "s_msg_done"];
+
 // size used for any level sprite that is neither in the index nor guessed
 const UNKNOWN_SPRITE_SIZE = 16;
 
@@ -97,7 +101,7 @@ const Sprites = {
 		// the no mask sprite exists so carried things stop colliding
 		this.records.sNoMask = { name: "sNoMask", w: 1, h: 1, ox: 0, oy: 0, mask: null, imageSpeed: 0, frameCount: 1, frames: null, image: null, state: "none", guessed: false };
 
-		const eager = new Set(wanted || []);
+		const eager = new Set([...(wanted || []), ...SPRITE_ALWAYS_LOAD]);
 		if (this.mode === "loose") {
 			for (const name of Object.keys(index)) {
 				if (SPRITE_PRELOAD_PREFIXES.some((p) => name.startsWith(p))) eager.add(name);
