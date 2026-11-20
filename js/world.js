@@ -1180,7 +1180,13 @@ class World {
 			for (const o of live) {
 				if (o.deactivated || o.destroyed) continue;
 				if (o.timers !== null) o.countDownTimers();
-				if (!o.destroyed) o.update();
+				if (o.destroyed) continue;
+				// every mover remembers where it started the frame, so anything riding it can copy its move
+				if (o.lastx !== undefined) {
+					o.lastx = o.x;
+					o.lasty = o.y;
+				}
+				o.update();
 			}
 			for (const o of live) {
 				if (o.deactivated || o.destroyed || o.afterUpdate === undefined) continue;

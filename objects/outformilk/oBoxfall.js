@@ -34,9 +34,6 @@ class oBoxFall extends oGround {
 
 		if (truthy(this.landed)) return;
 
-		this.lastx = this.x;
-		this.lasty = this.y;
-
 		this.calcOnFloorAtWall();
 
 		if (truthy(this.onFloor)) {

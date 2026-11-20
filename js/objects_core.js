@@ -148,8 +148,6 @@ class oCrate extends oIaObject {
 	}
 	update() {
 		this.calcOnFloorAtWall();
-		this.lastx = this.x;
-		this.lasty = this.y;
 		this.applyFrictionGravity();
 		if (!this.carriedBy) {
 			this.moveThroughObjectsSimple(this.xspd, this.yspd);
@@ -188,9 +186,6 @@ class oCrateBg extends oIaObject {
 			this.yspd += 0.05;
 		}
 		this.moveThroughObjects(this.xspd, this.yspd);
-    
-    this.lastx = this.x;
-    this.lasty = this.y;
 	}
 }
 
@@ -217,8 +212,6 @@ class oCrateMetal extends oIaObject {
 	update() {
 		this.calcOnFloorAtWall();
 		this.applyFrictionGravity();
-		this.lastx = this.x;
-		this.lasty = this.y;
 		this.moveThroughObjectsSimple(this.xspd, this.yspd);
 	}
 }

@@ -519,9 +519,6 @@ const Movers = {
 
 	// Moves by speeds ignoring every object, for background movers and the dead.
 	moveIgnoringObjects(xspd, yspd, zspd) {
-		this.lastx = this.x;
-		this.lasty = this.y;
-
 		if (eq(xspd, 0) && eq(yspd, 0) && (zspd === undefined || eq(zspd, 0))) return;
 
 		const whx = this.x + this.rx + xspd;
