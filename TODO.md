@@ -61,6 +61,7 @@
 - Mixin field clashes: the pickup item switch is now itemOn, since active is the engine flag; also owner of carriedBy and over_con, the acton rule.
 - A button held when a screen or message box closes leaks its release into play: press the drop button in the inventory, close it while still holding, let go, and the player drops what's in hand.
 - In loose sprite mode, sprites only spawned at runtime (star1, sShootingStar, s_snow_poof, sAniPop) may not load; packed mode loads all.
+- A pose name with a suffix that has no sprite (guy has no swim boost sprite, swim with carry and other combos nobody drew) falls straight back to stand; drop suffixes from the end until a sprite exists instead. Guy also needs a swim boost sprite made.
 - Graphics issues reported by the user, details to come.
 - Physics and collision issues reported by the user, details to come.
 

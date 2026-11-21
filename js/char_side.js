@@ -9,6 +9,14 @@ const SIDE_CLIMB_SPEED = 0.5;
 // how long a short tap on jump counts as short
 const SIDE_SHORT_JUMP_FRAMES = 7;
 
+// At the water's top, rising any slower than this is stopped, so only a swim boost or a jump
+// breaks out of the water.
+const SWIM_BREAKOUT_SPEED = 0.6;
+
+// How far past swim speed counts as boosting. Capping the speed through an angle and back leaves
+// it a hair off, so a plain comparison misreads cruising at full speed as a boost.
+const SWIM_BOOST_MARGIN = 0.05;
+
 class oCharSide extends oChar {
 	constructor() {
 		super();
@@ -222,7 +230,7 @@ class oCharSide extends oChar {
 		} else if (truthy(this.swimming)) {
 			if (truthy(this.moving)) {
 				si += "swim";
-				si += this.curswimspd > this.swimspd ? "_boost" : "";
+				si += this.curswimspd > this.swimspd + SWIM_BOOST_MARGIN ? "_boost" : "";
 			} else {
 				si += "float";
 			}
@@ -367,8 +375,10 @@ class oCharSide extends oChar {
 		// status updates
 		this.checkStartSwimming();
 
-		// at the top of the water when the point just above us is dry
-		const swimattop = truthy(this.swimming) && this.collisionPoint(this.x, this.y - 3, oWater, 0, 1) === null;
+		// At the top of the water when the top row of our collision box is dry. Changed from the
+		// original, which tested a point a fixed distance above our spot, so with a short box the two
+		// tests disagreed and a slow rise could lift the whole box out without ever counting as the top.
+		const swimattop = truthy(this.swimming) && this.collisionPoint(this.x, this.bbox_top, oWater, 0, 1) === null;
 
 		if (truthy(this.jumped) && (truthy(this.onFloor) || truthy(this.climbing) || truthy(this.hanging) || truthy(this.swimming))) {
 			this.jumped = 0;
@@ -390,10 +400,6 @@ class oCharSide extends oChar {
 			// slow first
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.swim_fric, 0);
 			this.yspd = sign(this.yspd) * Math.max(Math.abs(this.yspd) - this.swim_fric, 0);
-			// stop at the surface unless rising fast enough to break out
-			if (swimattop && this.yspd > -0.6) {
-				this.yspd = 0;
-			}
 
 			let curspdang = pointDistance(0, 0, this.xspd, this.yspd);
 
@@ -406,6 +412,13 @@ class oCharSide extends oChar {
 			curspdang = Math.min(newspdang, Math.max(this.swimspd, curspdang));
 			this.xspd = curspdang * Math.cos(goang / 180 * Math.PI);
 			this.yspd = curspdang * -Math.sin(goang / 180 * Math.PI);
+
+			// Stop at the surface unless rising fast enough to break out or steering down, which also
+			// catches us there when we fall in. Changed from the original, which stopped before adding
+			// the steering, so holding up crept us out of the water.
+			if (swimattop && this.yspd > -SWIM_BREAKOUT_SPEED && !(this.con.ljVp > 0)) {
+				this.yspd = 0;
+			}
 
 			// drift gently when not steering and below the surface
 			if (!this.con.iBtnAnyDir && !swimattop) {
@@ -712,7 +725,7 @@ class oCharSide extends oChar {
 
 		// swim boost instead of a jump, only once slowed from the last boost
 		this.curswimspd = pointDistance(0, 0, this.xspd, this.yspd);
-		if (this.con.iBtnA && truthy(this.swimming) && !swimattop && this.curswimspd <= this.swimspd) {
+		if (this.con.iBtnA && truthy(this.swimming) && !swimattop && this.curswimspd <= this.swimspd + SWIM_BOOST_MARGIN) {
 			this.xspd += this.swimboost * this.con.ljHp;
 			this.yspd += this.swimboost * this.con.ljVp;
 
