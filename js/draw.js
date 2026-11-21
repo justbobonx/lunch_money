@@ -17,9 +17,25 @@ const VIEW_H = 180;
 const DISPLAY_W = 640;
 const DISPLAY_H = 360;
 
-// The canvas's real pixels match the size it is shown at on the page, so the game is drawn
-// straight at screen resolution and the browser never stretches it. Everything is still laid out
-// in display pixels above and scaled up by this much.
+// The canvas's real pixels match the size it is shown at on the page, so the browser never stretches
+// it. Pixel perfect shows it at the largest whole multiple of the display and draws straight onto it.
+// Otherwise it fills the window at the display's shape, the frame is drawn into its own canvas at the
+// next whole multiple up and shrunk smoothly onto the page, so every game pixel looks the same size.
+// Everything is still laid out in display pixels above and scaled up by the multiple.
+
+// In smooth fit the canvas holds the whole multiple just under the window size and the browser
+// stretches it up, which is fastest; set this to take the one just over and shrink it down, sharper
+// but with more pixels to draw.
+const SMOOTH_ROUND_UP = false;
+// a scale this close to a whole number counts as that number, so rounding noise in the window
+// size does not move the smooth fit a whole multiple
+const SCALE_SNAP = 0.001;
+
+// Scanlines darken the bottom part of every game pixel row, like an old screen, over the room but
+// under the popups and the overlay. Their colour, how dark, and how much of each row they take.
+const SCANLINE_COLOR = "#000000";
+const SCANLINE_ALPHA = 0.4;
+const SCANLINE_SHARE = 0.5;
 
 // the overlay is laid out on this grid
 const GUI_W = 640;
@@ -84,6 +100,20 @@ const INSPECT_BACK_COLOR = "#000000";
 const INSPECT_BACK_ALPHA = 0.6;
 const INSPECT_FIELDS = ["triggerScript", "trigOffScript", "lookScript", "enter_script", "conRoom", "message"];
 const INSPECT_VALUE_MAX = 40;
+
+// The debug key help, in the middle of the overlay: its font, line spacing, padding and the gap
+// between its columns in overlay pixels, its colours, and its backing's fade.
+const HELP_FONT = "ftSmall";
+const HELP_LINE = 10;
+const HELP_PAD = 6;
+const HELP_GAP = 12;
+const HELP_TITLE_COLOR = "#ffee33";
+const HELP_KEY_COLOR = "#aaccff";
+const HELP_TEXT_COLOR = "#ffffff";
+const HELP_ON_COLOR = "#66ff66";
+const HELP_OFF_COLOR = "#ff6666";
+const HELP_BACK_COLOR = "#000000";
+const HELP_BACK_ALPHA = 0.75;
 
 // ---------------------------------------------------------------- placed sprites
 
@@ -159,7 +189,13 @@ const LP_SAVED_FIELDS = ["spi", "ifr", "spd", "x", "y", "exoffx", "exoffy", "x_s
 	"tiledx", "tiledy", "tile_loop"];
 
 const Draw = {
+	// where drawing goes now: the page canvas, or a layer's own canvas while one draws
 	ctx: null,
+	// the debug switches, the debug keys set them from what was kept at start
+	pixelPerfect: false,
+	scanlines: false,
+	// one game pixel row of scanline, made for the current scale
+	scanPattern: null,
 	// the stretch from layer pixels to canvas pixels, set per layer
 	base: { sx: 1, sy: 1, ox: 0, oy: 0 },
 	// screen pixels per display pixel on the page canvas, and the one in use for the current target,
@@ -196,24 +232,29 @@ const Draw = {
 	inspectHits: [],
 	inspectAreas: [],
 
-	attach(ctx) {
-		this.ctx = ctx;
-		ctx.imageSmoothingEnabled = false;
-	},
-
-	// Sizes the page canvas to a whole multiple of the display that fits the window, with its real
-	// pixels matching the screen's, and shows it at that size. Resizing a canvas forgets its
-	// settings, so smoothing is turned off again.
+	// Sizes the page canvas to the window and points drawing at it. The canvas always holds a whole
+	// multiple of the display, so game pixels stay square inside it. Pixel perfect shows it at the
+	// largest whole multiple that fits, with real pixels matching the screen's. Otherwise the browser
+	// stretches it smoothly to fill the window at the display's shape, which costs nothing here; the
+	// multiple drawn is the one just under that size, or just over it when set to round up.
+	// Resizing a canvas forgets its settings, so smoothing is set again, and the scanline row is
+	// made again for the new scale.
 	fitCanvas(canvas, winW, winH, pixelRatio) {
-		const fit = Math.max(1, Math.floor(Math.min(winW / DISPLAY_W, winH / DISPLAY_H)));
-		const scale = Math.max(1, Math.round(fit * pixelRatio));
+		const room = Math.min(winW / DISPLAY_W, winH / DISPLAY_H);
+		const fit = this.pixelPerfect ? Math.max(1, Math.floor(room)) : room;
+		let scale = Math.round(fit * pixelRatio);
+		if (!this.pixelPerfect) scale = SMOOTH_ROUND_UP ? Math.ceil(fit * pixelRatio - SCALE_SNAP) : Math.floor(fit * pixelRatio + SCALE_SNAP);
+		scale = Math.max(1, scale);
 		canvas.style.width = (DISPLAY_W * fit) + "px";
 		canvas.style.height = (DISPLAY_H * fit) + "px";
+		canvas.style.imageRendering = this.pixelPerfect ? "pixelated" : "auto";
 		canvas.width = DISPLAY_W * scale;
 		canvas.height = DISPLAY_H * scale;
-		canvas.getContext("2d").imageSmoothingEnabled = false;
+		this.ctx = canvas.getContext("2d");
+		this.ctx.imageSmoothingEnabled = false;
 		this.screenScale = scale;
 		this.targetScale = scale;
+		this.scanPattern = null;
 	},
 
 	// Reads the font tables and pictures. A font that will not load is left out and falls back.
@@ -727,6 +768,26 @@ const Draw = {
 		const mouseOnLayer = new Map();
 
 		for (const lyr of rm.layers) {
+			// Scanlines go over the room's own layers, before the first of the shared popup layers, so
+			// popups and the overlay stay crisp. The row repeats from the canvas corner with no
+			// stretch, so its bands sit on the game pixel rows.
+			if (lyr === g.popupLayer && this.scanlines) {
+				if (this.scanPattern === null) {
+					const rowh = DISPLAY_H / VIEW_H * this.screenScale;
+					const band = Math.max(1, Math.round(rowh * SCANLINE_SHARE));
+					const row = this.makeCanvas(1, rowh);
+					const rg = row.getContext("2d");
+					rg.fillStyle = SCANLINE_COLOR;
+					rg.fillRect(0, rowh - band, 1, band);
+					this.scanPattern = ctx.createPattern(row, "repeat");
+				}
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.globalAlpha = SCANLINE_ALPHA;
+				ctx.globalCompositeOperation = "source-over";
+				ctx.fillStyle = this.scanPattern;
+				ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+				ctx.globalAlpha = 1;
+			}
 			if (truthy(lyr.disabled)) continue;
 
 			let lyrw = lyr.wd;
@@ -918,6 +979,33 @@ const Draw = {
 		this.curdrawoffx = 0;
 		this.curdrawoffy = 0;
 		this.overlay(g);
+
+		// The debug key help over everything, in the overlay's pixels: the keys, what they do, and
+		// for the switches whether they are on.
+		if (!Debug.helpOpen) return;
+		this.base = { sx: DISPLAY_W / GUI_W, sy: DISPLAY_H / GUI_H, ox: 0, oy: 0 };
+		this.halign = "left";
+		this.valign = "top";
+		this.setFont(HELP_FONT);
+		const keysw = Math.max(...DEBUG_KEYS.map((d) => this.stringWidth(d.keys)));
+		const labelw = Math.max(...DEBUG_KEYS.map((d) => this.stringWidth(d.label)));
+		const w = HELP_PAD * 2 + keysw + HELP_GAP + labelw + HELP_GAP + this.stringWidth("off");
+		const h = HELP_PAD * 2 + (DEBUG_KEYS.length + 1) * HELP_LINE;
+		const hx = Math.floor((GUI_W - w) / 2);
+		const hy = Math.floor((GUI_H - h) / 2);
+		this.color = HELP_BACK_COLOR;
+		this.alpha = HELP_BACK_ALPHA;
+		this.rectangle(hx, hy, hx + w - 1, hy + h - 1, false);
+		this.guiText(hx + HELP_PAD, hy + HELP_PAD, "debug keys", HELP_TITLE_COLOR, 1, HELP_FONT);
+		DEBUG_KEYS.forEach((d, i) => {
+			const ly = hy + HELP_PAD + (i + 1) * HELP_LINE;
+			this.guiText(hx + HELP_PAD, ly, d.keys, HELP_KEY_COLOR, 1, HELP_FONT);
+			this.guiText(hx + HELP_PAD + keysw + HELP_GAP, ly, d.label, HELP_TEXT_COLOR, 1, HELP_FONT);
+			if (d.get) {
+				this.guiText(hx + HELP_PAD + keysw + HELP_GAP + labelw + HELP_GAP, ly, d.get() ? "on" : "off",
+					d.get() ? HELP_ON_COLOR : HELP_OFF_COLOR, 1, HELP_FONT);
+			}
+		});
 	},
 
 	// Outline and name over an object that only stands in for now.

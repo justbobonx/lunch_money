@@ -27,14 +27,8 @@
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 <script>
-	// the canvas fills the window by a whole multiple, drawn at the screen's own pixels
-	const view = document.getElementById("view");
-	function fit() {
-		Draw.fitCanvas(view, window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
-	}
-	window.addEventListener("resize", fit);
-	fit();
-	Shell.start(view);
+	// the shell fits the canvas to the window and keeps it fitted
+	Shell.start(document.getElementById("view"));
 </script>
 </body>
 </html>

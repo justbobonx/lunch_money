@@ -27,13 +27,26 @@ const LOADING_TEXT_GAP = 12;
 const LOADING_BAR_W = 320;
 const LOADING_BAR_H = 8;
 
-// Debug keys, held with control (or command). The browser's own meaning of them is blocked.
-// The first restarts the room fresh with the player alive at its start spot, the second brings
-// the player back alive where they stand with everything else about them reset.
+// Debug keys, all listed in the debug key table further down. The browser's own meaning of them
+// is blocked. Tab switches the debug overlay and backspace shows the list, both without control.
+// With control (or command): restart the room fresh with the player alive at its start spot,
+// bring the player back alive where they stand with everything else about them reset,
+// switch scanlines, and switch pixel perfect scaling against the smooth fit to the window.
+const DEBUG_KEY_OVERLAY = "Tab";
+const DEBUG_KEY_HELP = "Backspace";
 const DEBUG_KEY_RESTART_ROOM = "KeyR";
 const DEBUG_KEY_REVIVE_PLAYER = "KeyE";
+const DEBUG_KEY_SCANLINES = "KeyF";
+const DEBUG_KEY_PIXEL_PERFECT = "KeyS";
 // With the arrows, the player hops this far that way, straight through anything in the way.
 const DEBUG_HOP_DIST = 30;
+
+// Where the scanline and pixel perfect switches are kept between visits, and how they start the
+// first time. The overlay's own key and start are with the world and the drawing.
+const SCANLINES_KEY = "lunch_money_scanlines";
+const SCANLINES_AT_START = true;
+const PIXEL_PERFECT_KEY = "lunch_money_pixel_perfect";
+const PIXEL_PERFECT_AT_START = false;
 
 // Calls out to systems that come in later stages. Each one logs the first time it is asked.
 const Hooks = {
@@ -226,42 +239,44 @@ const Save = {
 	}
 };
 
-// The debug keys. The keys are caught ahead of everything else so the browser and the game
-// never see them, and what they ask for happens at the start of the next frame, between updates.
-const Debug = {
-	pending: null,
-
-	attach(target) {
-		target.addEventListener("keydown", (e) => {
-			if (!(e.ctrlKey || e.metaKey)) return;
-			if (e.code === DEBUG_KEY_RESTART_ROOM) this.pending = "restart";
-			else if (e.code === DEBUG_KEY_REVIVE_PLAYER) this.pending = "revive";
-			else if (e.code === "ArrowLeft") this.pending = "hop_left";
-			else if (e.code === "ArrowRight") this.pending = "hop_right";
-			else if (e.code === "ArrowUp") this.pending = "hop_up";
-			else if (e.code === "ArrowDown") this.pending = "hop_down";
-			else return;
-			e.preventDefault();
-			e.stopImmediatePropagation();
-		}, true);
+// The debug key table, the one list both the key catching and the help read. Each has the keys
+// that set it off, whether control is held, how the help names the keys and what it does, and
+// what it does, run between updates. Switches also have their setting, where it is kept between
+// visits and how it starts, and flipping one keeps the new setting. Holding a key down repeats only
+// the hops.
+const DEBUG_KEYS = [
+	{
+		codes: [DEBUG_KEY_OVERLAY], ctrl: false, keys: "Tab", label: "debug overlay",
+		kept: DEBUG_OVERLAY_KEY, start: DRAW_STATS_AT_START,
+		get: () => game.drawStats,
+		set: (on) => { game.drawStats = on; }
 	},
-
-	update() {
-		const what = this.pending;
-		this.pending = null;
-		if (what === null || game.curroom === null) return;
-
-		if (what === "restart") {
-			// the world cleared and the room started again, as the room picker does
-			if (game.enterRoom(game.curroomi)) Save.write();
-		} else if (game.guy === null) {
-			return;
-		} else if (what.startsWith("hop")) {
-			// a plain jump to the new spot with all motion dropped, so the movers see no travel
+	{
+		codes: [DEBUG_KEY_RESTART_ROOM], ctrl: true, keys: "ctrl R", label: "restart room",
+		// the world cleared and the room started again, as the room picker does
+		act: () => {
+			if (game.curroom !== null && game.enterRoom(game.curroomi)) Save.write();
+		}
+	},
+	{
+		codes: [DEBUG_KEY_REVIVE_PLAYER], ctrl: true, keys: "ctrl E", label: "revive",
+		act: () => {
+			if (game.curroom === null || game.guy === null) return;
+			game.guy.reviveInPlace();
+			game.settleGuy();
+			Save.write();
+		}
+	},
+	{
+		codes: ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"], ctrl: true, keys: "ctrl arrows", label: "hop",
+		repeats: true,
+		// a plain jump to the new spot with all motion dropped, so the movers see no travel
+		act: (code) => {
+			if (game.curroom === null || game.guy === null) return;
 			const guy = game.guy;
-			if (what === "hop_left") guy.x -= DEBUG_HOP_DIST;
-			else if (what === "hop_right") guy.x += DEBUG_HOP_DIST;
-			else if (what === "hop_up") guy.y -= DEBUG_HOP_DIST;
+			if (code === "ArrowLeft") guy.x -= DEBUG_HOP_DIST;
+			else if (code === "ArrowRight") guy.x += DEBUG_HOP_DIST;
+			else if (code === "ArrowUp") guy.y -= DEBUG_HOP_DIST;
 			else guy.y += DEBUG_HOP_DIST;
 			guy.xspd = 0;
 			guy.yspd = 0;
@@ -269,22 +284,94 @@ const Debug = {
 			guy.ry = 0;
 			guy.lastx = guy.x;
 			guy.lasty = guy.y;
-		} else {
-			game.guy.reviveInPlace();
-			game.settleGuy();
-			Save.write();
 		}
+	},
+	{
+		codes: [DEBUG_KEY_SCANLINES], ctrl: true, keys: "ctrl F", label: "scanlines",
+		kept: SCANLINES_KEY, start: SCANLINES_AT_START,
+		get: () => Draw.scanlines,
+		set: (on) => { Draw.scanlines = on; }
+	},
+	{
+		codes: [DEBUG_KEY_PIXEL_PERFECT], ctrl: true, keys: "ctrl S", label: "pixel perfect",
+		kept: PIXEL_PERFECT_KEY, start: PIXEL_PERFECT_AT_START,
+		get: () => Draw.pixelPerfect,
+		// the canvas fits again at once, as a window resize does
+		set: (on) => {
+			Draw.pixelPerfect = on;
+			Shell.fit();
+		}
+	},
+	{
+		codes: [DEBUG_KEY_HELP], ctrl: false, keys: "Backspace", label: "this help",
+		act: () => { Debug.helpOpen = !Debug.helpOpen; }
+	}
+];
+
+// The debug keys. The keys are caught ahead of everything else so the browser and the game
+// never see them, their releases included, so a debug key that shares a letter with a game button
+// never shows the game a press or a release. What they ask for happens at the start of the next
+// frame, between updates.
+const Debug = {
+	pending: null,
+	// keys caught on the way down whose release is caught too
+	held: {},
+	helpOpen: false,
+
+	// Brings back the switches as they were last left, then listens for the keys.
+	attach(target) {
+		for (const d of DEBUG_KEYS) {
+			if (!d.kept) continue;
+			let kept = null;
+			try { kept = localStorage.getItem(d.kept); } catch (e) { /* nothing kept */ }
+			d.set(kept === null ? d.start : kept === "1");
+		}
+		target.addEventListener("keydown", (e) => {
+			const d = DEBUG_KEYS.find((k) => k.codes.includes(e.code) && k.ctrl === (e.ctrlKey || e.metaKey));
+			if (d === undefined) return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			// a key the game already saw go down keeps its release, so it is not left stuck down
+			if (!Input.down[e.code]) this.held[e.code] = true;
+			if (!e.repeat || d.repeats) this.pending = { entry: d, code: e.code };
+		}, true);
+		target.addEventListener("keyup", (e) => {
+			if (!this.held[e.code]) return;
+			this.held[e.code] = false;
+			e.stopImmediatePropagation();
+		}, true);
+	},
+
+	update() {
+		const p = this.pending;
+		this.pending = null;
+		if (p === null) return;
+		const d = p.entry;
+		if (!d.kept) {
+			d.act(p.code);
+			return;
+		}
+		d.set(!d.get());
+		try { localStorage.setItem(d.kept, d.get() ? "1" : "0"); } catch (e) { /* nothing kept */ }
 	}
 };
 
 const Shell = {
 	lastTime: 0,
 	acc: 0,
+	canvas: null,
+
+	// The canvas fits the window, on a resize and when the scaling switch flips.
+	fit() {
+		Draw.fitCanvas(this.canvas, window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
+	},
 
 	async start(canvas) {
-		const ctx = canvas.getContext("2d");
-		Draw.attach(ctx);
+		this.canvas = canvas;
+		// the switches come back first, so the first fit already knows how to scale
 		Debug.attach(window);
+		this.fit();
+		window.addEventListener("resize", () => this.fit());
 		Input.attach(window, canvas);
 		Save.attach(window);
 		roomPicker.attach(canvas);

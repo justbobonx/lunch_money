@@ -180,10 +180,8 @@ class World {
 		// objects that come along when the player changes rooms, waiting to be placed in the new one
 		this.carryOver = [];
 		this.curuid = 0;
-		// the overlay comes back the way it was last left, the starting setting only counts the first time
-		let kept = null;
-		try { kept = localStorage.getItem(DEBUG_OVERLAY_KEY); } catch (e) { /* nothing kept */ }
-		this.drawStats = kept === null ? DRAW_STATS_AT_START : kept === "1";
+		// the debug keys bring the overlay back the way it was last left
+		this.drawStats = DRAW_STATS_AT_START;
 		this.popupLayer = null;
 		this.popupHdLayer = null;
 		this.guiLayer = null;
@@ -1207,10 +1205,6 @@ class World {
 		}
 
 		this.frames++;
-		if (Input.pressed.Tab) {
-			this.drawStats = !this.drawStats;
-			try { localStorage.setItem(DEBUG_OVERLAY_KEY, this.drawStats ? "1" : "0"); } catch (e) { /* nothing kept */ }
-		}
 
 		Hooks.lines.length = 0;
 

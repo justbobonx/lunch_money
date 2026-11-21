@@ -46,7 +46,7 @@ const Input = {
 				this.anyPressed = true;
 			}
 			this.down[e.code] = true;
-			if (e.code.startsWith("Arrow") || e.code === "Space" || e.code === "Tab") e.preventDefault();
+			if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
 		});
 		target.addEventListener("keyup", (e) => {
 			this.down[e.code] = false;
@@ -56,8 +56,8 @@ const Input = {
 			this.down = {};
 		});
 		if (!canvas) return;
-		// the canvas is shown at a whole multiple of the display, so its shown size maps straight
-		// to display pixels whatever its real pixel count for the screen's density
+		// the canvas is always shown at the display's shape, so its shown size maps straight
+		// to display pixels whatever its real pixel count or how it is scaled
 		const track = (e) => {
 			const r = canvas.getBoundingClientRect();
 			this.mouseX = (e.clientX - r.left) / r.width * DISPLAY_W;
