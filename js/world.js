@@ -15,7 +15,7 @@ const DEFAULT_WORLD = { rooms: [{ name: "TestDev" }], startroomi: 0 };
 // The page cannot list a folder, so a generated list says which room files and which optional
 // world files exist. Another generated list gives every original object's parent.
 const ROOM_LIST_FILE = "assets/rooms.json";
-const OBJECT_TREE_FILE = "assets/object_tree.json";
+const UNPORTED_OBJECT_FILE = "assets/unported_object_list.json";
 
 // The world file names the object folders it uses. A generated list says which files each folder
 // under the object directory holds, since the page cannot list a folder either.
@@ -261,7 +261,7 @@ class World {
 			}));
 		}
 
-		const treeText = await tryRead(OBJECT_TREE_FILE);
+		const treeText = await tryRead(UNPORTED_OBJECT_FILE);
 		if (treeText !== null) {
 			standins.load(JSON.parse(treeText));
 		} else {

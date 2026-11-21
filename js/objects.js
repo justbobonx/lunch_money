@@ -28,6 +28,11 @@ const QP_LABEL_BG_ALPHA = 0.7;
 const QP_LABEL_BG_TOP = 4;
 const QP_LABEL_BG_BOTTOM = 10;
 
+// Floor zones on top down slopes. A sideways slope turns this share of sideways speed into up or
+// down speed, and both slopes trim speed by this much, the 45 degree cut of the original.
+const FLOOR_RAMP_SHARE = 0.5;
+const FLOOR_RAMP_TRIM = 0.707;
+
 // ---------------------------------------------------------------- mixins
 
 // All an object needs to be looked at, picked up, used and given to.
@@ -656,6 +661,53 @@ class oFloorEffect extends oBaseObject {
 	}
 	// called by whoever stands on it so it can change their movement
 	effect_obj(obj, acc, maxspd) {}
+}
+
+// A sideways slope. Walking across it while on the ground also moves you up or down the screen,
+// uphill to the right unless the room flips it.
+class oFlFxRampH extends oFloorEffect {
+	constructor() {
+		super();
+		this.up_dir = 1;
+	}
+	effect_obj(obj, acc, maxspd) {
+		if (!truthy(obj.onFloor)) return;
+		obj.yspd = clamp(obj.yspd - obj.xspd * FLOOR_RAMP_SHARE * acc * this.up_dir, -maxspd, maxspd);
+		obj.xspd *= FLOOR_RAMP_TRIM;
+		obj.yspd *= FLOOR_RAMP_TRIM;
+	}
+}
+
+// A slope going up the screen. It slows movement up and down, in the air too, as the original did.
+class oFlFxRampV extends oFloorEffect {
+	effect_obj(obj, acc, maxspd) {
+		obj.yspd *= FLOOR_RAMP_TRIM;
+	}
+}
+
+// A pad that knocks back whoever stands on it, away from its middle, with no damage.
+// Only things that can take a hit are knocked.
+class oFlFxHitter extends oFloorEffect {
+	constructor() {
+		super();
+		this.hforce = 2;
+	}
+	effect_obj(obj, acc, maxspd) {
+		if (!truthy(obj.onFloor) || typeof obj.takeHit !== "function") return;
+		obj.takeHit(this.sprite_cx(), this.sprite_cy(), this.hforce);
+	}
+}
+
+// A pad that bounces whoever lands on it up into the air.
+class oFlFxJumper extends oFloorEffect {
+	constructor() {
+		super();
+		this.boost = 3;
+	}
+	effect_obj(obj, acc, maxspd) {
+		if (!truthy(obj.onFloor)) return;
+		obj.zspd += this.boost;
+	}
 }
 
 // An area that fires when a player character enters it and again when they leave, once its conditions are met.

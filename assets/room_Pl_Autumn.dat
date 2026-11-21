@@ -960,8 +960,8 @@
 					"objinit":»{
 						"trigOnce": 0,
 						"only_inside": 0,
-						"triggerScript": [ [ "groupViz", "cur", "hidden_land", 1 ] ],
-						"trigOffScript": [ [ "groupViz", "cur", "hidden_land", 0 ] ]
+						"triggerScript": [ [ "groupViz", "hidden_land", 1 ] ],
+						"trigOffScript": [ [ "groupViz", "hidden_land", 0 ] ]
 					}«,
 					"x":717,
 					"y_sc":8.5,
@@ -2018,7 +2018,7 @@
 	"autogen_boundry_layers":null,
 	"room_init":»{
 		"enter_script": [
-			[ "groupViz", "cur", "hidden_land", 0 ]
+			[ "groupViz", "hidden_land", 0 ]
 		]
 	}«,
 	"camx":-161

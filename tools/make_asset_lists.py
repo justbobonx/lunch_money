@@ -2,7 +2,7 @@
 """Writes the two generated lists the page needs because a browser cannot list a folder.
 
   assets/rooms.json        which room files and optional world files are present
-  assets/object_tree.json  every original object and its parent, read from the GM object folders
+  assets/unported_object_list.json  every original object and its parent, read from the GM object folders
 
 usage: make_asset_lists.py <lunch_money dir> [<gm objects dir>]
 """
@@ -40,7 +40,7 @@ for p in sorted(glob.glob(os.path.join(objects_dir, "*", "*.yy"))):
     text = open(p, encoding="utf8").read()
     m = re.search(r'"parentObjectId"\s*:\s*\{\s*"name"\s*:\s*"([^"]+)"', text)
     tree[name] = m.group(1) if m else None
-with open(os.path.join(assets, "object_tree.json"), "w") as f:
+with open(os.path.join(assets, "unported_object_list.json"), "w") as f:
     json.dump({"parents": tree}, f, indent="\t")
     f.write("\n")
 print("rooms", len(ordered), "objects", len(tree))

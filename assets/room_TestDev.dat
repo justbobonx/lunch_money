@@ -5654,8 +5654,8 @@
 					"objinit":»{
 					  "trigOnce": 0,
 						"only_inside":1,
-						"triggerScript": [ [ "groupViz", "cur", "arcade_fr", 0 ] ],
-						"trigOffScript": [ [ "groupViz", "cur", "arcade_fr", 1 ] ]
+						"triggerScript": [ [ "groupViz", "arcade_fr", 0 ] ],
+						"trigOffScript": [ [ "groupViz", "arcade_fr", 1 ] ]
 					}«,
 					"x":-624,
 					"y_sc":22.5,
