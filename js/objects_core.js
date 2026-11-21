@@ -1,5 +1,14 @@
 // Basic building blocks any game can use: floors, walls, one way floors, ladders, ropes, crates,
-// doors, triggers, signs, masks, one time effects and value faders.
+// doors, triggers, signs, masks, one time effects, sparkle fields and value faders.
+
+// A sparkle field: the sparkles it picks from, the plain one twice as often, how many it keeps going
+// at most for each square pixel of its box, and the wait in milliseconds before the next one, both
+// the least wait and the most extra on top. The wait is for a box of one square pixel and shrinks
+// as the box grows, so a bigger field sparkles faster.
+const SPECKLER_SPRITES = ["s_teleport_sparkle", "s_teleport_sparkle", "s_teleport_sparkle_2"];
+const SPECKLER_MAX_PER_PIXEL = 30 / 200;
+const SPECKLER_WAIT_MS = 40 * 200;
+const SPECKLER_WAIT_EXTRA_MS = 40 * 200;
 
 // Stretchable ground: an edge strip along the top and a fill stretched over the rest, each eight pixels square.
 class oFloor extends oGround {
@@ -154,6 +163,54 @@ class oFxOneShot extends oBaseObject {
 			this.alpha -= this.aspd;
 		}
 	}
+}
+
+// A field of sparkles over its box, like the teleport glitter. While shown it keeps adding sparkles
+// at random spots, more likely near the middle, each playing its animation once just in front of it
+// in its layer and then gone. Its own picture is only a marker and never drawn. Hidden, it adds
+// none, and the ones already going play out.
+class oSpeckler extends oBaseObject {
+	constructor() {
+		super();
+		// updates until the next sparkle, and the sparkles still going
+		this.nextspeck = 0;
+		this.specks = [];
+		this.maxnum = 0;
+		this.wait = 0;
+		this.waitextra = 0;
+	}
+
+	// The limit and the waits follow the size of the box it was given.
+	init() {
+		super.init();
+		const size = this.sprite_width * this.sprite_height;
+		const toUpdates = GAME_FPS / 1000;
+		this.maxnum = SPECKLER_MAX_PER_PIXEL * size;
+		this.wait = size > 0 ? SPECKLER_WAIT_MS / size * toUpdates : 0;
+		this.waitextra = size > 0 ? SPECKLER_WAIT_EXTRA_MS / size * toUpdates : 0;
+	}
+
+	update() {
+		if (!truthy(this.visible) || !this.mylayer) return;
+		this.specks = this.specks.filter((sp) => !sp.destroyed);
+		if (this.nextspeck > 0) this.nextspeck--;
+		if (this.nextspeck > 0 || this.specks.length >= this.maxnum) return;
+
+		// a spot in the box from its top left, each way the sum of two even rolls
+		const w = this.sprite_width - 1;
+		const h = this.sprite_height;
+		const sx = rng.random(w / 2) + rng.random(w / 2);
+		const sy = rng.random(h / 2) + rng.random(h / 2);
+		const lyr = this.mylayer;
+		this.specks.push(game.createObject(oFxOneShot, {
+			x: this.x - this.exoffx + sx, y: this.y - this.exoffy + sy,
+			spi: rng.choose(...SPECKLER_SPRITES), alpha: this.alpha
+		}, lyr, lyr.lsprites.indexOf(this) + 1));
+		// what the last wait ran over comes off the next one
+		this.nextspeck += this.wait + rng.random(this.waitextra);
+	}
+
+	draw() {}
 }
 
 // Eases one value of an object to a new one in equal steps over a number of updates, then is gone.

@@ -52,7 +52,7 @@ const NO_TINT = "#ffffff";
 
 // fonts read at start, each a json glyph table and a png beside it
 const FONT_DIR = "sprites/fonts/";
-const FONT_NAMES = ["ftSmall", "ftTiny", "ftTinyer", "ftArcade2"];
+const FONT_NAMES = ["ftSmall", "ftTiny", "ftTinyer", "ftArcade2", "ftConsole"];
 
 // rooms ask for fonts that were never converted, those draw with this one instead
 const FONT_FALLBACK = "ftSmall";
@@ -978,6 +978,8 @@ const Draw = {
 		this.subpixel = false;
 		this.curdrawoffx = 0;
 		this.curdrawoffy = 0;
+		// a screen over play, such as the inventory, under the debug overlay
+		Screens.draw();
 		this.overlay(g);
 
 		// The debug key help over everything, in the overlay's pixels: the keys, what they do, and

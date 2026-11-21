@@ -296,6 +296,9 @@
 				},
 				{
 					"spd":"0",
+					"objinit":»{
+						"start_items": ["oGun", "oSword", "oMagnet", "oArBow", "oKey"]
+					}«,
 					"x":187,
 					"isobj":"oShipLocker",
 					"y":35,
@@ -386,7 +389,7 @@
 				{
 					"spd":"0",
 					"x":13,
-					"isobj":"o_ship_potted_plant",
+					"isobj":"oShipPottedPlant",
 					"y":112,
 					"spi":"s_ship_potted_plant",
 					"name":"8C95A"
@@ -394,7 +397,7 @@
 				{
 					"spd":"0",
 					"x":214,
-					"isobj":"o_ship_potted_plant",
+					"isobj":"oShipPottedPlant",
 					"y":116,
 					"spi":"s_ship_potted_plant",
 					"name":"D25A5"
@@ -752,7 +755,7 @@
 					}«,
 					"x":340,
 					"exoffy":16,
-					"isobj":"o_ship_analyizer",
+					"isobj":"oShipAnalizer",
 					"y":19,
 					"spi":"ship_sci_analyizer",
 					"name":"D93DD"
@@ -4127,7 +4130,7 @@
 			},{
 				"spd":"0",
 				"x":710,
-				"isobj":"o_ship_potted_plant",
+				"isobj":"oShipPottedPlant",
 				"y":213,
 				"spi":"s_ship_potted_plant",
 				"name":"18B7C0"
@@ -4152,7 +4155,7 @@
 			},{
 				"spd":"0",
 				"x":710,
-				"isobj":"o_ship_potted_plant",
+				"isobj":"oShipPottedPlant",
 				"y":224,
 				"spi":"s_ship_potted_plant",
 				"name":"18B7C1"

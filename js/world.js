@@ -440,6 +440,8 @@ class World {
 	// world's script and goal files are fixed data, so they stay loaded instead of being read again.
 	clearWorld() {
 		this.guy = null;
+		// a screen over play goes with the world it showed
+		Screens.forget();
 		// objects are destroyed, so they take what they own with them, pictures are just dropped
 		const remove = (obj) => {
 			if (obj instanceof oBaseObject) obj.destroy();
@@ -1187,9 +1189,10 @@ class World {
 	// ------------------------------------------------------------ the frame
 
 	// One fixed step: the controller reads input first, then a waiting room change, then while play
-	// is not paused the room's own update, every object's update, and every after update, then the
-	// camera. Every object updates before any settles in its after update, so an after update sees
-	// where everyone ended up: carried things following their carrier, riders and followers.
+	// is not paused any screen over play, the room's own update, every object's update, and every
+	// after update, then the camera. Every object updates before any settles in its after update, so
+	// an after update sees where everyone ended up: carried things following their carrier, riders
+	// and followers.
 	// The camera goes last so it frames where everything settled. A timer that runs out goes just
 	// before its object's update.
 	step() {
@@ -1209,6 +1212,8 @@ class World {
 		Hooks.lines.length = 0;
 
 		if (!this.simPaused) {
+			// a screen over play goes first, so everyone this update sees what it changed
+			Screens.update();
 			if (this.curroom !== null) this.curroom.update();
 			// a copy, so objects made or destroyed during the step do not upset the walk
 			const live = this.instances.slice();

@@ -1,8 +1,11 @@
-// On screen interface drawn in overlay pixels over the game. For now only the room picker:
-// a list of every room in the world that pauses play, to go to any of them.
+// On screen interface drawn in overlay pixels over the game.
+// The room picker: a list of every room in the world that pauses play, to go to any of them.
 // Keys: the open key toggles it, up and down or the mouse wheel move, page keys and home and end
 // jump, enter or a click goes to the room, escape closes. The open key is not one the
 // controller reads, so it never clashes with play.
+// The screens over play: the full inventory screen and the ship console's screen. Play keeps
+// running under them, only the player's controls are off while one is up, and they read the menu
+// controller instead.
 
 // the key that opens and closes the picker
 const ROOM_PICKER_KEY = "Backquote";
@@ -31,6 +34,59 @@ const PICKER_TEXT_COLOR = "#ffffff";
 const PICKER_DIM_COLOR = "#7788aa";
 const PICKER_HERE_COLOR = "#ffdd66";
 const PICKER_ERROR_COLOR = "#ff6666";
+
+// The inventory screen: one panel per inventory, stacked and centred, each a backing box with the
+// owner's box on the left and a grid of cells on the right, as the original laid them out.
+// The panel's border, the owner box's size, the size its picture is fitted to, the step from it to
+// the cells and the strip left on the right, where the owner's name sits, the cell size and step,
+// how far in an item sits and its size, the fewest rows a panel is tall so the owner box fits,
+// and the gap between panels, all in overlay pixels.
+const INVSCR_PAD = 2;
+const INVSCR_OWNER_W = 42;
+const INVSCR_OWNER_H = 32;
+const INVSCR_OWNER_FIT = 28;
+const INVSCR_OWNER_STEP = 44;
+const INVSCR_SIDE_STRIP = 6;
+const INVSCR_OWNER_NAME_Y = 30;
+const INVSCR_CELL = 20;
+const INVSCR_PITCH = 22;
+const INVSCR_ITEM_INSET = 2;
+const INVSCR_ITEM_SIZE = 16;
+const INVSCR_MIN_ROWS = 2;
+const INVSCR_PANEL_GAP = 4;
+// the in hand marker's place in a cell, and how long each frame of the cursor and selection shows
+const INVSCR_HELD_X = -1;
+const INVSCR_HELD_Y = 14;
+const INVSCR_BLINK_MS = 250;
+// its sprites, and the ending of an item's own inventory picture
+const INVSCR_OWNER_BOX = "s_igg_bg_square_box_lk";
+const INVSCR_CELL_BOX = "s_igg_bg_square_box";
+const INVSCR_CURSOR = "s_igg_bg_square_hl";
+const INVSCR_SELECTION = "s_igg_bg_square_sel";
+const INVSCR_HELD_ICON = "s_icon_btn_x";
+const INVSCR_ITEM_SPRITE_END = "_inv";
+// the owner's name, and the highlighted item's name under the panels with its gap below them
+const INVSCR_OWNER_FONT = "ftTiny";
+const INVSCR_OWNER_COLOR = "#ffffff";
+const INVSCR_ITEM_FONT = "ftSmall";
+const INVSCR_ITEM_COLOR = "#ccccee";
+const INVSCR_ITEM_GAP = 4;
+
+// The console screen: the close up picture, its spot and stretch, the text's spot, wrap width, font,
+// colour and line spacing as a share of the font's height, the header over every text, and the
+// text a console shows when its room gives none.
+const CONSOLE_PICTURE = "s_ship_small_console_closeup";
+const CONSOLE_PICTURE_X = 320;
+const CONSOLE_PICTURE_Y = 160;
+const CONSOLE_PICTURE_SCALE = 2;
+const CONSOLE_TEXT_X = 88;
+const CONSOLE_TEXT_Y = 57;
+const CONSOLE_WRAP = 380;
+const CONSOLE_FONT = "ftConsole";
+const CONSOLE_COLOR = "#00ff00";
+const CONSOLE_LINE_SHARE = 1.5;
+const CONSOLE_HEADER = "=================== Star Ventures Unlimited ===================\n";
+const CONSOLE_DEFAULT_TEXT = "\n\nSystem check...\nAll systems currently nominal\n";
 
 // A pop up list of rooms. The shell asks it every frame whether play may run, and has it
 // draw after the game. Going to a room waits for that room's pictures first.
@@ -256,3 +312,311 @@ class RoomPicker {
 }
 
 const roomPicker = new RoomPicker();
+
+// ---------------------------------------------------------------- screens over play
+
+// The one screen over play at a time. Putting one up switches the player's controls off and taking
+// it down puts them back as they were. The world runs it each update, ahead of everyone, with the
+// menu controller, and the frame draws it under the debug overlay, in overlay pixels.
+const Screens = {
+	current: null,
+	conwasoff: false,
+
+	// Gives back whether it went up, which it does not while another is up.
+	open(screen) {
+		if (this.current !== null) return false;
+		this.current = screen;
+		this.conwasoff = game.controller.conOff;
+		game.controller.conOff = true;
+		return true;
+	},
+
+	close() {
+		this.current = null;
+		game.controller.conOff = this.conwasoff;
+	},
+
+	// dropped with the world, which puts the controls back itself
+	forget() {
+		this.current = null;
+	},
+
+	update() {
+		if (this.current !== null) this.current.update(game.uiController);
+	},
+
+	draw() {
+		if (this.current === null) return;
+		Draw.base = { sx: DISPLAY_W / GUI_W, sy: DISPLAY_H / GUI_H, ox: 0, oy: 0 };
+		Draw.curdrawoffx = 0;
+		Draw.curdrawoffy = 0;
+		Draw.halign = "left";
+		Draw.valign = "top";
+		Draw.color = "#ffffff";
+		Draw.alpha = 1;
+		this.current.draw();
+		Draw.color = "#ffffff";
+		Draw.alpha = 1;
+		Draw.halign = "left";
+	}
+};
+
+// The full inventory screen over one or more inventories. Each panel keeps a grid of the items
+// themselves, placed where they sat last time, and items that change panel change inventory there
+// and then, so the hands are always right. Closing writes each inventory's list back in grid order.
+// Keys: arrows move, up and down crossing panels. A picks an item, A on another cell swaps the two,
+// A on the picked one takes it into a hand. Y sends the item to the next panel's first free cell.
+// X takes it into a hand or puts it back in the bag. B closes, as does the button it was opened
+// with when one is given.
+// Only a bag can refuse an item, and a screen has at most one bag, the player's, so a swap moves the
+// item going into the bag first and a refusal leaves both where they were.
+class InventoryScreen {
+	constructor(invs, closeButton) {
+		this.closeButton = closeButton === undefined ? null : closeButton;
+		// the highlighted panel and cell, and the picked ones, the cell minus one for none
+		this.curp = 0;
+		this.hli = 0;
+		this.selp = 0;
+		this.seli = -1;
+
+		// Items go back to their cell from last time when it is free, else to the first free one.
+		// Ones that find no cell stay in the list, unseen, after the rest. The owner's picture and
+		// frame are taken now and stay as they are.
+		this.panels = invs.map((inv) => {
+			const grid = new Array(inv.size).fill(null);
+			const overflow = [];
+			for (const item of inv.inv_list) {
+				let pos = item._inv_pos;
+				if (!(pos >= 0 && pos < inv.size) || grid[pos] !== null) pos = grid.indexOf(null);
+				if (pos < 0) overflow.push(item);
+				else grid[pos] = item;
+			}
+			return {
+				inv: inv, grid: grid, overflow: overflow,
+				w: INVSCR_PAD + inv.w * INVSCR_PITCH + INVSCR_OWNER_STEP + INVSCR_SIDE_STRIP,
+				h: INVSCR_PAD + Math.max(Math.ceil(inv.size / inv.w), INVSCR_MIN_ROWS) * INVSCR_PITCH,
+				spi: inv.owner.spi, ifr: inv.owner.ifr,
+				name: inv.name !== undefined ? inv.name : inv.owner.name
+			};
+		});
+
+		// lined up on the left and stacked by their own heights, the whole stack centred
+		const totw = Math.max(...this.panels.map((p) => p.w));
+		const toth = this.panels.reduce((sum, p) => sum + p.h, 0) + INVSCR_PANEL_GAP * (this.panels.length - 1);
+		let y = Math.floor((GUI_H - toth) / 2);
+		for (const p of this.panels) {
+			p.x = Math.floor((GUI_W - totw) / 2);
+			p.y = y;
+			y += p.h + INVSCR_PANEL_GAP;
+		}
+		this.bottom = y - INVSCR_PANEL_GAP;
+	}
+
+	update(con) {
+		if (con.iBtnB || (this.closeButton !== null && con[this.closeButton])) {
+			this.close();
+			return;
+		}
+		// anything used up meanwhile, like a blown up stick of dynamite, is gone from the grid
+		for (const p of this.panels) {
+			for (let i = 0; i < p.grid.length; i++) {
+				if (p.grid[i] !== null && p.grid[i].destroyed) p.grid[i] = null;
+			}
+		}
+
+		let p = this.panels[this.curp];
+		if (con.iBtnX && p.grid[this.hli] !== null) {
+			if (p.grid[this.hli] === p.inv.owner.carrying) p.inv.switch_held(-1);
+			else this.hold(this.curp, this.hli);
+		}
+		if (con.iBtnA) {
+			if (this.seli === this.hli && this.selp === this.curp) {
+				this.hold(this.curp, this.hli);
+				this.seli = -1;
+			} else if (this.seli >= 0) {
+				this.swap();
+				this.seli = -1;
+			} else if (p.grid[this.hli] !== null) {
+				this.seli = this.hli;
+				this.selp = this.curp;
+			}
+		}
+		if (con.iBtnY && p.grid[this.hli] !== null && this.panels.length > 1) {
+			const next = this.panels[(this.curp + 1) % this.panels.length];
+			const to = next.grid.indexOf(null);
+			const item = p.grid[this.hli];
+			if (to >= 0 && this.move(item, p, next)) {
+				p.grid[this.hli] = null;
+				next.grid[to] = item;
+				this.seli = -1;
+			}
+		}
+
+		// left and right stay in the row, up and down go row by row and on into the next panel,
+		// keeping the column where it fits
+		const w = p.inv.w;
+		const last = p.inv.size - 1;
+		if (con.iRightP && this.hli % w < w - 1 && this.hli < last) this.hli++;
+		if (con.iLeftP && this.hli % w > 0) this.hli--;
+		if (con.iUpP) {
+			if (this.hli >= w) {
+				this.hli -= w;
+			} else if (this.curp > 0) {
+				p = this.panels[--this.curp];
+				this.hli = Math.min(Math.floor((p.inv.size - 1) / p.inv.w) * p.inv.w + Math.min(this.hli % w, p.inv.w - 1), p.inv.size - 1);
+			}
+		} else if (con.iDownP) {
+			if (Math.floor(this.hli / w) < Math.floor(last / w)) {
+				this.hli = Math.min(this.hli + w, last);
+			} else if (this.curp < this.panels.length - 1) {
+				p = this.panels[++this.curp];
+				this.hli = Math.min(this.hli % w, p.inv.w - 1, p.inv.size - 1);
+			}
+		}
+	}
+
+	// Moves an item out of one panel's inventory into another's: let go of, then taken in. A bag
+	// that will not take it gives it back to where it came from. Gives back whether it moved. The
+	// grids are left to the caller.
+	move(item, from, to) {
+		from.inv.release(item);
+		if (to.inv.pickup(item, undefined, true) !== undefined) return true;
+		from.inv.pickup(item, undefined, true);
+		return false;
+	}
+
+	// Takes an item out into a hand. An item in a locker has no hand to go to, so it moves to the
+	// first free cell of the panel with a hand first, and stays put when there is no room.
+	hold(pi, cell) {
+		let p = this.panels[pi];
+		const item = p.grid[cell];
+		if (p.inv.stows) {
+			const hp = this.panels.find((q) => !q.inv.stows);
+			const to = hp !== undefined ? hp.grid.indexOf(null) : -1;
+			if (to < 0 || !this.move(item, p, hp)) return;
+			p.grid[cell] = null;
+			hp.grid[to] = item;
+			p = hp;
+		}
+		p.inv.switch_held(p.inv.inv_list.indexOf(item));
+	}
+
+	// Swaps the picked cell with the highlighted one, either of them maybe empty.
+	swap() {
+		const sp = this.panels[this.selp];
+		const cp = this.panels[this.curp];
+		const a = sp.grid[this.seli];
+		const b = cp.grid[this.hli];
+		if (sp !== cp) {
+			if (!cp.inv.stows || b === null) {
+				if (!this.move(a, sp, cp)) return;
+				if (b !== null) this.move(b, cp, sp);
+			} else {
+				if (!this.move(b, cp, sp)) return;
+				this.move(a, sp, cp);
+			}
+		}
+		sp.grid[this.seli] = b;
+		cp.grid[this.hli] = a;
+	}
+
+	// Writes each list back in grid order, each item keeping its cell for next time, with the hand
+	// and the one before it found again by the item, then lets the first owner know.
+	close() {
+		for (const p of this.panels) {
+			const inv = p.inv;
+			const before = inv.last_held_i >= 0 ? inv.inv_list[inv.last_held_i] : undefined;
+			inv.inv_list.length = 0;
+			p.grid.forEach((item, gi) => {
+				if (item === null) return;
+				item._inv_pos = gi;
+				inv.inv_list.push(item);
+			});
+			for (const item of p.overflow) inv.inv_list.push(item);
+			inv.cur_held_i = inv.inv_list.indexOf(inv.owner.carrying);
+			inv.last_held_i = before === undefined ? -1 : inv.inv_list.indexOf(before);
+		}
+		Screens.close();
+		this.panels[0].inv.owner.inv_done();
+	}
+
+	// A sprite scaled so its longer side is a given size, centred in a box by its own size and
+	// origin, as the original showed owners and items with no inventory picture.
+	drawFitted(spi, ifr, x, y, boxw, boxh, fit) {
+		const rec = Sprites.peek(spi);
+		if (!rec) return;
+		const sc = fit / Math.max(rec.w, rec.h);
+		Draw.spriteExt(spi, ifr, x + Math.floor((boxw - rec.w * sc) / 2 + rec.ox * sc),
+			y + Math.floor((boxh - rec.h * sc) / 2 + rec.oy * sc), sc, sc, 0, NO_TINT, 1);
+	}
+
+	// Each panel: its backing, the owner's box with their picture and name, then a cell for each
+	// place the inventory has, with its item, the in hand marker, the selection and the cursor.
+	// Under them all, the highlighted item's name.
+	draw() {
+		const blink = Math.floor(currentTime() / INVSCR_BLINK_MS);
+		this.panels.forEach((p, pi) => {
+			Draw.bgSquare(p.x, p.y, p.w, p.h, p.inv.bg);
+			const ox = p.x + INVSCR_PAD;
+			const oy = p.y + INVSCR_PAD;
+			Draw.bgSquare(ox, oy, INVSCR_OWNER_W, INVSCR_OWNER_H, INVSCR_OWNER_BOX);
+			this.drawFitted(p.spi, p.ifr, ox, oy, INVSCR_OWNER_W, INVSCR_OWNER_H, INVSCR_OWNER_FIT);
+			Draw.setFont(INVSCR_OWNER_FONT);
+			Draw.color = INVSCR_OWNER_COLOR;
+			Draw.text(Math.floor(ox + (INVSCR_OWNER_W - Draw.stringWidth(p.name)) / 2), oy + INVSCR_OWNER_NAME_Y, p.name);
+			Draw.color = "#ffffff";
+
+			for (let i = 0; i < p.inv.size; i++) {
+				const bx = ox + INVSCR_OWNER_STEP + (i % p.inv.w) * INVSCR_PITCH;
+				const by = oy + Math.floor(i / p.inv.w) * INVSCR_PITCH;
+				Draw.bgSquare(bx, by, INVSCR_CELL, INVSCR_CELL, INVSCR_CELL_BOX);
+				const item = p.grid[i];
+				if (item !== null) {
+					if (Sprites.exists(item.spi + INVSCR_ITEM_SPRITE_END)) {
+						Draw.spriteExt(item.spi + INVSCR_ITEM_SPRITE_END, 0, bx + INVSCR_ITEM_INSET, by + INVSCR_ITEM_INSET, 1, 1, 0, NO_TINT, 1);
+					} else {
+						this.drawFitted(item.spi, 0, bx + INVSCR_ITEM_INSET, by + INVSCR_ITEM_INSET, INVSCR_ITEM_SIZE, INVSCR_ITEM_SIZE, INVSCR_ITEM_SIZE);
+					}
+					if (item === p.inv.owner.carrying) Draw.spriteExt(INVSCR_HELD_ICON, 0, bx + INVSCR_HELD_X, by + INVSCR_HELD_Y, 1, 1, 0, NO_TINT, 1);
+				}
+				if (pi === this.selp && i === this.seli) Draw.spriteExt(INVSCR_SELECTION, blink, bx, by, 1, 1, 0, NO_TINT, 1);
+				if (pi === this.curp && i === this.hli) Draw.spriteExt(INVSCR_CURSOR, blink, bx, by, 1, 1, 0, NO_TINT, 1);
+			}
+		});
+
+		const item = this.panels[this.curp].grid[this.hli];
+		if (item === null) return;
+		Draw.halign = "center";
+		Draw.guiText(Math.floor(GUI_W / 2), this.bottom + INVSCR_ITEM_GAP, item.gname, INVSCR_ITEM_COLOR, 1, INVSCR_ITEM_FONT);
+	}
+}
+
+// The console's screen: its close up with green text typing out a letter an update under the
+// header, the room's own text or the usual one. A shows it all, B closes and switches the console
+// off.
+class ConsoleScreen {
+	constructor(owner, text) {
+		this.owner = owner;
+		this.text = text !== null && text !== undefined ? String(text) : CONSOLE_DEFAULT_TEXT;
+		// how many letters show so far
+		this.shown = 0;
+	}
+
+	update(con) {
+		if (con.iBtnB) {
+			Screens.close();
+			this.owner.turnoff();
+			return;
+		}
+		if (con.iBtnA) this.shown = this.text.length;
+		else if (this.shown < this.text.length) this.shown++;
+	}
+
+	draw() {
+		Draw.spriteExt(CONSOLE_PICTURE, 0, CONSOLE_PICTURE_X, CONSOLE_PICTURE_Y, CONSOLE_PICTURE_SCALE, CONSOLE_PICTURE_SCALE, 0, NO_TINT, 1);
+		Draw.setFont(CONSOLE_FONT);
+		Draw.color = CONSOLE_COLOR;
+		Draw.textRaw(CONSOLE_TEXT_X, CONSOLE_TEXT_Y, CONSOLE_HEADER + this.text.substring(0, this.shown),
+			Draw.stringHeight("M") * CONSOLE_LINE_SHARE, CONSOLE_WRAP, 1, 1, 0);
+	}
+}

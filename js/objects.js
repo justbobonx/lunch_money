@@ -95,10 +95,13 @@ const Pickupable = {
 
 // ---------------------------------------------------------------- inventory
 
-// Anything that holds items: the player characters, the dog, later lockers. Items sit in a list in
-// the order they came in, with at most one of them out in the owner's hand. Items stay in play while
+// Anything that holds items: the player characters, the dog, lockers. Items sit in a list in the
+// order they came in, with at most one of them out in the owner's hand. Items stay in play while
 // held, hidden and without a mask, in the owner's layer, and the owner draws the one in hand.
-// The quick pick wheel opens over the owner while the item button is held.
+// An inventory that stows, like a locker's, keeps its items out of play instead, in no layer and
+// as they were, the way a chest keeps what is inside.
+// The quick pick wheel opens over the owner while the item button is held, and a quick tap opens
+// the full inventory screen.
 class Inventory {
 	constructor(size, bg, owner, name, inv_list) {
 		this.locked = false;
@@ -110,6 +113,8 @@ class Inventory {
 		this.bg = bg;
 		this.owner = owner;
 		this.name = name;
+		// keeps its items out of play, for holders with no hand
+		this.stows = false;
 		// the place in the list of the item in hand and of the one in hand before it, minus one for none
 		this.cur_held_i = -1;
 		this.last_held_i = -1;
@@ -157,7 +162,8 @@ class Inventory {
 
 	// Takes an item in, into the hand unless told not to. Not while crawl sliding, and only things
 	// that can be picked up. It goes just under the owner in the owner's layer, hidden and without a
-	// mask, keeping its own mask for when it is dropped.
+	// mask, keeping its own mask for when it is dropped. One that stows takes it out of every layer,
+	// so it is off, and leaves it otherwise as it is.
 	pickup(obj, inv_pos, noSwitch) {
 		if (!truthy(obj.pickupable)) return undefined;
 		if (truthy(this.owner.crawling) && this.owner.sliding > 0) return undefined;
@@ -165,6 +171,11 @@ class Inventory {
 		obj.carriedBy = this.owner;
 		// out of its old place first, so the owner's place is counted without it
 		if (obj.mylayer) game.layerRemove(obj.mylayer, obj);
+		if (this.stows) {
+			obj.mylayer = null;
+			game.updateActive(obj);
+			return this.add(obj, inv_pos, false);
+		}
 		game.layerInsert(this.owner.mylayer, obj, this.owner.mylayer.lsprites.indexOf(this.owner));
 
 		obj.looseMask = obj.mask;
@@ -179,24 +190,32 @@ class Inventory {
 		this.owner.carrying.put_away(this.owner);
 	}
 
+	// Lets go of an item without putting it anywhere: out of the hand and the list, and unless it was
+	// stowed, its own mask back and showing again, where it is.
+	release(obj) {
+		if (this.owner.carrying === obj) {
+			this.put_away_held();
+			this.owner.carrying = null;
+			this.cur_held_i = -1;
+		}
+		this.remove(obj);
+		if (!this.stows) {
+			obj.mask = obj.looseMask;
+			obj.visible = true;
+		}
+		obj.carriedBy = null;
+	}
+
 	// Lets go of the item in hand and gives it back. The owner's speed carries on into it, a push
 	// onward, and side on a little lift, which only shows on things that move themselves.
 	drop_held() {
 		const obj = this.owner.carrying;
 		if (!obj) return undefined;
 
-		this.put_away_held();
-
+		this.release(obj);
 		obj.xspd = this.owner.xspd + sign(this.owner.xspd) * INV_DROP_PUSH;
 		obj.yspd = truthy(this.owner.ch_side) ? this.owner.yspd - INV_DROP_LIFT
 			: this.owner.yspd + sign(this.owner.yspd) * INV_DROP_PUSH;
-		obj.mask = obj.looseMask;
-		obj.visible = true;
-		obj.carriedBy = null;
-
-		this.remove_i(this.cur_held_i);
-		this.owner.carrying = null;
-		this.cur_held_i = -1;
 		return obj;
 	}
 
@@ -264,6 +283,8 @@ class Inventory {
 	// or holds something that fits in here, taking out the last item when the hand is empty. Left
 	// and right turn it, down twice drops what is in hand and takes out the next, up switches the
 	// item on or off when it has a switch. Letting go closes it. Takes the owner's frame while open.
+	// A tap too short to open it opens the full inventory screen on this inventory alone, which
+	// another tap closes, unless the hand holds something that cannot go in here.
 	qp_handle_ui(con) {
 		if (con.iBtnRd) {
 			this.bdown_time++;
@@ -274,11 +295,13 @@ class Inventory {
 			}
 		}
 
-		// A quick tap opened the full inventory screen in the original. That screen is not built
-		// yet, so a tap does nothing for now.
 		if (con.iBtnRr) {
 			this.bdown_time = 0;
-			this.in_inv_sel = 0;
+			if (this.in_inv_sel) {
+				this.in_inv_sel = 0;
+			} else if (!this.owner.carrying || truthy(this.owner.carrying.holdable)) {
+				Screens.open(new InventoryScreen([this], "iBtnRr"));
+			}
 		}
 
 		if (!this.in_inv_sel) return false;
