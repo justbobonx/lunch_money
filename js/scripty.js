@@ -14,6 +14,8 @@ const SAY_SCREEN_FADE_START = 60;
 const SAY_SCREEN_FADE_TIME = 60;
 const SAY_SCREEN_BG_COLOR = "#000000";
 const SAY_SCREEN_FONT = "ftScreenTitle";
+// How long the player shows off an item they were just given, in updates.
+const PRESENT_HELD_UPDATES = 150;
 
 // The engine calls a script may make by name, given the action's remaining values.
 const SCRIPT_CALLS = {
@@ -26,9 +28,10 @@ const SCRIPT_CALLS = {
 };
 
 // Actions the data uses whose systems are later stages: the spotlight, one time effects, sound,
-// copying groups, the inventory, and the other characters. Each logs once and is passed over.
+// copying groups, and the other characters, whose giving and taking go with them. Each logs once
+// and is passed over.
 const SCRIPT_OPS_NOT_YET = ["setSpotlight", "add_onefx", "playBgSound", "copyGroup",
-	"pickup", "giveNew", "give", "take", "take_obj", "walkTo", "saveCurLoc", "use", "face"];
+	"give", "take", "walkTo", "saveCurLoc", "use", "face"];
 
 // A value against another by a comparison's name. On and off count as one and zero.
 function scriptValIs(a, comp, b) {
@@ -396,6 +399,42 @@ const ScriptOps = {
 		this.nexta = true;
 	},
 
+	// ------------------------------------------------------------ the inventory
+
+	// The actor picks up a named thing, and with one more value the player shows it off.
+	pickup(ca) {
+		const obj = this.lookup(ca[1]);
+		if (obj && this.actor && this.actor.inv) this.actor.inv.pickup(obj);
+		if (ca.length > 2) game.guy.presenting = PRESENT_HELD_UPDATES;
+		this.nexta = true;
+	},
+
+	// A new object of a kind put straight into someone's hands, gone again if they cannot take it,
+	// and with one more value the player shows it off.
+	giveNew(ca) {
+		const towho = this.lookup(ca[2]);
+		if (objectType(ca[1]) === undefined) {
+			Hooks.todo("script giving an unknown object " + ca[1]);
+		} else if (towho && towho.inv) {
+			const obj = game.createObject(ca[1], {});
+			if (towho.inv.pickup(obj) === undefined) obj.destroy();
+		}
+		if (ca.length > 3) game.guy.presenting = PRESENT_HELD_UPDATES;
+		this.nexta = true;
+	},
+
+	// Takes the item in hand away for good. The one holding it is whoever last acted on the actor,
+	// as a character being given something remembers, else the actor. The original only looked at
+	// the actor, which for a character being given something holds nothing.
+	take_obj(ca) {
+		const holder = (this.actor && this.actor.actwho) || this.actor;
+		if (holder && holder.inv) {
+			const obj = holder.inv.drop_held();
+			if (obj) obj.destroy();
+		}
+		this.nexta = true;
+	},
+
 	// ------------------------------------------------------------ rooms, layers and areas
 
 	layerViz(ca) {
@@ -583,9 +622,11 @@ class oScripty extends oBaseObject {
 			}
 			return scriptValIs(dist, check[2], check[3]);
 		}
+		// Whether the item being given is of a kind. The giver is whoever last acted on the actor,
+		// as a character being given something remembers, else the actor.
 		if (type === "isGive") {
-			Hooks.todo("script check of what is given, which needs the inventory");
-			return false;
+			const giver = (this.actor && this.actor.actwho) || this.actor;
+			return !!giver && !!giver.carrying && giver.carrying.constructor === objectType(check[1]);
 		}
 		// The original read the time from the runner itself, where nothing writes it. Here it is
 		// the actor's, where remembering the last time puts it.

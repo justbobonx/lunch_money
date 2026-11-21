@@ -1,5 +1,32 @@
-// The engine's object classes: everything the engine files name, the shared mixins, the stand in
+// The engine's object classes: everything the engine files name, the shared mixins, the
 // inventory, and the stand ins and name lookup for object classes. Always loaded first.
+
+// Inventory: rows of the full inventory screen unless set, and what a drop passes on from the
+// owner, a push onward and side on a lift.
+const INV_DEFAULT_ROWS = 2;
+const INV_DROP_PUSH = 0.3;
+const INV_DROP_LIFT = 0.2;
+// The quick pick wheel: updates the item button is held before it opens, the distance between
+// slots, the row's nudge left and height over the owner, the squeezed item's size, the on or off
+// light's place in a slot, and the pointer's height.
+const QP_HOLD_UPDATES = 20;
+const QP_SLOT_STEP = 13;
+const QP_ROW_OFFX = 6;
+const QP_ROW_ABOVE = 26;
+const QP_ICON_SIZE = 10;
+const QP_LIGHT_OFFSET = 7;
+const QP_POINTER_ABOVE = 12;
+// Its labels: the font, height of the name over the owner and of the drop question over that,
+// their colours, and the dark backing strip's colour, fade and top and bottom under the text spot.
+const QP_FONT = "ftTinyer";
+const QP_LABEL_ABOVE = 39;
+const QP_LABEL_STEP = 7;
+const QP_NAME_COLOR = "#ccccee";
+const QP_DROP_COLOR = "#ffddaa";
+const QP_LABEL_BG_COLOR = "#000000";
+const QP_LABEL_BG_ALPHA = 0.7;
+const QP_LABEL_BG_TOP = 4;
+const QP_LABEL_BG_BOTTOM = 10;
 
 // ---------------------------------------------------------------- mixins
 
@@ -58,40 +85,272 @@ const Pickupable = {
 		// offsets so the item sits right in the hand
 		this.holdoffx = 0;
 		this.holdoffy = 0;
+		// its own mask while held, as held things have none
+		this.looseMask = null;
 	},
 
 	put_away(who) {},
 	take_out(who) {}
 };
 
-// ---------------------------------------------------------------- inventory stand in
+// ---------------------------------------------------------------- inventory
 
-// The inventory is a later stage. This keeps the calls the players make and reports them.
+// Anything that holds items: the player characters, the dog, later lockers. Items sit in a list in
+// the order they came in, with at most one of them out in the owner's hand. Items stay in play while
+// held, hidden and without a mask, in the owner's layer, and the owner draws the one in hand.
+// The quick pick wheel opens over the owner while the item button is held.
 class Inventory {
-	constructor(size, sprite, owner, font) {
+	constructor(size, bg, owner, name, inv_list) {
+		this.locked = false;
+		this.size = size;
+		// rows of the full inventory screen, the columns follow from the size
+		this.h = INV_DEFAULT_ROWS;
+		this.w = Math.ceil(size / this.h);
+		// the full inventory screen's backing sprite
+		this.bg = bg;
 		this.owner = owner;
-		this.inv_list = [];
+		this.name = name;
+		// the place in the list of the item in hand and of the one in hand before it, minus one for none
+		this.cur_held_i = -1;
+		this.last_held_i = -1;
+		this.inv_list = inv_list !== undefined ? inv_list : [];
+		// one press down in the wheel asks, a second drops
+		this.inv_ask_drop = 0;
+		// facts about particular spots, for the full inventory screen
+		this.spot_overs = -1;
+		// the wheel is open, and how long the item button has been held
+		this.in_inv_sel = 0;
+		this.bdown_time = 0;
 	}
-	set_height(h) {}
-	// never takes over the frame until the real one exists
-	qp_handle_ui(con) {
-		return false;
+
+	set_height(h) {
+		this.h = h;
+		this.w = Math.ceil(this.size / h);
 	}
-	// the quick pick wheel is never open until the real one exists
-	get in_inv_sel() {
-		return false;
+
+	set_inv_list(inv_list) {
+		this.inv_list = inv_list;
 	}
-	pickup(obj, pos, noSwitch) {
-		Hooks.todo("inventory pickup of " + obj.constructor.name);
+
+	// Adds to the end of the list, remembering a spot for the full screen, the list place when none
+	// is given, and can take it out into the hand.
+	add(obj, pos, andswitch) {
+		this.inv_list.push(obj);
+		obj._inv_pos = pos !== undefined ? pos : this.inv_list.length - 1;
+		if (truthy(andswitch)) this.switch_held(this.inv_list.length - 1);
+		return obj._inv_pos;
 	}
+
+	remove(obj) {
+		this.remove_i(this.inv_list.indexOf(obj));
+	}
+
+	// A place outside the list removes nothing, as in the original. The places of the item in hand
+	// and of the one before it follow the list closing up, where the original let them slip.
+	remove_i(ind) {
+		if (ind < 0) return;
+		this.inv_list.splice(ind, 1);
+		if (ind < this.cur_held_i) this.cur_held_i--;
+		if (ind < this.last_held_i) this.last_held_i--;
+		else if (ind === this.last_held_i) this.last_held_i = -1;
+	}
+
+	// Takes an item in, into the hand unless told not to. Not while crawl sliding, and only things
+	// that can be picked up. It goes just under the owner in the owner's layer, hidden and without a
+	// mask, keeping its own mask for when it is dropped.
+	pickup(obj, inv_pos, noSwitch) {
+		if (!truthy(obj.pickupable)) return undefined;
+		if (truthy(this.owner.crawling) && this.owner.sliding > 0) return undefined;
+
+		obj.carriedBy = this.owner;
+		// out of its old place first, so the owner's place is counted without it
+		if (obj.mylayer) game.layerRemove(obj.mylayer, obj);
+		game.layerInsert(this.owner.mylayer, obj, this.owner.mylayer.lsprites.indexOf(this.owner));
+
+		obj.looseMask = obj.mask;
+		obj.mask = "sNoMask";
+		obj.visible = false;
+
+		return this.add(obj, inv_pos, !truthy(noSwitch));
+	}
+
+	put_away_held() {
+		if (!this.owner.carrying) return;
+		this.owner.carrying.put_away(this.owner);
+	}
+
+	// Lets go of the item in hand and gives it back. The owner's speed carries on into it, a push
+	// onward, and side on a little lift, which only shows on things that move themselves.
 	drop_held() {
-		Hooks.todo("inventory drop");
+		const obj = this.owner.carrying;
+		if (!obj) return undefined;
+
+		this.put_away_held();
+
+		obj.xspd = this.owner.xspd + sign(this.owner.xspd) * INV_DROP_PUSH;
+		obj.yspd = truthy(this.owner.ch_side) ? this.owner.yspd - INV_DROP_LIFT
+			: this.owner.yspd + sign(this.owner.yspd) * INV_DROP_PUSH;
+		obj.mask = obj.looseMask;
+		obj.visible = true;
+		obj.carriedBy = null;
+
+		this.remove_i(this.cur_held_i);
+		this.owner.carrying = null;
+		this.cur_held_i = -1;
+		return obj;
 	}
-	switch_held(i) {
-		Hooks.todo("inventory switch held");
+
+	// Puts away whatever is in hand and takes out the item at a place. A place with nothing, or
+	// with an empty placeholder, leaves the hand empty. Something that cannot go in the bag, like a
+	// crate, holds the hand until it is dropped, so nothing switches while it is carried; an item
+	// given then goes in the bag without coming out.
+	switch_held(newi) {
+		if (this.owner.carrying && !truthy(this.owner.carrying.holdable)) return;
+		if (this.owner.carrying) {
+			this.put_away_held();
+			this.owner.carrying = null;
+			this.last_held_i = this.cur_held_i;
+			this.cur_held_i = -1;
+		} else {
+			this.last_held_i = -1;
+		}
+		const next = this.inv_list[newi];
+		if (next !== undefined && !(next instanceof oInvNone)) {
+			this.owner.carrying = next;
+			this.cur_held_i = newi;
+			game.moveObjToLayer(next, this.owner.mylayer);
+		}
 	}
+
+	// the item in hand before this one, or the newest
 	switch_back() {
-		Hooks.todo("inventory switch back");
+		this.switch_held(this.last_held_i >= 0 ? this.last_held_i : this.inv_list.length - 1);
+	}
+
+	// the item, by object or name, when it is in here
+	check_for_obj(obj) {
+		obj = game.lookupInst(obj);
+		return obj !== undefined && this.inv_list.indexOf(obj) >= 0 ? obj : undefined;
+	}
+
+	index_of(item) {
+		return this.inv_list.indexOf(item);
+	}
+
+	// the first item with a sprite
+	find_spr(spr) {
+		return this.inv_list.find((item) => item.spi === spr);
+	}
+
+	// the first item of a kind, by class or class name
+	find_obj(obj) {
+		return this.inv_list.find((item) => item.constructor === obj || item.constructor.name === obj);
+	}
+
+	len() {
+		return this.inv_list.length;
+	}
+
+	// Empties it for good: every item is destroyed. Unlike the original, the hand empties too.
+	clear() {
+		this.put_away_held();
+		for (let i = this.inv_list.length - 1; i >= 0; i--) this.inv_list.splice(i, 1)[0].destroy();
+		this.owner.carrying = null;
+		this.cur_held_i = -1;
+		this.last_held_i = -1;
+	}
+
+	// The quick pick wheel. Holding the item button a while opens it, as long as the hand is empty
+	// or holds something that fits in here, taking out the last item when the hand is empty. Left
+	// and right turn it, down twice drops what is in hand and takes out the next, up switches the
+	// item on or off when it has a switch. Letting go closes it. Takes the owner's frame while open.
+	qp_handle_ui(con) {
+		if (con.iBtnRd) {
+			this.bdown_time++;
+			if (this.bdown_time > QP_HOLD_UPDATES && !this.in_inv_sel
+				&& (!this.owner.carrying || truthy(this.owner.carrying.holdable))) {
+				if (this.cur_held_i < 0) this.switch_back();
+				this.in_inv_sel = 1;
+			}
+		}
+
+		// A quick tap opened the full inventory screen in the original. That screen is not built
+		// yet, so a tap does nothing for now.
+		if (con.iBtnRr) {
+			this.bdown_time = 0;
+			this.in_inv_sel = 0;
+		}
+
+		if (!this.in_inv_sel) return false;
+
+		// any other choice forgets a drop that was asked
+		if (con.iBtnY || con.iUpP || con.iLeftP || con.iRightP) this.inv_ask_drop = 0;
+
+		// turning an empty wheel goes nowhere
+		if (this.inv_list.length > 0) {
+			let newi = this.cur_held_i;
+			if (con.iRightP) newi = (this.cur_held_i - 1 + this.inv_list.length) % this.inv_list.length;
+			if (con.iLeftP) newi = (this.cur_held_i + 1) % this.inv_list.length;
+			if (newi !== this.cur_held_i) this.switch_held(newi);
+		}
+
+		if (this.owner.carrying) {
+			if (con.iDownP) {
+				if (++this.inv_ask_drop > 1) {
+					// the original read the place after the drop had already cleared it, so the
+					// hand stayed empty; here the next item along comes out
+					const dropi = this.cur_held_i;
+					this.drop_held();
+					this.switch_held(Math.min(dropi, this.inv_list.length - 1));
+					this.last_held_i = 0;
+					this.inv_ask_drop = 0;
+				}
+			} else if (con.iUpP && this.owner.carrying.itemOn > -1) {
+				this.owner.carrying.itemOn = (this.owner.carrying.itemOn + 1) % 2;
+			}
+		}
+
+		return true;
+	}
+
+	// A row of slots over the owner with the item in hand in the middle under the pointer, each
+	// item squeezed into its slot with its on or off light, and the name of the item in hand
+	// above, with the drop question over that once asked.
+	qp_draw() {
+		const n = this.inv_list.length;
+		const half = Math.floor((n - 1) / 2);
+		const rowx = this.owner.x - half * QP_SLOT_STEP - QP_ROW_OFFX;
+		const rowy = this.owner.y - QP_ROW_ABOVE;
+
+		for (let vi = 0; vi < n; vi++) {
+			const item = this.inv_list[(vi + this.cur_held_i - half + n) % n];
+			if (!item) continue;
+			const ix = rowx + QP_SLOT_STEP * vi;
+			Draw.sprite("s_inv_bg", 0, ix, rowy);
+			Draw.spriteStretched(item.spi, 0, ix + 1, rowy + 1, QP_ICON_SIZE, QP_ICON_SIZE);
+			if (item.itemOn > -1) Draw.sprite("s_inv_active", item.itemOn, ix + QP_LIGHT_OFFSET, rowy + QP_LIGHT_OFFSET);
+		}
+		Draw.sprite("s_inv_pointer", 0, this.owner.x, this.owner.y - QP_POINTER_ABOVE);
+
+		if (!this.owner.carrying) return;
+
+		const labels = [[this.owner.carrying.gname, QP_NAME_COLOR]];
+		if (this.inv_ask_drop === 1) labels.push(["DROP?", QP_DROP_COLOR]);
+		const tx = this.owner.x + 1;
+		Draw.setFont(QP_FONT);
+		Draw.halign = "center";
+		for (let li = 0; li < labels.length; li++) {
+			const ty = this.owner.y - QP_LABEL_ABOVE - QP_LABEL_STEP * li;
+			const halfw = Math.floor(Draw.stringWidth(labels[li][0]) / 2);
+			Draw.color = QP_LABEL_BG_COLOR;
+			Draw.alpha = QP_LABEL_BG_ALPHA;
+			Draw.rectangle(tx - halfw - 1, ty + QP_LABEL_BG_TOP, tx + halfw - 1, ty + QP_LABEL_BG_BOTTOM, 0);
+			Draw.color = labels[li][1];
+			Draw.alpha = 1;
+			Draw.textShadow(tx, ty, labels[li][0], 0, 1);
+		}
+		Draw.color = "#ffffff";
+		Draw.halign = "left";
 	}
 }
 
@@ -340,6 +599,16 @@ class oIaBgObject extends oBgObject {
 	}
 }
 mixin(oIaBgObject, Interactive);
+
+// An empty spot in an inventory: it fits in one, but taking it out leaves the hand empty.
+class oInvNone extends oIaBgObject {
+	constructor() {
+		super();
+		this.initPickupable();
+		this.holdable = true;
+	}
+}
+mixin(oInvNone, Pickupable);
 
 class oClimbableObj extends oBgObject {
 	constructor() {
@@ -692,7 +961,7 @@ class oChar extends oActor {
 		const inv = this.inv;
 		const con = this.con;
 
-		if (this.carrying) this.carrying.carriedBy = null;
+		if (this.carrying) this.inv.drop_held();
 
 		// every default as a freshly made one of the same class has them
 		const fresh = new this.constructor();
@@ -788,15 +1057,15 @@ class oChar extends oActor {
 				this.drop_request = 0;
 				this.lockface = 0;
 			}
+			// put it away, or let go of something that cannot go in the bag
 			if (this.con.iBtnB) {
-				this.inv.switch_held(-1);
+				if (truthy(this.carrying.holdable)) this.inv.switch_held(-1);
+				else this.inv.drop_held();
 			}
+			// an item can ask to be let go after its use; the original only cut it loose, leaving it
+			// hidden, without a mask and still in the inventory
 			if (this.con.iBtnX) {
-				if ((this.carrying || this).use(this) === "drop") {
-					(this.carrying || this).carriedBy = null;
-					this.carrying = null;
-					this.cur_held_i = -1;
-				}
+				if ((this.carrying || this).use(this) === "drop") this.inv.drop_held();
 			}
 			if (this.con.iBtnXd) {
 				(this.carrying || this).use_c(this);

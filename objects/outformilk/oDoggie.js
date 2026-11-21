@@ -64,11 +64,9 @@ class oDoggie extends oActor {
 		this.barks = 1;
 	}
 
+	// Taking the ball from its mouth. Unlike the original, it leaves the dog's inventory too.
 	pickup(who) {
-		if (this.carrying) {
-			who.inv.pickup(this.carrying);
-			this.carrying = null;
-		}
+		if (this.carrying) who.inv.pickup(this.inv.drop_held());
 	}
 
 	acton(action, who) {
@@ -207,6 +205,12 @@ class oDoggie extends oActor {
 
 		this.drawSprite = si;
 		this.spi = si;
+	}
+
+	// the held item is hidden from the normal draw, so the dog draws it in its mouth, in front of itself
+	draw() {
+		super.draw();
+		if (!truthy(this.dead) && this.carrying) this.carrying.draw();
 	}
 }
 oDoggie.defaultSprite = "sDoggie_stand";

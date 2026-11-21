@@ -19,9 +19,6 @@ oTank.ported = false;
 class oAniSpark extends oBgObject {}
 oAniSpark.ported = false;
 
-class oChest extends oIaBgObject {}
-oChest.ported = false;
-
 class oGameBoxV extends oIaBgObject {}
 oGameBoxV.ported = false;
 
