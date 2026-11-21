@@ -1,6 +1,6 @@
 {
 	"curuid":"18D637",
-	"object_folders":["outformilk"],
+	"object_folders":["outformilk","ship"],
 	"rooms":[{
 		"name":"TestDev",
 		"index":0

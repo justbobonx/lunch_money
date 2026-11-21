@@ -381,7 +381,6 @@ class oTrigger extends oBaseObject {
 		this.whotriggered = null;
 		this.inTrigger = false;
 		this.triggered = false;
-		this.no_trig_on_reenter = 0;
 		this.offsetToTriggerer = false;
 		this.offx = 0;
 		this.offy = -10;

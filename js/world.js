@@ -640,28 +640,24 @@ class World {
 	}
 
 	// A layer of the current room by its exact name, or with a star at the end, the list of every
-	// layer whose name holds the text before the star anywhere in it.
+	// layer whose name starts with the text before the star.
 	findLayer(name) {
 		const layers = this.curroom.layers;
 		if (name.endsWith("*")) {
 			const part = name.substring(0, name.length - 1);
-			return layers.filter((lyr) => part === "" || lyr.name.indexOf(part) >= 0);
+			return layers.filter((lyr) => lyr.name.startsWith(part));
 		}
 		return layers.find((lyr) => lyr.name === name);
 	}
 
 	// Switches a layer on or off, or with no switch given just brings its objects in line with
 	// the room and layer. Each object is on only when the room, the layer and the object are.
-	// Triggers coming back on forget who was standing in them, unless told not to.
+	// Triggers keep their state, so one never fires again until the guy leaves and comes back in.
 	layerSetEnabled(lyr, enabled) {
 		if (enabled !== undefined) lyr.disabled = truthy(enabled) ? 0 : 1;
 		for (const spr of lyr.lsprites) {
 			if (!(spr instanceof oBaseObject)) continue;
 			this.updateActive(spr);
-			if (spr.active && spr.inTrigger !== undefined && !truthy(spr.no_trig_on_reenter)) {
-				spr.inTrigger = 0;
-				spr.triggered = 0;
-			}
 		}
 	}
 
@@ -1162,9 +1158,10 @@ class World {
 		if (enterato) {
 			this.moveObjToLayer(guy, enterato.mylayer.name, undefined);
 			// coming in standing in a trigger counts as already in it
-			if (enterato.inTrigger !== undefined && truthy(enterato.no_trig_on_reenter)) {
+			if (enterato.inTrigger !== undefined) {
 				enterato.inTrigger = 1;
 				enterato.triggered = 1;
+				enterato.whotriggered = guy;
 			}
 			guy.x = enterato.x;
 			guy.y = enterato.y;

@@ -20,6 +20,14 @@ class oFloor extends oGround {
 
 class oSolidFloor extends oGround {}
 
+// A hidden marker, a named spot for scripts and doors to find.
+class oEmptyObject extends oBaseObject {
+	constructor() {
+		super();
+		this.visible = false;
+	}
+}
+
 // Spiky wall that hurts on touch.
 class oWall extends oGround {
 	constructor() {
@@ -288,7 +296,6 @@ class oLyrDoor extends oIaBgObject {
 		// for coming in from other rooms
 		this.inTrigger = 0;
 		this.triggered = 0;
-		this.no_trig_on_reenter = 1;
 		this.open_sensor = undefined;
 		this.sense_on = null;
 		this.manual_override = 0;
@@ -388,6 +395,50 @@ class oDoor extends oIaBgObject {
 	}
 }
 oDoor.defaultSprite = "sDoor";
+
+// A solid interactive thing that runs a script when acted on, and another when picked up.
+// Picking it up runs only the script; it never goes into the inventory.
+class oIaObjScript extends oIaObject {
+	constructor() {
+		super();
+		this.actonScript = null;
+		this.pickupScript = null;
+	}
+
+	acton(action, who, pars) {
+		if (Array.isArray(this.actonScript)) Hooks.runScript(this.actonScript, who, undefined, undefined, undefined, this);
+	}
+
+	pickup(upper) {
+		if (Array.isArray(this.pickupScript)) Hooks.runScript(this.pickupScript, upper, undefined, undefined, undefined, this);
+	}
+}
+
+// The same for background things, and it can be set to run its acton script only once until reset.
+class oIaBgObjScript extends oIaBgObject {
+	constructor() {
+		super();
+		this.actonScript = null;
+		this.pickupScript = null;
+		this.onlyOnce = 0;
+		this.has_ran = 0;
+	}
+
+	reset() {
+		this.has_ran = 0;
+	}
+
+	acton(action, who, pars) {
+		if (Array.isArray(this.actonScript) && (!truthy(this.onlyOnce) || this.has_ran === 0)) {
+			this.has_ran++;
+			Hooks.runScript(this.actonScript, who, undefined, undefined, undefined, this);
+		}
+	}
+
+	pickup(upper) {
+		if (Array.isArray(this.pickupScript)) Hooks.runScript(this.pickupScript, upper, undefined, undefined, undefined, this);
+	}
+}
 
 // A sign that shows its message when looked at, and hides it on a second look or once out of view.
 class oSign extends oIaBgObject {

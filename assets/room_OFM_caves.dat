@@ -202,7 +202,6 @@
 				{
 					"exoffx":8,
 					"objinit":»{
-						"no_trig_on_reenter":1,
 						"triggerScript": [
 							[ "goto_room", "OutForMilk", "beach_cave_exit_1", 1,1 ],
 						]
@@ -219,7 +218,6 @@
 				{
 					"objinit":»{
 						"visible":1,
-						"no_trig_on_reenter":1,
 						"triggerScript": [
 							[ "goto_room", "OutForMilk", "beach_cave_1", 1,1 ],
 						]
