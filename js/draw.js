@@ -50,6 +50,15 @@ const UNPORTED_COLOR = "#ff00ff";
 const UNPORTED_LABEL_COLOR = "#ffffff";
 const UNPORTED_LABEL_FONT = "5px monospace";
 
+// The one thing the player would act on gets an outline, yellow when it can be picked up and orange
+// when it can only be acted on, its fade slowly pulsing.
+const INVIEW_PICKUP_COLOR = "#ffee33";
+const INVIEW_ACTON_COLOR = "#ff9933";
+const INVIEW_ALPHA = 0.8;
+const INVIEW_PULSE = 0.2;
+// how quickly the pulse goes, in turns of the wave per second
+const INVIEW_PULSE_SPEED = 2;
+
 // sprites missing from the converted set are a faint box of their guessed size in their blend colour
 const MISSING_PICTURE_ALPHA = 0.35;
 
@@ -266,7 +275,9 @@ const Draw = {
 	// The engine's sprite draw: a frame placed by its origin at a spot in the current target,
 	// stretched, turned counterclockwise in degrees, multiplied by a colour and faded.
 	// Frame numbers wrap around the frame count both ways.
-	spriteRaw(name, subimg, x, y, xscale, yscale, rot, col, alpha) {
+	// Given an outline colour it draws only the frame's shape in that solid colour, one pixel out on
+	// every side, for drawing under the frame itself.
+	spriteRaw(name, subimg, x, y, xscale, yscale, rot, col, alpha, outline) {
 		const rec = Sprites.peek(name);
 		if (!rec) return;
 		const n = rec.frames ? rec.frames.length : 1;
@@ -280,6 +291,32 @@ const Draw = {
 		ctx.scale(xscale, yscale);
 		if (rec.image && rec.frames) {
 			const f = rec.frames[fi];
+			if (outline) {
+				const ok = rec.name + "|" + fi + "|outline|" + outline;
+				let oc = this.tintCache[ok];
+				if (!oc || oc.source !== rec.image) {
+					const canvas = this.makeCanvas(f[2], f[3]);
+					if (canvas) {
+						const g = canvas.getContext("2d");
+						g.drawImage(rec.image, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+						g.globalCompositeOperation = "source-in";
+						g.fillStyle = outline;
+						g.fillRect(0, 0, f[2], f[3]);
+						oc = this.tintCache[ok] = { source: rec.image, canvas: canvas };
+					}
+				}
+				if (oc) {
+					// one screen pixel out whatever the stretch
+					const px = 1 / Math.abs(xscale || 1);
+					const py = 1 / Math.abs(yscale || 1);
+					ctx.drawImage(oc.canvas, -rec.ox - px, -rec.oy);
+					ctx.drawImage(oc.canvas, -rec.ox + px, -rec.oy);
+					ctx.drawImage(oc.canvas, -rec.ox, -rec.oy - py);
+					ctx.drawImage(oc.canvas, -rec.ox, -rec.oy + py);
+				}
+				ctx.globalAlpha = 1;
+				return;
+			}
 			const tint = this.tinted(rec.name + "|" + fi, rec.image, f[0], f[1], f[2], f[3], col);
 			if (tint) ctx.drawImage(tint, -rec.ox, -rec.oy);
 			else ctx.drawImage(rec.image, f[0], f[1], f[2], f[3], -rec.ox, -rec.oy, f[2], f[3]);
@@ -348,6 +385,11 @@ const Draw = {
 		let xo = -this.curdrawoffx;
 		let yo = -this.curdrawoffy;
 		if (!truthy(s.tiled)) {
+			if (truthy(s.inview) && !s.carriedBy) {
+				const pulse = INVIEW_ALPHA + Math.sin(game.frames / GAME_FPS * INVIEW_PULSE_SPEED * Math.PI * 2) * INVIEW_PULSE;
+				this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, NO_TINT, s.alpha * pulse,
+					truthy(s.pickupable) ? INVIEW_PICKUP_COLOR : INVIEW_ACTON_COLOR);
+			}
 			this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alpha);
 			return;
 		}

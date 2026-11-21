@@ -1074,9 +1074,10 @@ class oChar extends oActor {
 				(this.carrying || this).use_r(this);
 			}
 		} else if (this.lookObjs.length > 0) {
-			for (const lobj of this.lookObjs) {
-				// someone else is holding it
-				if (lobj.carriedBy) continue;
+			// only the one thing in view is acted on, the one drawn with the outline, and not when
+			// someone else is holding it
+			const lobj = this.lookObjs.find((o) => truthy(o.inview));
+			if (lobj && !lobj.carriedBy) {
 				if (this.con.iBtnX) {
 					lobj.acton("look", this);
 				}
