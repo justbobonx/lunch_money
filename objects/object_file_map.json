@@ -9,7 +9,8 @@
 		"oBoxfall.js",
 		"oDoggie.js",
 		"oSnow.js",
-		"oStars.js"
+		"oStars.js",
+		"oTank.js"
 	],
 	"ship": [
 		"goShip.js"

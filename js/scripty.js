@@ -285,12 +285,13 @@ const ScriptOps = {
 	},
 
 	// An object made at a spot, named when a name is given, with settings laid on, into a layer
-	// by name, the actor's layer, or the pop up layer when none is given.
+	// by name, the actor's layer, or the pop up layer when none is given. Anything that is not a
+	// layer name, like the minus one some old scripts pass to mean none, also gets the pop up layer.
 	createObj(ca) {
 		let lyr = ca[5];
 		if (lyr === "actor") lyr = this.actor.mylayer;
 		else if (typeof lyr === "string") lyr = game.findLayer(lyr);
-		if (!lyr || Array.isArray(lyr)) lyr = game.popupLayer;
+		if (!(lyr instanceof Layer)) lyr = game.popupLayer;
 		if (objectType(ca[1]) === undefined) {
 			Hooks.todo("script making an unknown object " + ca[1]);
 		} else {

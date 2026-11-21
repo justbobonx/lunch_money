@@ -242,7 +242,6 @@
 		"oStaticBox": "oBaseObject",
 		"oStayinBox": "oBaseObject",
 		"oSword": "oIaBgObject",
-		"oTank": "oObject",
 		"oText": "oBaseObject",
 		"oTextField": "oLeGuiObj",
 		"oThug": "oActor",

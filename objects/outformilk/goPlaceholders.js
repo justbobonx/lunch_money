@@ -8,14 +8,6 @@ class oBouncer extends oObject {
 }
 oBouncer.ported = false;
 
-class oTank extends oObject {
-	constructor() {
-		super();
-		this.initMoveable();
-	}
-}
-oTank.ported = false;
-
 class oAniSpark extends oBgObject {}
 oAniSpark.ported = false;
 
