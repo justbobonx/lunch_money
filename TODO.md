@@ -14,7 +14,7 @@
 - eaoHole: a top down floor zone that drops the player into a hole (fall animation, half a life, a short respawn script). No room uses it yet; needs the fall-in-hole pieces.
 - oBoat: when ported, it should run the floor zone check with real speed values like the player does; the original passed none, which would break the sideways slope.
 - Script action stubs that only log a not-ported notice (marked in the code).
-- oBubble: side view swimming asks for a bubble every two seconds and only logs until oBubble is ported.
+- Sound: the spark's zap should be cut off after 3 to 8 updates and when the spark is destroyed; it only logs for now.
 - oShark is not ported; its turn poof and its float death spray (the original's killGuyFloat) come with it.
 
 ### GM quirks kept for now (remove eventually)
@@ -28,7 +28,9 @@
 - oPuzBox: the puzzle box minigame (colors, guys, letters, numbers; timer and score), about 1400 lines in the original. Pl_Autumn has eight trig_pb triggers along its left edge that each make one with a different box_type, into the pop up layer. Wanted on a high layer.
 - OFM_underwater: star field veloy is written as 0.0-2, probably meant 0.02.
 - Death sprays follow whoever did the killing and pass through it: every batch comes from the killer's spot (the rat, the log, the hard landing's own character). Script deaths have no killer here and follow the player; the original followed the script runner, which sits at its trigger.
-- The swim jump water burst comes from the water object's own spot, usually its top left corner, not the player.
+- Bubbles count up two each update (the original counts once and again for the wobble), so they fade after 300 updates and are gone at 350, and the wobble jumps back to its start every 80 updates, part way through a swing.
+- Placed sparks go off as soon as the room loads, since the room's saved frame and speed land over the spark's resting ones; a spark due again mid animation starts over.
+- The foreground water tiler repeats whole tiles until it passes its stretched size, so a stretch that isn't a whole number of tiles draws a little past its edge (TestDev's water by a pixel each way).
 - Glass shards come from the glass's own spot, not where it was hit.
 - A particle only checks the first solid it overlaps, so one inside the followed object stops on nothing else there.
 - Blood that stops on a solid with no lifetime stays until revive or a room switch, keeping its burst alive with it.
@@ -43,6 +45,7 @@
 - Stand-in presets (like oGrGrass was): small classes or room config?
 - Start room is TestDev, overriding world.dat's OutForMilk; keep while testing?
 - The swim boost poof goes at the bottom of the player's layer as the original asked, so it draws behind everything there; in the original its particles were separate objects added on top of the layer, so they drew in front. Keep it behind, or put it on top?
+- Changed from the original: jumping out of water now makes the same splash as going in, at the player's spot on the water's top. The original let out a different, smaller burst from the water object's own spot, usually its top left corner.
 - Particles use plain random, while the rest of the port uses its seeded generator; switch them if replays ever matter.
 
 ## Fix

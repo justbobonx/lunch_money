@@ -1,5 +1,6 @@
 // Basic building blocks any game can use: floors, walls, one way floors, ladders, ropes, crates,
-// doors, triggers, signs, masks, one time effects, sparkle fields, particle emitters and value faders.
+// doors, triggers, signs, masks, one time effects, electric sparks, sparkle fields, particle
+// emitters, bubbles, foreground water and value faders.
 
 // Particle emitters. Each keeps at most this many particles going and drops its oldest to make room,
 // standing in for the original's limit per particle sprite, which never worked. A particle that
@@ -8,6 +9,29 @@
 const PARTICLE_CAP = 1000;
 const PARTICLE_FAILSAFE_UPDATES = 300;
 const PARTICLE_DEFAULT_SPRITE = "sSolidWh";
+
+// A swimmer's bubble: the most its count can start at, so bubbles let out together drift apart,
+// the count where it starts to fade and where it is gone, how far it rises each update, and its
+// sideways wobble: how wide, how many counts between restarts, and counts per half swing.
+// The count goes up by two each update, as in the original.
+const BUBBLE_START_MAX = 160;
+const BUBBLE_FADE_AT = 600;
+const BUBBLE_GONE_AT = 700;
+const BUBBLE_RISE = 0.25;
+const BUBBLE_WOBBLE = 0.07;
+const BUBBLE_WOBBLE_RESTART = 160;
+const BUBBLE_WOBBLE_HALF = 60;
+// it pops once there is no water this far above it
+const BUBBLE_WATER_ABOVE = 2;
+
+// An electric spark: the frame it rests on between sparks, the wait before its first spark, which
+// starts somewhere along it so sparks placed together go off apart, the wait between later sparks,
+// the least and the most extra on top, all in updates, and the zap it makes.
+const SPARK_REST_FRAME = 6;
+const SPARK_FIRST_WAIT = 60;
+const SPARK_WAIT_MIN = 5;
+const SPARK_WAIT_EXTRA = 300;
+const SPARK_SOUND = "sndZapLong";
 
 // A sparkle field: the sparkles it picks from, the plain one twice as often, how many it keeps going
 // at most for each square pixel of its box, and the wait in milliseconds before the next one, both
@@ -189,6 +213,50 @@ class oFxOneShot extends oBaseObject {
 			this.y += this.yspd;
 			this.alpha -= this.aspd;
 		}
+	}
+}
+
+// An electric spark that rests on its still frame and every so often plays its animation once with
+// a zap, then rests again for a random while. The one time kind is gone after its one spark.
+// A room's placement sets its frame and speed over these, as the original's loading did, so a
+// placed one sparks straight away and starts its waits from there.
+class oAniSpark extends oBgObject {
+	constructor() {
+		super();
+		this.spd = 0;
+		this.ifr = SPARK_REST_FRAME;
+		this.nextSpark = SPARK_FIRST_WAIT;
+		this.step = rng.irandom(SPARK_FIRST_WAIT);
+		this.once = false;
+		this.onAnimEnd = (self) => {
+			self.spd = 0;
+			self.ifr = SPARK_REST_FRAME;
+			if (self.once) {
+				self.destroy();
+				return;
+			}
+			self.step = 0;
+			self.nextSpark = SPARK_WAIT_MIN + rng.irandom(SPARK_WAIT_EXTRA);
+		};
+	}
+
+	update() {
+		if (++this.step === this.nextSpark) {
+			this.spd = 1;
+			this.ifr = 0;
+			// the original cut the zap short after a few updates and on being destroyed, which waits for sound
+			Hooks.sound(SPARK_SOUND);
+		}
+	}
+}
+oAniSpark.defaultSprite = "sAniSpark";
+
+class oAniSparkOnce extends oAniSpark {
+	constructor() {
+		super();
+		this.once = true;
+		this.nextSpark = 1;
+		this.step = 0;
 	}
 }
 
@@ -425,6 +493,37 @@ class oFountain extends oFxParticler {
 		this.yspd_adj = 0.015;
 	}
 }
+
+// A bubble rising through water with a slight wobble, keeping the fractions of its moves so it
+// steps whole pixels. It fades near the end of its count, and pops when the count runs out or the
+// water above it does.
+class oBubble extends oBaseObject {
+	constructor() {
+		super();
+		this.step = rng.irandom(BUBBLE_START_MAX);
+		this.rx = 0;
+		this.ry = 0;
+	}
+
+	update() {
+		this.step++;
+		if (this.step > BUBBLE_FADE_AT) this.alpha = (BUBBLE_GONE_AT - this.step) / (BUBBLE_GONE_AT - BUBBLE_FADE_AT);
+		if (this.step > BUBBLE_GONE_AT || this.instancePlace(this.x, this.y - BUBBLE_WATER_ABOVE, oWater) === null) {
+			this.destroy();
+			return;
+		}
+
+		// the wobble counts on once more, so the count rises two each update
+		this.step++;
+		const whx = this.x + this.rx + Math.sin((this.step % BUBBLE_WOBBLE_RESTART) / BUBBLE_WOBBLE_HALF * Math.PI) * BUBBLE_WOBBLE;
+		this.x = round(whx);
+		this.rx = whx - this.x;
+		const why = this.y + this.ry - BUBBLE_RISE;
+		this.y = round(why);
+		this.ry = why - this.y;
+	}
+}
+oBubble.defaultSprite = "sBubble";
 
 // Eases one value of an object to a new one in equal steps over a number of updates, then is gone.
 class oFader extends oBaseObject {
@@ -781,8 +880,10 @@ class oSpriteTiler extends oBaseObject {
 		}
 	}
 }
+// The water's surface drawn over whatever swims in it, its animated tile repeated across its area.
+// It sits beside the tiler it is built on rather than with the water, since it needs that class first.
 class oWaterFg extends oSpriteTiler {}
-oWaterFg.ported = false;
+oWaterFg.defaultSprite = "sWaterFg";
 
 // An extra area for another trigger, passing on who entered and taking its settings.
 class oTrigKid extends oTrigger {

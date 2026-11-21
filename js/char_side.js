@@ -767,20 +767,9 @@ class oCharSide extends oChar {
 					const mxspd = Math.max(this.xspd, this.runspd * 2);
 					this.xspd = clamp(this.xspd + sign(this.xspd) * this.runspd, minspd, mxspd);
 				}
-				// bursting out of water throws up drops, let out from the water's own spot as in the original
+				// jumping out of water splashes where we break the surface, the same splash as going in
 				if (truthy(this.swimming)) {
-					game.createObject(oFxParticlerOneShot, {
-						x: this.x, y: this.y,
-						amount: 5,
-						time: 3,
-						origObj: this.inwaterObj,
-						dirminmax: [20, 160],
-						dirspdminmax: [0.3, 0.4],
-						colors: ["#6dd0f7", "#ffffff", "#cccccc"],
-						alphaminmax: [0.6, 0.8],
-						deadonland: 1,
-						deadontime: [10, 60]
-					}, this.mylayer);
+					this.makeSplash();
 				}
 
 				if (truthy(this.climbing)) {

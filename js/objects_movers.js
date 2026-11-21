@@ -850,7 +850,7 @@ const Movers = {
 		// bubbles every two seconds while swimming side view
 		if (truthy(this.ch_side) && truthy(this.swimming)) {
 			if (this.step % 120 === 0) {
-				Hooks.todo("bubbles while swimming, the bubble object is not ported");
+				game.createObject(oBubble, { x: this.x + this.xspd, y: this.y + this.yspd - 5 }, this.mylayer);
 			}
 		}
 	},
