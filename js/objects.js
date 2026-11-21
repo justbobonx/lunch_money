@@ -33,6 +33,10 @@ const QP_LABEL_BG_BOTTOM = 10;
 const FLOOR_RAMP_SHARE = 0.5;
 const FLOOR_RAMP_TRIM = 0.707;
 
+// The debug revive leaves these alone: where it is, its name, its layer, and whether it is gone or
+// switched off.
+const REVIVE_KEEP_FIELDS = ["x", "y", "name", "mylayer", "destroyed", "pdis"];
+
 // ---------------------------------------------------------------- mixins
 
 // All an object needs to be looked at, picked up, used and given to.
