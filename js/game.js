@@ -1,7 +1,7 @@
 // The game shell: loads the world, the sprites and the fonts, then runs the world at a fixed
 // rate whatever the display rate. Each browser frame runs the updates that are due, then draws
 // once if any ran, telling the drawing how many it covers so animation keeps update pace.
-// Sound, effects and the inventory are stand ins here that log
+// Sound and the inventory are stand ins here that log
 // once what was asked of them, until their own stages exist.
 
 // the most steps run to catch up after a slow frame
@@ -61,13 +61,6 @@ const Hooks = {
 	},
 	debugLine(x1, y1, x2, y2, color) {
 		if (game.drawStats) this.lines.push({ x1: x1, y1: y1, x2: x2, y2: y2, color: color });
-	},
-	splash(who) {
-		this.todo("water splash");
-	},
-	particles(kind, who, x, y) {
-		this.todo("particles: " + kind);
-		return null;
 	},
 	sound(name) {
 		this.todo("sound " + name);
@@ -264,6 +257,10 @@ const DEBUG_KEYS = [
 			if (game.curroom === null || game.guy === null) return;
 			game.guy.reviveInPlace();
 			game.settleGuy();
+			// every particle goes, the blood with the rest, as the original did on its revive
+			for (const o of game.instances) {
+				if (o instanceof oFxParticler) o.particles.length = 0;
+			}
 			Save.write();
 		}
 	},

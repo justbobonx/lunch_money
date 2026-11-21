@@ -284,9 +284,8 @@ class oCharTopd extends oChar {
 			if (truthy(this.dead)) {
 				if (this.deadTime > 0) {
 					this.deadTime--;
-					for (let i = 0; i < this.deadAmnt; i++) {
-						Hooks.particles("blood", this, this.x, this.y - 5);
-					}
+					// the original never sets how much, so this never splatters there either
+					if (this.deadAmnt > 0) Hooks.todo("top down death splatter");
 				}
 			}
 			return;
@@ -556,7 +555,7 @@ class oCharTopd extends oChar {
 					this.yspd = sign(this.yspd) * Math.min(Math.abs(this.yspd) + this.runspd, this.runspd * 2) * Math.abs(Math.sin(jdir));
 				}
 				if (truthy(this.swimming)) {
-					Hooks.splash(this);
+					this.makeSplash();
 				}
 
 				// remembered for bouncing off things we cannot stand on

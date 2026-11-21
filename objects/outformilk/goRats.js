@@ -47,7 +47,7 @@ class oNpc_Chaser extends oActor {
 	}
 
 	at_target(t) {
-		killGuy(this.biteSprayAmount, this.biteSprayTime, [-0.6, 0.6], [-1, 1, 0.4], 1);
+		game.guy.kill(this.biteSprayAmount, this.biteSprayTime, [-0.6, 0.6], [-1, 1, 0.4], 1, undefined, this);
 	}
 
 	update() {

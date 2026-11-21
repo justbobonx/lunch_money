@@ -677,10 +677,14 @@ class World {
 		}
 	}
 
-	// A whole room on or off, its one shot effects cleared first.
+	// A whole room on or off, every one shot effect cleared first: the one time animations and the
+	// particle bursts, in every room and the shared layers alike, so none waits frozen for the
+	// player's return or carries on over the next room.
 	roomSetEnabled(rm, enabled) {
 		rm.disabled = truthy(enabled) ? 0 : 1;
-		Hooks.todo("clearing one shot effects on a room change");
+		for (const o of this.instances.slice()) {
+			if (o instanceof oFxOneShot || o instanceof oFxParticlerOneShot) o.destroy();
+		}
 		for (const lyr of rm.layers) this.layerSetEnabled(lyr);
 	}
 

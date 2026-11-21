@@ -133,7 +133,7 @@ class oCharSide extends oChar {
 			const dir = pointDirection(who.x, who.y, this.x + who.xspd, this.y + this.yspd);
 			const forcex = lengthdirX(2, dir);
 			const forcey = lengthdirY(2, dir);
-			game.guy.kill(200, 10, [-2 + forcex, 2 + forcex], [-2 + forcey, 1 + forcey], 1, "sndSplat");
+			game.guy.kill(200, 10, [-2 + forcex, 2 + forcex], [-2 + forcey, 1 + forcey], 1, "sndSplat", this);
 			this.xspd += who.xspd / 2;
 			this.yspd += who.yspd / 2;
 		}
@@ -722,7 +722,23 @@ class oCharSide extends oChar {
 			this.xspd = lengthdirX(this.curswimspd, goang);
 			this.yspd = lengthdirY(this.curswimspd, goang);
 
-			Hooks.particles("swim boost puff", this, this.x, this.y);
+			// a trail of bubbles back the way we pushed off, drawn behind everything in our layer
+			const poofang = (goang + 180) % 360;
+			game.createObject(oFxParticlerOneShot, {
+				x: this.x, y: this.y,
+				amount: 1,
+				time: 12,
+				origObj: this,
+				dirminmax: [poofang - 90, poofang + 90],
+				dirspdminmax: [0.1, 0.3],
+				stoponobjs: 0,
+				airspd_slow: 0.004,
+				yspd_adj: -0.006,
+				alphaminmax: [0.6, 0.8],
+				alphaspd: -0.01,
+				deadontime: [120, 180],
+				colors: ["#99ddff", "#eeeeff", "#00bbff"]
+			}, this.mylayer, 0);
 		} else if ((this.con.iBtnA && !truthy(this.hit) && (!truthy(this.crawling) || eq(this.xspd, 0)) && this.sliding === 0
 			&& (truthy(this.onFloorL) || truthy(this.onFloor) || truthy(this.hanging) || swimattop
 				|| (truthy(this.climbing) && truthy(this.climbobj.jumpoff))))
@@ -751,8 +767,20 @@ class oCharSide extends oChar {
 					const mxspd = Math.max(this.xspd, this.runspd * 2);
 					this.xspd = clamp(this.xspd + sign(this.xspd) * this.runspd, minspd, mxspd);
 				}
+				// bursting out of water throws up drops, let out from the water's own spot as in the original
 				if (truthy(this.swimming)) {
-					Hooks.particles("water burst", this, this.x, this.y);
+					game.createObject(oFxParticlerOneShot, {
+						x: this.x, y: this.y,
+						amount: 5,
+						time: 3,
+						origObj: this.inwaterObj,
+						dirminmax: [20, 160],
+						dirspdminmax: [0.3, 0.4],
+						colors: ["#6dd0f7", "#ffffff", "#cccccc"],
+						alphaminmax: [0.6, 0.8],
+						deadonland: 1,
+						deadontime: [10, 60]
+					}, this.mylayer);
 				}
 
 				if (truthy(this.climbing)) {
@@ -816,7 +844,7 @@ class oCharSide extends oChar {
 
 		// a hard landing kills
 		if (truthy(this.hitFloor) && this.yspd > this.dropFallKillSpd) {
-			game.guy.kill(45, 3, 0, 0, 1, "sndSplat");
+			game.guy.kill(45, 3, 0, 0, 1, "sndSplat", this);
 		}
 
 		// background things we are over, pits kill, the first pit stops the check
@@ -824,7 +852,7 @@ class oCharSide extends oChar {
 		this.instancePlaceList(this.x, this.y, oBgObject, overs, true);
 		for (const bo of overs) {
 			if (bo.constructor === oPit) {
-				game.guy.killTwoBursts(200, 60, [60, 120], [0.5, 0.7], [70, 110], [0.5, 1.5], 0);
+				game.guy.killTwoBursts(200, 60, [60, 120], [0.5, 0.7], [70, 110], [0.5, 1.5], 0, undefined, this);
 				break;
 			}
 		}

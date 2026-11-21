@@ -11,17 +11,28 @@
 - oEdgeGroup is missing from the source.
 - Missing sprites: sGameBoxV, guy_stand_2, s_city_roof_wh, sBlock, s_egg, s_tnt, s_honeycomb.
 - Stand-in objects get only their parent's behavior, not the original's own create settings (oGrGrass was one, now ported). Each remaining stand-in needs a real class or room config.
-- Script action stubs that only log a not-ported notice (water splash, particles and others marked in the code).
+- eaoHole: a top down floor zone that drops the player into a hole (fall animation, half a life, a short respawn script). No room uses it yet; needs the fall-in-hole pieces.
+- oBoat: when ported, it should run the floor zone check with real speed values like the player does; the original passed none, which would break the sideways slope.
+- Script action stubs that only log a not-ported notice (marked in the code).
+- oBubble: side view swimming asks for a bubble every two seconds and only logs until oBubble is ported.
+- oShark is not ported; its turn poof and its float death spray (the original's killGuyFloat) come with it.
 
 ### GM quirks kept for now (remove eventually)
-
+- Stand-ins: unported_object_list.json and the Standins class give unported objects their GM parent behavior; both go once everything rooms use is ported.
 - Dog stop clears a misspelled field, so it still remembers the ball.
 - oBoxFall never lowers its life, so it never destroys itself.
 - The ball bounce test only checks speed.
 - The swimming rat spawns a bubble every update.
 - oDoor's default room roomLIlHouse isn't in the room list, so a door goes nowhere unless its room entry sets one.
 - whynot: the player's layer starts disabled.
+- oPuzBox: the puzzle box minigame (colors, guys, letters, numbers; timer and score), about 1400 lines in the original. Pl_Autumn has eight trig_pb triggers along its left edge that each make one with a different box_type, into the pop up layer. Wanted on a high layer.
 - OFM_underwater: star field veloy is written as 0.0-2, probably meant 0.02.
+- Death sprays follow whoever did the killing and pass through it: every batch comes from the killer's spot (the rat, the log, the hard landing's own character). Script deaths have no killer here and follow the player; the original followed the script runner, which sits at its trigger.
+- The swim jump water burst comes from the water object's own spot, usually its top left corner, not the player.
+- Glass shards come from the glass's own spot, not where it was hit.
+- A particle only checks the first solid it overlaps, so one inside the followed object stops on nothing else there.
+- Blood that stops on a solid with no lifetime stays until revive or a room switch, keeping its burst alive with it.
+- The top down death splatter never runs: the original never sets how much to splatter.
 
 ## Question
 
@@ -31,6 +42,8 @@
 - JumpRoom's chest has an openScript in its room entry that nothing in the original ever ran; should chests run it on opening?
 - Stand-in presets (like oGrGrass was): small classes or room config?
 - Start room is TestDev, overriding world.dat's OutForMilk; keep while testing?
+- The swim boost poof goes at the bottom of the player's layer as the original asked, so it draws behind everything there; in the original its particles were separate objects added on top of the layer, so they drew in front. Keep it behind, or put it on top?
+- Particles use plain random, while the rest of the port uses its seeded generator; switch them if replays ever matter.
 
 ## Fix
 
@@ -41,7 +54,7 @@
 - Objects with no sprite need a mask size from their config (width and height or a rectangle).
 - A camera pan time with no value snaps instantly.
 - No outside-room check, since rooms have no fixed bounds.
-- killGuy (added for the log and rat) duplicates the player's own kill methods; unify them.
+- Particles on a parallax or looping layer do not shift with it the way objects do; none of the placed emitters sit on one.
 - Mixin field clashes: the pickup item switch is now itemOn, since active is the engine flag; also owner of carriedBy and over_con, the acton rule.
 - A button held when a screen or message box closes leaks its release into play: press the drop button in the inventory, close it while still holding, let go, and the player drops what's in hand.
 - In loose sprite mode, sprites only spawned at runtime (star1, sShootingStar, s_snow_poof, sAniPop) may not load; packed mode loads all.

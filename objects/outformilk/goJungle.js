@@ -101,8 +101,8 @@ class oJgLog extends oObject {
 		this.moveThroughObjects(this.xspd, this.yspd);
 
 		if (truthy(this.on) && this.instancePlace(this.x, this.y, game.guy) !== null) {
-			killGuy(this.killSprayAmount, this.killSprayTime,
-				[-1 + this.xspd * this.killSprayPush, 1 + this.xspd * this.killSprayPush], 0, 1, "sndHit1");
+			game.guy.kill(this.killSprayAmount, this.killSprayTime,
+				[-1 + this.xspd * this.killSprayPush, 1 + this.xspd * this.killSprayPush], 0, 1, "sndHit1", this);
 		}
 
 		const eater = this.instancePlace(this.x, this.y, oLogEater);

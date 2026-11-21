@@ -1,5 +1,13 @@
 // Basic building blocks any game can use: floors, walls, one way floors, ladders, ropes, crates,
-// doors, triggers, signs, masks, one time effects, sparkle fields and value faders.
+// doors, triggers, signs, masks, one time effects, sparkle fields, particle emitters and value faders.
+
+// Particle emitters. Each keeps at most this many particles going and drops its oldest to make room,
+// standing in for the original's limit per particle sprite, which never worked. A particle that
+// never stops and has no lifetime of its own still goes after this many updates. Particles with no
+// sprite given are this one.
+const PARTICLE_CAP = 1000;
+const PARTICLE_FAILSAFE_UPDATES = 300;
+const PARTICLE_DEFAULT_SPRITE = "sSolidWh";
 
 // A sparkle field: the sparkles it picks from, the plain one twice as often, how many it keeps going
 // at most for each square pixel of its box, and the wait in milliseconds before the next one, both
@@ -50,7 +58,8 @@ class oWall extends oGround {
 	}
 }
 
-// Breaks when hit fast, slowing whoever broke it a little.
+// Breaks when hit fast, slowing whoever broke it a little. The shards burst from the glass's spot
+// along the hitter's way, carrying some of its speed, and fall slowly in the glass's layer.
 class oGlass extends oGround {
 	constructor() {
 		super();
@@ -58,7 +67,25 @@ class oGlass extends oGround {
 	}
 	acton(action, who) {
 		if (action === "hit") {
-			Hooks.particles("glass break", this, who.x + who.xspd, who.y + who.yspd);
+			const sd = pointDirection(0, 0, who.xspd, who.yspd);
+			game.createObject(oFxParticlerOneShot, {
+				x: who.x + who.xspd, y: who.y + who.yspd,
+				amount: 10,
+				time: 3,
+				origObj: { x: this.x, y: this.y },
+				dirminmax: [sd - 20, sd + 20],
+				dirspdminmax: [0.2, 0.4],
+				dir2minmax: [0, 360],
+				dir2spdminmax: [0.3, 0.5],
+				xminmax: [Math.min(who.xspd / 2, who.xspd), Math.max(who.xspd / 2, who.xspd)],
+				yminmax: [Math.min(who.yspd / 2, who.yspd), Math.max(who.yspd / 2, who.yspd)],
+				airspd_slow: 0.01,
+				yspd_adj: 0.01,
+				colors: ["#6dd0f7", "#ffffff", "#cccccc"],
+				alphaminmax: [0.4, 0.9],
+				deadonland: 1,
+				deadontime: [40, 60]
+			}, this.mylayer);
 			this.destroy();
 			who.xspd = sign(who.xspd) * (Math.abs(who.xspd) - 0.2);
 			who.calcOnFloorAtWall();
@@ -211,6 +238,192 @@ class oSpeckler extends oBaseObject {
 	}
 
 	draw() {}
+}
+
+// A particle emitter that stays, like a chimney's smoke or a campfire's sparks: an ordinary room
+// object that every so many updates lets out a handful of particles. The particles are not objects,
+// just records in its own list, moved in its update and drawn in its place in the layer.
+// Each one starts at the emitter with the emitter's speed, plus a push in a random direction and
+// a second one, a random nudge each way, and a random size, opacity and colour from the list.
+// Then each update it slows in the air, takes the wind and gravity, fades and grows or shrinks.
+// Only when told to stop on objects does it look for solids: there it stops and stays, or is gone
+// when told to die on landing, and a stopped one falls again once what it lay on moves away.
+// It goes when its lifetime runs out, or when it has neither stopped nor run out for too long.
+// Following an object, it lets out each batch from where that object is, and its particles pass
+// through it. Its own picture is only a marker and never drawn.
+class oFxParticler extends oBaseObject {
+	constructor() {
+		super();
+		this.fxsprite = PARTICLE_DEFAULT_SPRITE;
+		// updates between batches, a random extra on top, the countdown, and how many in a batch
+		this.frate = 1;
+		this.frate_randvar = 0;
+		this.cfr = 0;
+		this.amount = 0;
+		// the two pushes, each a direction range in degrees and a speed range
+		this.dirminmax = [0, 360];
+		this.dirspdminmax = [0, 0];
+		this.dir2minmax = [0, 360];
+		this.dir2spdminmax = [0, 0];
+		// the random nudge each way, and the start size and opacity ranges
+		this.xminmax = [0, 0];
+		this.yminmax = [0, 0];
+		this.scminmax = [0.5, 0.5];
+		this.alphaminmax = [1, 1];
+		// size and opacity change each update
+		this.scspd = 0;
+		this.alphaspd = 0;
+		// air drag on sideways speed, then the wind and gravity added each update
+		this.airspd_slow = 0.008;
+		this.xspd_adj = 0;
+		this.yspd_adj = 0.02;
+		this.colors = ["#ffffff"];
+		// whether particles look for solids, and whether landing on one ends them
+		this.stoponobjs = 1;
+		this.deadonland = 0;
+		// the lifetime range in updates, or none
+		this.deadontime = -1;
+		// the object followed, anything with a spot, or none
+		this.origObj = null;
+		// a one shot stops once it has let out all its batches
+		this.emitting = true;
+		this.particles = [];
+	}
+
+	// Moves every particle on, then lets out a batch when one is due.
+	update() {
+		const rec = Sprites.get(this.fxsprite);
+		const frames = rec ? rec.frameCount : 1;
+		const frameStep = rec ? rec.imageSpeed : 0;
+		const ps = this.particles;
+		let kept = 0;
+		for (let i = 0; i < ps.length; i++) {
+			const p = ps[i];
+			let gone = false;
+			if (p.go) {
+				p.xspd = sign(p.xspd) * Math.max(Math.abs(p.xspd) - this.airspd_slow, 0);
+				p.xspd += this.xspd_adj;
+				p.yspd += this.yspd_adj;
+				p.x += p.xspd;
+				p.y += p.yspd;
+
+				// only the first solid found counts, so lying in the followed object stops nothing
+				if (truthy(this.stoponobjs)) {
+					const hit = Collision.instancePlace.call(p, p.x, p.y, oObject);
+					if (hit !== null && hit !== this.origObj) {
+						if (truthy(this.deadonland)) {
+							gone = true;
+						} else {
+							p.go = false;
+							p.xspd = 0;
+							p.yspd = 0;
+							p.stoppedobj = hit;
+						}
+					}
+				}
+
+				p.alpha = clamp(p.alpha + this.alphaspd, 0, 1);
+				p.x_sc = Math.max(p.x_sc + this.scspd, 0);
+				p.y_sc = p.x_sc;
+				// a lifetime counts down to nothing, without one the count runs on below zero to the failsafe
+				p.deadontime--;
+				if (p.deadontime === 0 || p.deadontime < -PARTICLE_FAILSAFE_UPDATES) gone = true;
+			} else if (Collision.instancePlace.call(p, p.x, p.y, p.stoppedobj) === null) {
+				p.go = true;
+			}
+			if (gone) continue;
+			p.ifr = frames > 0 ? (p.ifr + frameStep) % frames : 0;
+			ps[kept++] = p;
+		}
+		ps.length = kept;
+
+		if (this.emitting && --this.cfr <= 0) this.emit();
+	}
+
+	// One batch, from the followed object's spot when there is one.
+	emit() {
+		const range = (mm) => mm[0] + Math.random() * (mm[1] - mm[0]);
+		this.cfr = this.frate + Math.floor(Math.random() * (this.frate_randvar + 1));
+		if (this.origObj !== null && this.origObj !== undefined) {
+			this.x = this.origObj.x;
+			this.y = this.origObj.y;
+		}
+		const lifetime = Array.isArray(this.deadontime) ? this.deadontime : null;
+		for (let i = 0; i < this.amount; i++) {
+			const d = range(this.dirminmax);
+			const s = range(this.dirspdminmax);
+			const d2 = range(this.dir2minmax);
+			const s2 = range(this.dir2spdminmax);
+			const sc = range(this.scminmax);
+			this.particles.push({
+				spi: this.fxsprite, ifr: 0, x: this.x, y: this.y, ang: 0,
+				xspd: this.xspd + lengthdirX(s, d) + lengthdirX(s2, d2) + range(this.xminmax),
+				yspd: this.yspd + lengthdirY(s, d) + lengthdirY(s2, d2) + range(this.yminmax),
+				x_sc: sc, y_sc: sc,
+				alpha: range(this.alphaminmax),
+				col: this.colors[Math.floor(Math.random() * this.colors.length)],
+				deadontime: lifetime !== null
+					? lifetime[0] + Math.floor(Math.random() * (lifetime[1] - lifetime[0] + 1)) : -1,
+				go: true,
+				stoppedobj: null
+			});
+			if (this.particles.length > PARTICLE_CAP) this.particles.shift();
+		}
+	}
+
+	draw() {
+		for (const p of this.particles) {
+			Draw.spriteExt(p.spi, p.ifr, p.x, p.y, p.x_sc, p.y_sc, 0, p.col, p.alpha);
+		}
+	}
+}
+
+// A burst made by something happening, like breaking glass, a death or a splash. It lets out its
+// number of batches, then is gone once its last particle is, so it outlives whatever made it.
+// Every room switch clears them, an effect being a moment that should not wait for the player.
+class oFxParticlerOneShot extends oFxParticler {
+	constructor() {
+		super();
+		// batches left to let out
+		this.time = 1;
+	}
+
+	init() {
+		super.init();
+		this.emitting = this.time > 0;
+	}
+
+	update() {
+		super.update();
+		if (!this.emitting && this.particles.length === 0) this.destroy();
+	}
+
+	emit() {
+		super.emit();
+		if (--this.time <= 0) this.emitting = false;
+	}
+}
+
+// A fountain's falling drops, the original's settings for a placed emitter.
+class oFountain extends oFxParticler {
+	constructor() {
+		super();
+		this.fxsprite = "s_fountain_drop";
+		this.frate = 10;
+		this.frate_randvar = 2;
+		this.amount = 1;
+		this.dirminmax = [89, 91];
+		this.dirspdminmax = [0.6, 0.7];
+		this.scminmax = [0.1, 0.3];
+		this.scspd = 0.06;
+		this.colors = ["#99ddff", "#eeeeff", "#00bbff"];
+		this.alphaminmax = [0.6, 0.8];
+		this.alphaspd = -0.0025;
+		this.stoponobjs = 0;
+		this.deadonland = 0;
+		this.deadontime = [90, 95];
+		this.yspd_adj = 0.015;
+	}
 }
 
 // Eases one value of an object to a new one in equal steps over a number of updates, then is gone.

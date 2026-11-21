@@ -22,7 +22,7 @@ const SCRIPT_CALLS = {
 	lp_move_obj_to_layer: (obj, lyr, idx) => game.moveObjToLayer(obj, lyr, idx),
 	restore_last_layers_state: () => game.restoreLastLayersState(),
 	killGuy: (amount, time, xminmax, yminmax, leavevis, soundfx) =>
-		killGuy(amount, time, xminmax, yminmax, leavevis, soundfx),
+		game.guy.kill(amount, time, xminmax, yminmax, leavevis, soundfx),
 	killGuyDD: (amount, time, dirminmax, dirspdminmax, dir2minmax, dir2spdminmax, leavevis, soundfx) =>
 		game.guy.killTwoBursts(amount, time, dirminmax, dirspdminmax, dir2minmax, dir2spdminmax, leavevis, soundfx)
 };

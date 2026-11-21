@@ -837,7 +837,7 @@ const Movers = {
 		this.swimming = this.inwater;
 
 		if (truthy(this.swimming) && !truthy(lastSwim)) {
-			Hooks.splash(this);
+			this.makeSplash();
 			if (truthy(this.ch_side)) {
 				this.yspd = sign(this.yspd) * Math.min(Math.abs(this.yspd) / 1.5, 3);
 			}
@@ -850,8 +850,29 @@ const Movers = {
 		// bubbles every two seconds while swimming side view
 		if (truthy(this.ch_side) && truthy(this.swimming)) {
 			if (this.step % 120 === 0) {
-				Hooks.particles("bubble", this, this.x + this.xspd, this.y + this.yspd - 5);
+				Hooks.todo("bubbles while swimming, the bubble object is not ported");
 			}
 		}
+	},
+
+	// Drops thrown up where we meet the water, harder the faster we were falling. Side view they
+	// start at the water's top and end on anything solid they land on, top down they start at our
+	// spot and fly free.
+	makeSplash() {
+		const side = truthy(this.ch_side);
+		game.createObject(oFxParticlerOneShot, {
+			x: this.x, y: side ? this.inwaterObj.bbox_top + 2 : this.y,
+			amount: 7,
+			time: 4,
+			dirminmax: [60, 120],
+			dirspdminmax: [Math.abs(this.yspd) / 10, Math.abs(this.yspd) / 4],
+			dir2minmax: [20, 160],
+			dir2spdminmax: [0.3, 0.4],
+			colors: ["#6dd0f7", "#ffffff", "#cccccc"],
+			alphaminmax: [0.6, 0.8],
+			stoponobjs: side ? 1 : 0,
+			deadonland: side ? 1 : 0,
+			deadontime: [10, 60]
+		}, this.mylayer);
 	}
 };

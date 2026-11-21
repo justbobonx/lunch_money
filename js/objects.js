@@ -571,35 +571,6 @@ class oIaSolidGr extends oSolidGr {
 }
 mixin(oIaSolidGr, Interactive);
 
-// Kills the player: the first time only, slows them, and when they are still shown, sprays and
-// hides them unless told to leave them showing. The spray details are for the particle stage.
-function killGuy(amount, time, xminmax, yminmax, leavevis, soundfx) {
-	const guy = game.guy;
-	if (truthy(guy.dead)) return;
-
-	guy.dead = true;
-	guy.yspd = Math.max(guy.yspd / 2, 0);
-	guy.xspd = guy.xspd / 2;
-
-	if (amount === undefined) amount = 0;
-	if (time === undefined) time = 1;
-
-	// only if they are still there
-	if (truthy(guy.visible)) {
-		Hooks.particles("death spray", guy, guy.x, guy.y, {
-			amount: amount / time, time: time,
-			xminmax: (xminmax !== undefined && xminmax !== 0) ? xminmax : [-1, 1],
-			yminmax: (yminmax !== undefined && yminmax !== 0) ? yminmax : [-1, 0],
-			sizeminmax: [0.25, 1],
-			colors: ["#ff0000", "#990000", "#cc0000"]
-		});
-
-		guy.visible = truthy(leavevis);
-
-		if (soundfx !== undefined) Hooks.sound(soundfx);
-	}
-}
-
 // Solid interactive things.
 class oIaObject extends oObject {
 	constructor() {
@@ -1067,30 +1038,59 @@ class oChar extends oActor {
 		Hooks.todo("inventory pictures of held items");
 	}
 
-	// Dies once: halves the speeds, sprays blood, and can vanish.
-	// The spray itself is a later stage effect.
-	kill(amount, time, xminmax, yminmax, leavevis, soundfx) {
+	// Dies once: halves the speeds, and when still shown, sprays blood and vanishes unless told to
+	// stay shown. The amount is spread over the time in updates. The spray follows whoever did the
+	// killing and passes through it, as in the original; with nobody named, scripts among them,
+	// that is the player. The spray goes in the player's layer and is given back.
+	kill(amount, time, xminmax, yminmax, leavevis, soundfx, killer) {
 		if (truthy(this.dead)) return null;
 		this.dead = true;
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
+		if (amount === undefined) amount = 0;
+		if (time === undefined) time = 1;
 		let deathSpray = null;
 		if (truthy(this.visible)) {
-			deathSpray = Hooks.particles("death spray", this, this.x, this.y);
+			deathSpray = game.createObject(oFxParticlerOneShot, {
+				x: this.x, y: this.y,
+				amount: amount / time,
+				time: time,
+				origObj: killer !== undefined ? killer : this,
+				xminmax: (xminmax !== undefined && xminmax !== 0) ? xminmax : [-1, 1],
+				yminmax: (yminmax !== undefined && yminmax !== 0) ? yminmax : [-1, 0],
+				scminmax: [0.25, 1],
+				colors: ["#ff0000", "#990000", "#cc0000"]
+			}, this.mylayer);
 			this.visible = leavevis === true || leavevis === 1;
 			if (soundfx !== undefined) Hooks.sound(soundfx);
 		}
 		return deathSpray;
 	}
 
-	// The same death with a second burst, used by pits.
-	killTwoBursts(amount, time, dirminmax, dirspdminmax, dir2minmax, dir2spdminmax, leavevis, soundfx) {
+	// The same death with the spray as two pushes in direction ranges, its drops dying on landing
+	// or within a second or so, used by pits.
+	killTwoBursts(amount, time, dirminmax, dirspdminmax, dir2minmax, dir2spdminmax, leavevis, soundfx, killer) {
 		if (truthy(this.dead)) return;
 		this.dead = true;
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
+		if (amount === undefined) amount = 0;
+		if (time === undefined) time = 1;
 		if (truthy(this.visible)) {
-			Hooks.particles("death spray, two bursts", this, this.x, this.y);
+			game.createObject(oFxParticlerOneShot, {
+				x: this.x, y: this.y,
+				amount: amount / time,
+				time: time,
+				origObj: killer !== undefined ? killer : this,
+				dirminmax: dirminmax,
+				dirspdminmax: dirspdminmax,
+				dir2minmax: dir2minmax,
+				dir2spdminmax: dir2spdminmax,
+				scminmax: [0.25, 1],
+				colors: ["#ff0000", "#990000", "#cc0000"],
+				deadontime: [30, 90],
+				deadonland: 1
+			}, this.mylayer);
 			this.visible = leavevis === true || leavevis === 1;
 			if (soundfx !== undefined) Hooks.sound(soundfx);
 		}
