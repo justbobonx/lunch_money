@@ -34,7 +34,7 @@ class oJgLogShooter extends oGround {
 	}
 
 	update() {
-		if (!truthy(this.on)) return;
+		if (!this.on) return;
 
 		this.step++;
 
@@ -100,7 +100,7 @@ class oJgLog extends oObject {
 
 		this.moveThroughObjects(this.xspd, this.yspd);
 
-		if (truthy(this.on) && this.instancePlace(this.x, this.y, game.guy) !== null) {
+		if (this.on && this.instancePlace(this.x, this.y, game.guy) !== null) {
 			game.guy.kill(this.killSprayAmount, this.killSprayTime,
 				[-1 + this.xspd * this.killSprayPush, 1 + this.xspd * this.killSprayPush], 0, 1, "sndHit1", this);
 		}

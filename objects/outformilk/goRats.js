@@ -80,7 +80,7 @@ class oNpc_Chaser extends oActor {
 		this.applyFrictionGravity();
 
 		// hop at random
-		if (truthy(this.onFloor) && rng.irandom(this.hopOdds) === 0) {
+		if (this.onFloor && rng.irandom(this.hopOdds) === 0) {
 			this.yspd += rng.randomRange(this.hopMin, this.hopMax);
 		}
 
@@ -104,7 +104,7 @@ class oNpc_Chaser extends oActor {
 			}
 
 			// jump when stuck at a wall and the distance is not closing
-			if (truthy(this.atWall) && truthy(this.onFloor) && this.locod >= this.loco_lastd && this.followd === sign(this.locodx)) {
+			if (this.atWall && this.onFloor && this.locod >= this.loco_lastd && this.followd === sign(this.locodx)) {
 				this.yspd = -(this.wallJumpSpeed + Math.min(Math.abs(this.xspd), 1) * this.wallJumpBonus);
 			}
 
@@ -123,7 +123,7 @@ class oNpc_Chaser extends oActor {
 
 		this.moveThroughObjects(this.xspd, this.yspd);
 
-		if (truthy(this.hitFloor)) {
+		if (this.hitFloor) {
 			this.yspd = 0;
 		}
 
@@ -132,7 +132,7 @@ class oNpc_Chaser extends oActor {
 
 	// held on one frame in the air, otherwise it runs at its own pace
 	afterUpdate() {
-		if (!truthy(this.onFloor)) {
+		if (!this.onFloor) {
 			this.spd = 0;
 			this.ifr = this.airFrame;
 		} else {

@@ -1,9 +1,6 @@
 // Math and value rules the original engine relied on, so ported logic behaves the same.
 // Angles are degrees, counterclockwise on screen, with y pointing down.
 
-// two reals closer than this count as equal, the engine default
-const REAL_EPSILON = 0.00001;
-
 // the original used this as its "infinitely tall" height
 const BIGGEST_INT = 2147483643;
 
@@ -14,33 +11,6 @@ const GAME_FPS = 60;
 // Nothing that moves the game reads it.
 function currentTime() {
 	return (typeof performance !== "undefined") ? performance.now() : Date.now();
-}
-
-// a value counts as true only above one half, so minus one and small fractions are false
-function truthy(v) {
-	if (typeof v === "number") return v > 0.5;
-	if (typeof v === "boolean") return v;
-	return v !== null && v !== undefined && v !== "";
-}
-
-// equality on reals uses the epsilon, plain values compare normally
-function eq(a, b) {
-	if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) < REAL_EPSILON;
-	return a === b;
-}
-
-function ne(a, b) {
-	return !eq(a, b);
-}
-
-// Rounds to the nearest whole number with exact halves going to the even neighbour.
-// Guess: the engine is believed to round halves to even, not verified against the runtime.
-function round(v) {
-	const f = Math.floor(v);
-	const diff = v - f;
-	if (diff > 0.5) return f + 1;
-	if (diff < 0.5) return f;
-	return (f % 2 === 0) ? f : f + 1;
 }
 
 // The engine's remainder keeps the sign of the left side.

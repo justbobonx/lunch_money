@@ -66,6 +66,8 @@ class oCharSide extends oChar {
 		this.wasclimbing = false;
 
 		this.hanging = false;
+		// set when we slip off a hang, so the grab does not catch again until we are clear of it
+		this.hangRegrabBlocked = false;
 		this.hangingObj = null;
 		// none, slow, normal and fast in the original were zero, four, eight and sixteen thousandths
 		this.hangslipspd = 0;
@@ -155,17 +157,17 @@ class oCharSide extends oChar {
 		game.guy.mask = "guy_stand";
 		const hobj = game.guy.instancePlace(game.guy.x, game.guy.y, oObject);
 		game.guy.mask = omi;
-		return hobj === null || truthy(hobj.thruUp) || game.guy.placeMeeting(game.guy.x, game.guy.y, hobj);
+		return hobj === null || hobj.thruUp || game.guy.placeMeeting(game.guy.x, game.guy.y, hobj);
 	}
 
 	// Grabs a ledge when falling and pressing into a hangable wall, or a hangable
 	// background object when pressing up. A small mask at hand height finds the edge,
 	// and a second check two pixels lower makes sure it is a ledge and not a ceiling.
-	// A fall off sets the hang to minus one, which reads as not hanging but blocks
-	// the first grab setup until it clears, kept as in the original.
+	// Slipping off a hang blocks the grab setup until the grab conditions fail once,
+	// as in the original.
 	checkSetHanging(iUp) {
 		this.hangingObj = null;
-		if (truthy(this.canHang)) {
+		if (this.canHang) {
 			const omi = this.mask;
 			this.mask = this.skin_hang_wch;
 			let hawt = this.instancePlace(this.x + this.facing, this.y, oObject);
@@ -181,21 +183,22 @@ class oCharSide extends oChar {
 			const hatbWall = hawbt !== null && hawbb !== null;
 
 			// only hang when coming down
-			const ableHang = !this.carrying && !truthy(this.onFloor) && !truthy(this.diving) && this.yspd >= 0;
+			const ableHang = !this.carrying && !this.onFloor && !this.diving && this.yspd >= 0;
 
-			const presstowall = truthy(this.atWall) && ((this.facing < 0 && this.con.iLeft) || (this.facing > 0 && this.con.iRight));
+			const presstowall = this.atWall && ((this.facing < 0 && this.con.iLeft) || (this.facing > 0 && this.con.iRight));
 
-			if (ableHang && ((presstowall && hatWall && truthy(hawt.hangable)) || (iUp && hatbWall && truthy(hawbt.hangable)))) {
-				if (+this.hanging === 0) {
+			if (ableHang && ((presstowall && hatWall && hawt.hangable) || (iUp && hatbWall && hawbt.hangable))) {
+				if (!this.hanging && !this.hangRegrabBlocked) {
 					this.yspd = Math.min(this.yspd, 0);
-					this.hanging = 1;
+					this.hanging = true;
 				}
 				this.hangingObj = hatWall ? hawt : hawbt;
 				this.hangingObjBg = this.hangingObj instanceof oBgObject;
 				// always stop side movement
 				this.xspd = sign(this.xspd) * 0.1;
 			} else {
-				this.hanging = 0;
+				this.hanging = false;
+				this.hangRegrabBlocked = false;
 			}
 		}
 	}
@@ -207,62 +210,62 @@ class oCharSide extends oChar {
 
 		if (this.in_pose !== null) {
 			si += this.in_pose;
-		} else if (truthy(this.presenting)) {
+		} else if (this.presenting) {
 			si += "wow";
-		} else if (truthy(this.con.conOff) && truthy(this.onFloor)) {
+		} else if (this.con.conOff && this.onFloor) {
 			si += "stand_pause";
-		} else if (truthy(this.otherstate)) {
+		} else if (this.otherstate) {
 			si += "win";
-		} else if (truthy(this.dead) && !truthy(this.deadfall)) {
+		} else if (this.dead && !this.deadfall) {
 			si += "dead";
-		} else if (truthy(this.punching)) {
-			if (truthy(this.crawling) || truthy(this.sliding)) {
+		} else if (this.punching) {
+			if (this.crawling || this.sliding) {
 				si += "slide_kick";
-			} else if (truthy(this.onFloor)) {
+			} else if (this.onFloor) {
 				si += "punch";
 			} else {
 				si += "jump_kick";
 			}
-		} else if (truthy(this.hit)) {
-			si += truthy(this.onFloor) ? "hit_d" : "hit";
-		} else if (truthy(this.riding)) {
+		} else if (this.hit) {
+			si += this.onFloor ? "hit_d" : "hit";
+		} else if (this.riding) {
 			si += this.ride_sprite;
-		} else if (truthy(this.swimming)) {
-			if (truthy(this.moving)) {
+		} else if (this.swimming) {
+			if (this.moving) {
 				si += "swim";
 				si += this.curswimspd > this.swimspd + SWIM_BOOST_MARGIN ? "_boost" : "";
 			} else {
 				si += "float";
 			}
-		} else if (truthy(this.climbing)) {
-			si += truthy(this.moving) ? "climb_mv" : "climb_st";
-		} else if (truthy(this.diving)) {
+		} else if (this.climbing) {
+			si += this.moving ? "climb_mv" : "climb_st";
+		} else if (this.diving) {
 			si += "dive";
-		} else if (truthy(this.hanging)) {
-			si += truthy(this.hangingObjBg) ? "hangf" : "hang";
-		} else if (!truthy(this.onFloor)) {
-			si += truthy(this.xmoving) ? "jump" : "fall";
+		} else if (this.hanging) {
+			si += this.hangingObjBg ? "hangf" : "hang";
+		} else if (!this.onFloor) {
+			si += this.xmoving ? "jump" : "fall";
 		} else if (this.rolling > 0) {
 			si += "roll";
 		} else if (this.crawling > 0) {
-			if (!truthy(this.xmoving) || this.carrying) {
+			if (!this.xmoving || this.carrying) {
 				si += "crouch";
 			} else {
 				si += "crawl";
-				if (truthy(this.pushing)) si += "_push";
+				if (this.pushing) si += "_push";
 			}
 		} else if (this.sliding > 0) {
 			si += "slide";
-		} else if (truthy(this.xmoving)) {
+		} else if (this.xmoving) {
 			si += "run";
-			if (truthy(this.pushing)) si += "_push";
+			if (this.pushing) si += "_push";
 		} else {
 			si += "stand";
 			if (!this.carrying && this.still > 60 && this.still < 120) si += "_st";
 		}
 
 		// carry the item along in the hand
-		if (this.carrying && !truthy(this.dead)) {
+		if (this.carrying && !this.dead) {
 			this.carrying.x = this.x + Math.ceil(this.facing * 2.5) + this.carrying.holdoffx * this.facing;
 			if (si === this.skin + "_run") {
 				this.carrying.y = this.y + this.carryofx_run[Math.floor(this.ifr)];
@@ -275,12 +278,12 @@ class oCharSide extends oChar {
 
 			this.carrying.x_sc = this.facing * Math.abs(this.carrying.x_sc);
 
-			if (!truthy(this.presenting) && this.in_pose === null) {
+			if (!this.presenting && this.in_pose === null) {
 				si += "_carry";
 			}
 		}
 
-		this.y_sc = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
+		this.y_sc = (this.dead && this.swimming) ? -1 : 1;
 
 		const oldsp = this.drawSprite;
 		this.drawSprite = Sprites.exists(si) ? si : this.skin + "_stand";
@@ -302,22 +305,22 @@ class oCharSide extends oChar {
 	}
 
 	update() {
-		if (truthy(this.paused)) return;
+		if (this.paused) return;
 
 		this.step++;
 
 		// presenting an item waits for any button
-		if (truthy(this.presenting)) {
+		if (this.presenting) {
 			if (this.con.iBtnAny) this.presenting = 0;
 			return;
 		}
 
 		// won or dead: still falls and rides moving things while visible
-		if (truthy(this.otherstate) || truthy(this.dead)) {
-			if (truthy(this.visible)) {
+		if (this.otherstate || this.dead) {
+			if (this.visible) {
 				// a dead fall already has its contact flags cleared
 				this.applyFrictionGravity();
-				if (truthy(this.deadfall)) {
+				if (this.deadfall) {
 					this.moveIgnoringObjects(this.xspd, this.yspd);
 				} else {
 					this.calcOnFloorAtWall();
@@ -331,14 +334,14 @@ class oCharSide extends oChar {
 		// an open inventory takes the frame
 		if (this.inv.qp_handle_ui(this.con)) return;
 
-		if (truthy(this.riding)) return;
+		if (this.riding) return;
 
 		// ride along, get pushed out of anything that moved into us, then fresh contact flags
 		this.moveWithObjects();
 		this.pushedByObjects();
 		this.calcOnFloorAtWall();
 
-		const landed = !truthy(this.onFloorL) && truthy(this.onFloor);
+		const landed = !this.onFloorL && this.onFloor;
 
 		// A held item can take over the controls. With nothing held the original read
 		// the player's own setting here, which is always off.
@@ -349,7 +352,7 @@ class oCharSide extends oChar {
 		this.charActOnObjs();
 
 		// aiming freezes us and turns the aim within the facing half
-		if (truthy(this.aiming)) {
+		if (this.aiming) {
 			this.xspd = 0;
 			this.rx = 0;
 			this.yspd = 0;
@@ -378,25 +381,25 @@ class oCharSide extends oChar {
 		// At the top of the water when the top row of our collision box is dry. Changed from the
 		// original, which tested a point a fixed distance above our spot, so with a short box the two
 		// tests disagreed and a slow rise could lift the whole box out without ever counting as the top.
-		const swimattop = truthy(this.swimming) && this.collisionPoint(this.x, this.bbox_top, oWater, 0, 1) === null;
+		const swimattop = this.swimming && this.collisionPoint(this.x, this.bbox_top, oWater, 0, 1) === null;
 
-		if (truthy(this.jumped) && (truthy(this.onFloor) || truthy(this.climbing) || truthy(this.hanging) || truthy(this.swimming))) {
+		if (this.jumped && (this.onFloor || this.climbing || this.hanging || this.swimming)) {
 			this.jumped = 0;
 		}
 
 		// letting go of up and down, or pressing up while falling to regrab, ends the just climbed state
-		if (truthy(this.wasclimbing) && ((!this.con.iUp && !this.con.iDown) || (this.con.iUp && this.yspd > 0))) {
+		if (this.wasclimbing && ((!this.con.iUp && !this.con.iDown) || (this.con.iUp && this.yspd > 0))) {
 			this.wasclimbing = false;
 		}
 
-		if (truthy(this.punching)) {
+		if (this.punching) {
 			this.punching--;
 		}
 
 		// the speed this frame aims for, used by running
 		let curspd;
 
-		if (truthy(this.swimming)) {
+		if (this.swimming) {
 			// slow first
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.swim_fric, 0);
 			this.yspd = sign(this.yspd) * Math.max(Math.abs(this.yspd) - this.swim_fric, 0);
@@ -424,7 +427,7 @@ class oCharSide extends oChar {
 			if (!this.con.iBtnAnyDir && !swimattop) {
 				this.yspd = clamp(this.yspd - this.swimacc, -this.swimspd / 5, this.swimspd / 5);
 			}
-		} else if (truthy(this.climbing)) {
+		} else if (this.climbing) {
 			this.xspd = 0;
 			this.yspd = 0;
 			this.xspd += (this.con.iLeft ? -SIDE_CLIMB_SPEED : 0) + (this.con.iRight ? SIDE_CLIMB_SPEED : 0);
@@ -433,7 +436,7 @@ class oCharSide extends oChar {
 			// close to ground, unless it is a drop through floor we are inside
 			const nearFloorObj = this.instancePlace(this.x + sign(this.xspd), this.y + sign(this.yspd) + 3, oGround);
 			let nearFloor = nearFloorObj !== null;
-			if (nearFloor && truthy(nearFloorObj.dropDown) && this.placeMeeting(this.x, this.y, nearFloorObj)) {
+			if (nearFloor && nearFloorObj.dropDown && this.placeMeeting(this.x, this.y, nearFloorObj)) {
 				nearFloor = false;
 			}
 
@@ -442,12 +445,12 @@ class oCharSide extends oChar {
 				this.climbing = false;
 			}
 			// no ladder above while standing on a floor ends the climb
-			if (!this.placeMeeting(this.x, this.y - 1, oClimbableObj) && truthy(this.onFloor) && !this.con.iDown) {
+			if (!this.placeMeeting(this.x, this.y - 1, oClimbableObj) && this.onFloor && !this.con.iDown) {
 				this.climbing = false;
 				this.wasclimbing = true;
 			}
 			// standing on a solid floor ends the climb
-			if (truthy(this.onFloor) && !truthy(this.onFloorObj.dropDown) && !this.con.iUp) {
+			if (this.onFloor && !this.onFloorObj.dropDown && !this.con.iUp) {
 				this.climbing = false;
 				this.wasclimbing = true;
 			}
@@ -463,13 +466,13 @@ class oCharSide extends oChar {
 
 			// no sideways off the edge, and none at all on a two way ladder unless stepping off near the floor
 			const clmbo = this.instancePlace(this.x + sign(this.xspd), this.y, oClimbableObj);
-			if (clmbo === null || (truthy(clmbo.twoway) && !(nearFloor && !(this.con.iUp || this.con.iDown)))) {
+			if (clmbo === null || (clmbo.twoway && !(nearFloor && !(this.con.iUp || this.con.iDown)))) {
 				this.xspd = 0;
 				this.rx = 0;
 			}
 		} else {
 			// done crawling when up or off the floor, or moving while carrying, if there is room to stand
-			if ((truthy(this.crawling) && (!this.con.iDown || !truthy(this.onFloor))) || (this.carrying && ne(this.xspd, 0))) {
+			if ((this.crawling && (!this.con.iDown || !this.onFloor)) || (this.carrying && this.xspd !== 0)) {
 				if (this.checkOkToStand()) this.crawling = false;
 			}
 
@@ -477,18 +480,18 @@ class oCharSide extends oChar {
 			this.climbobj = this.instancePlace(this.x, this.y, oClimbableObj);
 			this.climbsoon = this.instancePlace(this.x + this.facing * 2, this.y, oClimbableObj);
 
-			const ableClimb = !truthy(this.wasclimbing) && !this.carrying
+			const ableClimb = !this.wasclimbing && !this.carrying
 				&& (this.con.iUp || this.con.iDown)
-				&& !truthy(this.hit) && !truthy(this.diving) && this.sliding === 0 && this.rolling === 0;
-			if (!truthy(this.climbing) && ableClimb) {
+				&& !this.hit && !this.diving && this.sliding === 0 && this.rolling === 0;
+			if (!this.climbing && ableClimb) {
 				if (this.climbobj !== null) {
 					// no starting down while standing on the ground, or up at the top
-					if ((this.con.iDown && truthy(this.onFloor) && !truthy(this.onFloorObj.dropDown))
+					if ((this.con.iDown && this.onFloor && !this.onFloorObj.dropDown)
 						|| (this.con.iUp && !this.placeMeeting(this.x, this.y - 1, oClimbableObj))) {
 						this.climbing = false;
 					} else {
 						this.climbing = true;
-						if (truthy(this.climbobj.twoway)) {
+						if (this.climbobj.twoway) {
 							this.x = this.climbobj.x;
 							this.rx = 0;
 							this.xspd = 0;
@@ -498,14 +501,14 @@ class oCharSide extends oChar {
 			}
 
 			// dive ends on the floor
-			if (truthy(this.onFloor)) {
+			if (this.onFloor) {
 				this.diving = false;
 			}
 			// dive starts in the air after a jump, pressing down and sideways, fast enough
-			const ableDive = truthy(this.jumped) && !truthy(this.onFloor) && !this.carrying
-				&& !truthy(this.wasclimbing) && this.con.iDown
+			const ableDive = this.jumped && !this.onFloor && !this.carrying
+				&& !this.wasclimbing && this.con.iDown
 				&& (this.con.iLeft || this.con.iRight) && Math.abs(this.xspd) > 0.4;
-			if (truthy(this.canDive) && !truthy(this.diving) && ableDive) {
+			if (this.canDive && !this.diving && ableDive) {
 				// still rising turns some of the rise into forward speed
 				if (this.yspd < 0) {
 					const sadj = Math.abs(this.yspd / 3);
@@ -518,9 +521,9 @@ class oCharSide extends oChar {
 			}
 
 			// roll starts on landing while down or diving, ends when down is released
-			const ableRoll = landed && (this.con.iDown || truthy(this.diving))
-				&& !this.carrying && !truthy(this.wasclimbing) && Math.abs(this.xspd) > 0.3;
-			if (truthy(this.canRoll) && ableRoll) {
+			const ableRoll = landed && (this.con.iDown || this.diving)
+				&& !this.carrying && !this.wasclimbing && Math.abs(this.xspd) > 0.3;
+			if (this.canRoll && ableRoll) {
 				this.rolling = this.rolltime;
 			} else if (this.rolling > 0 && !this.con.iDown) {
 				this.rolling = 0;
@@ -530,7 +533,7 @@ class oCharSide extends oChar {
 			if (this.rolling > 0) {
 				this.rolling--;
 				// a roll ends in a short slide
-				if (this.rolling === 0 && truthy(this.canSlide)) {
+				if (this.rolling === 0 && this.canSlide) {
 					this.sliding = Math.floor(this.slideTime * 0.6);
 				}
 			}
@@ -539,23 +542,23 @@ class oCharSide extends oChar {
 			// The original joins the not hit wall flag and the speed with a bitwise and before
 			// comparing, so only odd whole speeds pass. Kept as is.
 			// Guess: the bitwise and drops the fraction of the speed first.
-			if (truthy(this.canSlide) && truthy(this.onFloor) && (this.con.iDown || truthy(this.diving)) && (this.con.iRight || this.con.iLeft)
-				&& !this.carrying && this.climbobj === null && this.climbsoon === null && !truthy(this.climbing) && !truthy(this.wasclimbing)
+			if (this.canSlide && this.onFloor && (this.con.iDown || this.diving) && (this.con.iRight || this.con.iLeft)
+				&& !this.carrying && this.climbobj === null && this.climbsoon === null && !this.climbing && !this.wasclimbing
 				&& this.rolling === 0 && this.sliding === 0
-				&& (((truthy(this.hitWall) ? 0 : 1) & Math.trunc(Math.abs(this.xspd))) > 0.8)) {
+				&& (((this.hitWall ? 0 : 1) & Math.trunc(Math.abs(this.xspd))) > 0.8)) {
 				this.sliding = this.slideTime;
 			}
 			// crawl when slow with down held, and only crouch while carrying
-			if (truthy(this.canCrawl) && truthy(this.onFloor) && this.con.iDown
-				&& !truthy(this.climbing) && !truthy(this.wasclimbing) && this.rolling === 0 && this.sliding === 0
+			if (this.canCrawl && this.onFloor && this.con.iDown
+				&& !this.climbing && !this.wasclimbing && this.rolling === 0 && this.sliding === 0
 				&& Math.abs(this.xspd) <= this.crawlspd) {
-				if (!this.carrying || eq(this.xspd, 0)) {
+				if (!this.carrying || this.xspd === 0) {
 					this.crawling = true;
 				}
 			}
 
 			// down must stay held to keep sliding
-			if (this.sliding > 0 && (!this.con.iDown || !truthy(this.onFloor))) {
+			if (this.sliding > 0 && (!this.con.iDown || !this.onFloor)) {
 				this.sliding = 0;
 				if (!this.checkOkToStand()) this.crawling = true;
 			}
@@ -567,16 +570,16 @@ class oCharSide extends oChar {
 			// The original takes the size of the comparison, not of the speed, kept as is.
 			if (this.sliding === 1) {
 				this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.slide_fric, 0);
-				if (truthy(Math.abs(this.xspd < this.slide_fric)) && (!this.con.iLeft && !this.con.iRight)) {
+				if (Math.abs(this.xspd < this.slide_fric) && (!this.con.iLeft && !this.con.iRight)) {
 					this.sliding = 0;
 					this.crawling = true;
 				}
 			}
 
 			// a hit slides to a stop, then ends when we try to move again
-			if (truthy(this.hit) && truthy(this.onFloor)) {
+			if (this.hit && this.onFloor) {
 				this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.fric, 0);
-				if (eq(this.xspd, 0) && (!this.con.iLeft && !this.con.iRight && !this.con.iUp && !this.con.iDown)) {
+				if (this.xspd === 0 && (!this.con.iLeft && !this.con.iRight && !this.con.iUp && !this.con.iDown)) {
 					this.hit = 2;
 				}
 				if (this.hit === 2 && (this.con.iLeft || this.con.iRight || this.con.iUp || this.con.iDown || this.con.iBtnA)) {
@@ -585,18 +588,18 @@ class oCharSide extends oChar {
 			}
 
 			// run up to the top speed when not sliding, diving or rolling
-			curspd = truthy(this.crawling) ? this.crawlspd : this.runspd;
+			curspd = this.crawling ? this.crawlspd : this.runspd;
 
 			const overspeed = Math.abs(this.xspd) - this.runspd;
 			const dir_to_facing = (this.facing < 0 && this.con.iLeft) || (this.facing > 0 && this.con.iRight);
-			const norm_run = (!truthy(this.atWall) || (truthy(this.atWallObj.pushable) && dir_to_facing))
-				&& !truthy(this.hit) && !truthy(this.diving) && !truthy(this.climbing)
-				&& this.sliding === 0 && this.rolling === 0 && !(truthy(this.crawling) && this.carrying)
-				&& !truthy(this.punching);
+			const norm_run = (!this.atWall || (this.atWallObj.pushable && dir_to_facing))
+				&& !this.hit && !this.diving && !this.climbing
+				&& this.sliding === 0 && this.rolling === 0 && !(this.crawling && this.carrying)
+				&& !this.punching;
 
 			// turning against our motion in the air is weaker
 			const dir_not_spd = (this.xspd < 0 && this.con.iRight) || (this.xspd > 0 && this.con.iLeft);
-			if (!truthy(this.onFloor) && dir_not_spd) {
+			if (!this.onFloor && dir_not_spd) {
 				curspd *= this.airturnspd;
 			}
 
@@ -607,7 +610,7 @@ class oCharSide extends oChar {
 
 			// slow first, gentler while still pushing forward past top speed
 			if (norm_run || overspeed > 0) {
-				let slow = truthy(this.onFloor) ? this.fric : this.air_fric;
+				let slow = this.onFloor ? this.fric : this.air_fric;
 				if (overspeed > 0 && dir_to_facing) {
 					slow *= 0.5;
 				}
@@ -616,7 +619,7 @@ class oCharSide extends oChar {
 
 			// Hard stop when standing with nothing pressed. The check reads the speed from
 			// before friction, so it only fires when we were at exactly running speed.
-			if (truthy(this.onFloor) && eq(overspeed, 0) && !this.con.iLeft && !this.con.iRight) {
+			if (this.onFloor && overspeed === 0 && !this.con.iLeft && !this.con.iRight) {
 				this.xspd = 0;
 				this.rx = 0;
 			}
@@ -630,16 +633,17 @@ class oCharSide extends oChar {
 			}
 
 			// gravity, or the slow slip while hanging
-			if (!truthy(this.onFloor)) {
-				if (truthy(this.hanging)) {
+			if (!this.onFloor) {
+				if (this.hanging) {
 					this.yspd += this.hangslipspd;
 				} else {
 					this.yspd += this.grav;
 				}
 			}
 
-			if (truthy(this.hanging) && this.yspd > this.hangfallspd) {
-				this.hanging = -1;
+			if (this.hanging && this.yspd > this.hangfallspd) {
+				this.hanging = false;
+				this.hangRegrabBlocked = true;
 			}
 
 			this.checkSetHanging(this.con.iUp);
@@ -651,12 +655,12 @@ class oCharSide extends oChar {
 		this.moving = this.xmoving || this.ymoving;
 
 		// facing from the buttons, else from the speed, unless locked
-		if (!truthy(this.lockface) && this.rolling === 0 && !truthy(this.hit) && !truthy(this.diving) && !truthy(this.sliding)) {
+		if (!this.lockface && this.rolling === 0 && !this.hit && !this.diving && !this.sliding) {
 			if (this.con.iLeft) {
 				this.facing = -1;
 			} else if (this.con.iRight) {
 				this.facing = 1;
-			} else if (ne(this.xspd, 0)) {
+			} else if (this.xspd !== 0) {
 				this.facing = sign(this.xspd);
 			}
 		}
@@ -690,7 +694,7 @@ class oCharSide extends oChar {
 		// so something found by both gets hit twice. Something destroyed by its first hit
 		// is skipped, where the original would have failed.
 		const bos = [];
-		if (((truthy(this.diving) || this.rolling > 0) && Math.abs(this.xspd) > 0.8) || Math.abs(this.xspd) > 3) {
+		if (((this.diving || this.rolling > 0) && Math.abs(this.xspd) > 0.8) || Math.abs(this.xspd) > 3) {
 			this.instancePlaceList(Math.floor(this.x + this.xspd), this.y, oObject, bos, false);
 		}
 		if (Math.abs(this.yspd) > 3) {
@@ -702,8 +706,8 @@ class oCharSide extends oChar {
 		}
 
 		// pushing a pushable while running into it on the floor
-		if (truthy(this.atWall) && ne(this.xspd, 0) && this.sliding === 0 && this.rolling === 0 && truthy(this.onFloor)
-			&& truthy(this.atWallObj.pushable) && !this.carrying) {
+		if (this.atWall && this.xspd !== 0 && this.sliding === 0 && this.rolling === 0 && this.onFloor
+			&& this.atWallObj.pushable && !this.carrying) {
 			this.atWallObj.moveThroughObjects(this.xspd * this.atWallObj.pushAdj, 0);
 			this.pushing = true;
 			this.atWall = false;
@@ -713,7 +717,7 @@ class oCharSide extends oChar {
 		}
 
 		// down and jump on a drop through floor fakes a jump and falls through
-		if (this.con.iBtnA && this.con.iDown && this.onFloorObj && truthy(this.onFloorObj.dropDown)) {
+		if (this.con.iBtnA && this.con.iDown && this.onFloorObj && this.onFloorObj.dropDown) {
 			this.jumping = 8;
 			this.jumped = 1;
 			this.yspd = 1;
@@ -725,7 +729,7 @@ class oCharSide extends oChar {
 
 		// swim boost instead of a jump, only once slowed from the last boost
 		this.curswimspd = pointDistance(0, 0, this.xspd, this.yspd);
-		if (this.con.iBtnA && truthy(this.swimming) && !swimattop && this.curswimspd <= this.swimspd + SWIM_BOOST_MARGIN) {
+		if (this.con.iBtnA && this.swimming && !swimattop && this.curswimspd <= this.swimspd + SWIM_BOOST_MARGIN) {
 			this.xspd += this.swimboost * this.con.ljHp;
 			this.yspd += this.swimboost * this.con.ljVp;
 
@@ -752,10 +756,10 @@ class oCharSide extends oChar {
 				deadontime: [120, 180],
 				colors: ["#99ddff", "#eeeeff", "#00bbff"]
 			}, this.mylayer, 0);
-		} else if ((this.con.iBtnA && !truthy(this.hit) && (!truthy(this.crawling) || eq(this.xspd, 0)) && this.sliding === 0
-			&& (truthy(this.onFloorL) || truthy(this.onFloor) || truthy(this.hanging) || swimattop
-				|| (truthy(this.climbing) && truthy(this.climbobj.jumpoff))))
-			|| (this.con.iBtnAd && truthy(this.jumping))) {
+		} else if ((this.con.iBtnA && !this.hit && (!this.crawling || this.xspd === 0) && this.sliding === 0
+			&& (this.onFloorL || this.onFloor || this.hanging || swimattop
+				|| (this.climbing && this.climbobj.jumpoff)))
+			|| (this.con.iBtnAd && this.jumping)) {
 			// a jump starts on the first frame and keeps counting while held
 			this.jumping++;
 
@@ -763,14 +767,14 @@ class oCharSide extends oChar {
 				this.jumped = 1;
 				Hooks.sound("snd8bJump");
 				// base height, a boost when moving, lower out of water and from a roll
-				this.jumph = this.maxjumph + ((Math.abs(this.xspd) > 0 && !truthy(this.swimming)) ? this.jumpRunBoost : 0);
-				this.jumph = truthy(this.swimming) ? this.jumph * 0.7 : this.jumph;
+				this.jumph = this.maxjumph + ((Math.abs(this.xspd) > 0 && !this.swimming) ? this.jumpRunBoost : 0);
+				this.jumph = this.swimming ? this.jumph * 0.7 : this.jumph;
 				this.jumph = this.rolling > 0 ? this.jumph * 0.8 : this.jumph;
 				// always the full jump, any rise we had is assumed to be gone
 				this.yspd = -this.jumph;
 
 				// kick off a wall, lower and away from it
-				if (truthy(this.atWall) && truthy(this.hangjumpkickoff)) {
+				if (this.atWall && this.hangjumpkickoff) {
 					this.yspd = -this.jumph / 2;
 					this.xspd = -this.facing * 1.4;
 				}
@@ -781,11 +785,11 @@ class oCharSide extends oChar {
 					this.xspd = clamp(this.xspd + sign(this.xspd) * this.runspd, minspd, mxspd);
 				}
 				// jumping out of water splashes where we break the surface, the same splash as going in
-				if (truthy(this.swimming)) {
+				if (this.swimming) {
 					this.makeSplash();
 				}
 
-				if (truthy(this.climbing)) {
+				if (this.climbing) {
 					// down and jump on a ladder just lets go
 					if (this.con.iDown) {
 						this.yspd = 0;
@@ -802,7 +806,7 @@ class oCharSide extends oChar {
 			}
 		}
 		// letting go early takes some of the jump back
-		if (truthy(this.jumping) && !this.con.iBtnAd) {
+		if (this.jumping && !this.con.iBtnAd) {
 			if (this.jumping < SIDE_SHORT_JUMP_FRAMES) {
 				this.yspd += this.jumph / 2 - (this.jumping * this.grav);
 			}
@@ -810,12 +814,12 @@ class oCharSide extends oChar {
 		}
 
 		// crawling and sliding tilt to the floor's slope, if there is room
-		if (truthy(this.onFloor) && (truthy(this.crawling) || this.sliding > 0)) {
+		if (this.onFloor && (this.crawling || this.sliding > 0)) {
 			const lasta = this.ang;
 			this.ang = (360 + this.onFloorObj.ang) % 90;
 			this.ang = this.ang > 45 ? this.ang - 90 : this.ang;
 
-			if (ne(lasta, this.ang)) {
+			if (lasta !== this.ang) {
 				if (this.instancePlace(this.x, this.y, oObject) !== null) {
 					this.ang = lasta;
 					this.crawling = false;
@@ -841,11 +845,11 @@ class oCharSide extends oChar {
 		this.moveThroughObjects(this.xspd, this.yspd);
 
 		if (lx !== this.x || ly !== this.y) {
-			Hooks.debugLine(lx, ly, this.x, this.y, truthy(this.swimming) ? "#33ff33" : (truthy(this.onFloor) ? "#ffff00" : "#ff8800"));
+			Hooks.debugLine(lx, ly, this.x, this.y, this.swimming ? "#33ff33" : (this.onFloor ? "#ffff00" : "#ff8800"));
 		}
 
 		// a hard landing kills
-		if (truthy(this.hitFloor) && this.yspd > this.dropFallKillSpd) {
+		if (this.hitFloor && this.yspd > this.dropFallKillSpd) {
 			game.guy.kill(45, 3, 0, 0, 1, "sndSplat", this);
 		}
 
@@ -858,21 +862,21 @@ class oCharSide extends oChar {
 				break;
 			}
 		}
-		if (truthy(this.dead)) return;
+		if (this.dead) return;
 
 		// landing or bumping a ceiling
-		if (truthy(this.hitFloor)) {
-			if (this.yspd > 0 || truthy(this.bumpStopsJump)) {
+		if (this.hitFloor) {
+			if (this.yspd > 0 || this.bumpStopsJump) {
 				this.yspd = 0;
 			}
 		}
 		// a wall stops us
-		if (truthy(this.hitWall) && !truthy(this.pushing)) {
+		if (this.hitWall && !this.pushing) {
 			this.xspd = 0;
 		}
 
 		// remember the last place we stood still
-		if (truthy(this.onFloor) && eq(this.xspd, 0) && this.yspd < 0.2 && this.still > 60) {
+		if (this.onFloor && this.xspd === 0 && this.yspd < 0.2 && this.still > 60) {
 			this.lastsx = this.x;
 			this.lastsy = this.y;
 		}
@@ -893,7 +897,7 @@ class oCharSide extends oChar {
 
 		this.curlooki = 0;
 		for (; this.curlooki < this.lookObjs.length; this.curlooki++) {
-			if (!truthy(this.lookObjs[this.curlooki].nolook)) {
+			if (!this.lookObjs[this.curlooki].nolook) {
 				this.lookObjs[this.curlooki].inview = true;
 				break;
 			}
@@ -906,15 +910,15 @@ class oCharSide extends oChar {
 	// The held item's drop spot shown faint red while dropping, the presenting sparkle,
 	// ourselves, the item in hand, and the aim dots.
 	draw() {
-		if (truthy(this.drop_request) && this.carrying) {
+		if (this.drop_request && this.carrying) {
 			const c = this.carrying;
 			Draw.spriteExt(c.spi, c.ifr, this.x + this.drop_offx * this.facing, this.y + this.drop_offy,
 				c.x_sc, c.y_sc, c.ang, "#ff2222", 0.5);
 		}
-		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
+		if (this.presenting && this.carrying) this.drawPresenting();
 		super.draw();
-		if (this.carrying && !truthy(this.presenting)) this.carrying.draw();
-		if (truthy(this.aiming)) {
+		if (this.carrying && !this.presenting) this.carrying.draw();
+		if (this.aiming) {
 			const cx = this.sprite_cx();
 			const cy = this.sprite_cy();
 			const bi = Math.floor(currentTime() / 100) % 4;

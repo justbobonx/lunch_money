@@ -47,17 +47,17 @@ const Movers = {
 
 	// Friction on the floor, a little air drag and gravity off it, floating up in water.
 	applyFrictionGravity() {
-		if (truthy(this.atWall) || truthy(this.hitWall)) {
+		if (this.atWall || this.hitWall) {
 			this.xspd = 0;
 			this.rx = 0;
 		}
-		if (truthy(this.onFloor) || truthy(this.hitFloor)) {
+		if (this.onFloor || this.hitFloor) {
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.fric, 0);
 			this.yspd = 0;
 			this.ry = 0;
 		} else {
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.air_fric, 0);
-			if (truthy(this.swimming)) {
+			if (this.swimming) {
 				if (this.instancePlace(this.x, this.y - 3, oWater) !== null) {
 					// still water above, so drift up
 					this.yspd -= 0.01;
@@ -78,14 +78,14 @@ const Movers = {
 	// Objects without a controller read as not holding up, the original would have failed there.
 	thruableX(hobj, nx) {
 		const up = !!(this.con && this.con.iUp);
-		return (nx < this.x && (truthy(hobj.thruLeft) || (truthy(hobj.thruLeftNU) && !up && this.onFloorObj !== hobj)))
-			|| (nx > this.x && (truthy(hobj.thruRight) || (truthy(hobj.thruRightNU) && !up && this.onFloorObj !== hobj)));
+		return (nx < this.x && (hobj.thruLeft || (hobj.thruLeftNU && !up && this.onFloorObj !== hobj)))
+			|| (nx > this.x && (hobj.thruRight || (hobj.thruRightNU && !up && this.onFloorObj !== hobj)));
 	},
 
 	// Whether an up or down move into this object is allowed, including dropping through.
 	thruableY(hobj, ny) {
-		return (ny > this.y && (truthy(hobj.thruDown) || (truthy(hobj.dropDown) && (truthy(this.dropping) || truthy(this.climbing)))))
-			|| (ny < this.y && truthy(hobj.thruUp));
+		return (ny > this.y && (hobj.thruDown || (hobj.dropDown && (this.dropping || this.climbing))))
+			|| (ny < this.y && hobj.thruUp);
 	},
 
 	// The side view move. Speeds are read, never changed, hits only set the flags.
@@ -93,11 +93,11 @@ const Movers = {
 	// small drops, then up and down with a one pixel slide off narrow tips when falling straight.
 	moveThroughObjects(xspd, yspd) {
 		const whx = this.x + this.rx + xspd;
-		let nx = round(whx);
+		let nx = Math.round(whx);
 		this.rx = whx - nx;
 
 		const why = this.y + this.ry + yspd;
-		let ny = round(why);
+		let ny = Math.round(why);
 		this.ry = why - ny;
 
 		const ix = sign(nx - this.x);
@@ -127,7 +127,7 @@ const Movers = {
 				this.hitWall = true;
 
 				// try stepping up onto it
-				if (truthy(this.onFloor)) {
+				if (this.onFloor) {
 					const ncx = nx;
 					for (let ncy = this.y - 1; ncy > this.y - this.climbH; ncy--) {
 						const clo = this.instancePlace(ncx, ncy, hobj);
@@ -153,7 +153,7 @@ const Movers = {
 		}
 
 		// stepping down a small drop while walking on the floor
-		if (truthy(this.canClimb) && nx !== this.x && truthy(this.onFloor)
+		if (this.canClimb && nx !== this.x && this.onFloor
 			&& this.instancePlace(this.x, this.y + this.climbH, oObject) !== null) {
 			for (let ncy = this.y + this.climbH - 1; ncy > this.y; ncy--) {
 				if (this.instancePlace(nx, ncy, oObject) === null) {
@@ -189,7 +189,7 @@ const Movers = {
 				this.hitFloorObj = hobj;
 				// falling straight down onto a tip slides one pixel off it
 				// (the original also asks for no sideways speed here and wonders why itself)
-				if (ny > this.y && !truthy(this.hanging) && eq(Math.abs(xspd), 0)) {
+				if (ny > this.y && !this.hanging && Math.abs(xspd) === 0) {
 					if (this.instancePlace(this.x + 1, ny, oObject) === null) {
 						Hooks.debugLine(this.x, this.y, this.x + 1, this.y, "#6600aa");
 						this.x += 1;
@@ -232,14 +232,14 @@ const Movers = {
 		this.hitFloor = false;
 		this.hitFloorObj = null;
 
-		if (eq(xspd, 0) && eq(yspd, 0)) return;
+		if (xspd === 0 && yspd === 0) return;
 
 		const whx = this.x + this.rx + xspd;
-		let nx = round(whx);
+		let nx = Math.round(whx);
 		this.rx = whx - nx;
 
 		const why = this.y + this.ry + yspd;
-		let ny = round(why);
+		let ny = Math.round(why);
 		this.ry = why - ny;
 
 		const ix = sign(nx - this.x);
@@ -257,15 +257,15 @@ const Movers = {
 				this.hitWall = false;
 				break;
 			}
-			if (((truthy(hobj.thruLeft) || (truthy(hobj.thruLeftNU) && !up) && this.onFloorObj !== hobj) && nx < this.x)
-				|| ((truthy(hobj.thruRight) || (truthy(hobj.thruRightNU) && !up) && this.onFloorObj !== hobj) && nx > this.x)) {
+			if (((hobj.thruLeft || (hobj.thruLeftNU && !up) && this.onFloorObj !== hobj) && nx < this.x)
+				|| ((hobj.thruRight || (hobj.thruRightNU && !up) && this.onFloorObj !== hobj) && nx > this.x)) {
 				this.hitWall = false;
 				break;
 			}
 
 			this.hitWall = true;
 			this.hitWallObj = hobj;
-			if (truthy(this.onFloor)) {
+			if (this.onFloor) {
 				const ncx = nx;
 				for (let ncy = this.y - 1; ncy > this.y - this.climbH; ncy--) {
 					if (this.instancePlace(ncx, ncy, objtype) === null) {
@@ -288,7 +288,7 @@ const Movers = {
 		}
 
 		// stepping down
-		if (nx !== this.x && truthy(this.onFloor) && this.instancePlace(this.x, this.y + this.climbH, objtype) !== null) {
+		if (nx !== this.x && this.onFloor && this.instancePlace(this.x, this.y + this.climbH, objtype) !== null) {
 			for (let ncy = this.y + this.climbH - 1; ncy > this.y; ncy--) {
 				if (this.instancePlace(nx, ncy, objtype) === null) {
 					this.y = ncy;
@@ -308,15 +308,15 @@ const Movers = {
 				this.hitFloor = false;
 				break;
 			}
-			if (((truthy(hobj.thruDown) || (truthy(hobj.dropDown) && (truthy(this.dropping) || truthy(this.climbing)))) && ny > this.y)
-				|| (truthy(hobj.thruUp) && ny < this.y)) {
+			if (((hobj.thruDown || (hobj.dropDown && (this.dropping || this.climbing))) && ny > this.y)
+				|| (hobj.thruUp && ny < this.y)) {
 				this.hitFloor = false;
 				break;
 			}
 
 			this.hitFloor = true;
 			this.hitFloorObj = hobj;
-			if (ny > this.y && !truthy(this.hanging)) {
+			if (ny > this.y && !this.hanging) {
 				if (this.instancePlace(this.x + 1, ny, objtype) === null) {
 					this.x += 1;
 					nx = 0;
@@ -346,14 +346,14 @@ const Movers = {
 	// Top down version of the sideways pass rule: anything we are at or above in height also passes.
 	thruableXTopd(hobj, nx) {
 		const up = !!(this.con && this.con.iUp);
-		return (nx < this.x && (truthy(hobj.thruLeft) || (truthy(hobj.thruLeftNU) && !up && this.onFloorObj !== hobj)))
-			|| (nx > this.x && (truthy(hobj.thruRight) || (truthy(hobj.thruRightNU) && !up && this.onFloorObj !== hobj)))
+		return (nx < this.x && (hobj.thruLeft || (hobj.thruLeftNU && !up && this.onFloorObj !== hobj)))
+			|| (nx > this.x && (hobj.thruRight || (hobj.thruRightNU && !up && this.onFloorObj !== hobj)))
 			|| this.z >= hobj.ht;
 	},
 
 	thruableYTopd(hobj, ny) {
-		return (ny > this.y && truthy(hobj.thruDown))
-			|| (ny < this.y && truthy(hobj.thruUp))
+		return (ny > this.y && hobj.thruDown)
+			|| (ny < this.y && hobj.thruUp)
 			|| this.z >= hobj.ht;
 	},
 
@@ -369,14 +369,14 @@ const Movers = {
 		this.hitFloor = false;
 		this.hitFloorObj = null;
 
-		if (eq(xspd, 0) && eq(yspd, 0) && eq(zspd, 0)) return;
+		if (xspd === 0 && yspd === 0 && zspd === 0) return;
 
 		const whx = this.x + this.rx + xspd;
-		let nx = round(whx);
+		let nx = Math.round(whx);
 		this.rx = whx - nx;
 
 		const why = this.y + this.ry + yspd;
-		let ny = round(why);
+		let ny = Math.round(why);
 		this.ry = why - ny;
 
 		const ix = sign(nx - this.x);
@@ -393,14 +393,14 @@ const Movers = {
 			let hobj = this.instancePlace(nx, this.y, hobjs[hi]);
 			while (hobj !== null && nx !== this.x) {
 				// walking off a cliff edge from the side
-				if (truthy(hobj.thruable) && this.inFallWall !== hobj) {
+				if (hobj.thruable && this.inFallWall !== hobj) {
 					// drop by the cliff height plus enough to clear below its wall
 					const heightAdj = (hobj.bbox_bottom - this.y) + (this.y - this.bbox_top + 1);
 					this.z += heightAdj;
 					this.y += heightAdj;
 					ny = this.y;
 					// a little hop when just walking off
-					this.zspd += eq(this.zspd, 0) ? 0.5 : 0;
+					this.zspd += this.zspd === 0 ? 0.5 : 0;
 					// remember it so the down the map pass ignores it too
 					inos.push(hobj);
 					this.inFallWall = hobj;
@@ -418,7 +418,7 @@ const Movers = {
 					break;
 				}
 
-				if (truthy(hobj.standonable) && hobj.ht - this.z < this.climbH) {
+				if (hobj.standonable && hobj.ht - this.z < this.climbH) {
 					this.z = hobj.ht;
 					this.hitWall = false;
 					break;
@@ -446,11 +446,11 @@ const Movers = {
 			let hobj = hobjs[hi];
 			while (hobj !== null && ny !== this.y) {
 				// falling off a cliff, only when moving down the map
-				if (truthy(hobj.thruable) && ny > this.y && this.inFallWall !== hobj) {
+				if (hobj.thruable && ny > this.y && this.inFallWall !== hobj) {
 					const heightAdj = (hobj.bbox_bottom - this.y) + (this.y - this.bbox_top + 1);
 					this.z += heightAdj;
 					ny += heightAdj;
-					this.zspd = eq(this.zspd, 0) ? 0.5 : this.zspd;
+					this.zspd = this.zspd === 0 ? 0.5 : this.zspd;
 					this.inFallWall = hobj;
 					this.hitWally = false;
 					break;
@@ -468,7 +468,7 @@ const Movers = {
 
 				// climbing onto a low object clears the sideways hit flag, not this one,
 				// a quirk kept from the original
-				if (truthy(hobj.standonable) && hobj.ht - this.z < this.climbH) {
+				if (hobj.standonable && hobj.ht - this.z < this.climbH) {
 					this.z = hobj.ht;
 					this.hitWall = false;
 					break;
@@ -488,7 +488,7 @@ const Movers = {
 
 		// height
 		const whz = this.z + this.rz + zspd;
-		let nz = round(whz);
+		let nz = Math.round(whz);
 		this.rz = whz - nz;
 
 		hobjs.length = 0;
@@ -519,14 +519,14 @@ const Movers = {
 
 	// Moves by speeds ignoring every object, for background movers and the dead.
 	moveIgnoringObjects(xspd, yspd, zspd) {
-		if (eq(xspd, 0) && eq(yspd, 0) && (zspd === undefined || eq(zspd, 0))) return;
+		if (xspd === 0 && yspd === 0 && (zspd === undefined || zspd === 0)) return;
 
 		const whx = this.x + this.rx + xspd;
-		const nx = round(whx);
+		const nx = Math.round(whx);
 		this.rx = whx - nx;
 
 		const why = this.y + this.ry + yspd;
-		const ny = round(why);
+		const ny = Math.round(why);
 		this.ry = why - ny;
 
 		this.x = nx;
@@ -534,7 +534,7 @@ const Movers = {
 
 		if (zspd !== undefined) {
 			const whz = this.z + this.rz + zspd;
-			const nz = round(whz);
+			const nz = Math.round(whz);
 			this.rz = whz - nz;
 			this.z = nz;
 		}
@@ -554,7 +554,7 @@ const Movers = {
 		this.instancePlaceList(this.x, this.y + 1, oObject, ofos, 0);
 		for (const ofo of ofos) {
 			if (inos.indexOf(ofo) >= 0) continue;
-			if (this.yspd < 0 && truthy(ofo.thruUp)) continue;
+			if (this.yspd < 0 && ofo.thruUp) continue;
 			this.onFloor = true;
 			this.onFloorObj = ofo;
 			break;
@@ -566,7 +566,7 @@ const Movers = {
 		this.instancePlaceList(this.x + this.facing, this.y + this.facingy, oObject, awos, 0);
 		for (const awo of awos) {
 			if (inos.indexOf(awo) >= 0) continue;
-			if ((this.xspd > 0 && truthy(awo.thruRight)) || (this.xspd < 0 && truthy(this.thruLeft))) continue;
+			if ((this.xspd > 0 && awo.thruRight) || (this.xspd < 0 && this.thruLeft)) continue;
 			this.atWall = true;
 			this.atWallObj = awo;
 			break;
@@ -586,7 +586,7 @@ const Movers = {
 		this.onFloorObj = null;
 		let thisHeight = 0;
 		for (const ino of inos) {
-			if (truthy(ino.thruable)) {
+			if (ino.thruable) {
 				thisHeight = -10000;
 				this.onFloorObj = ino;
 			} else if (ino.ht >= thisHeight) {
@@ -606,7 +606,7 @@ const Movers = {
 		this.instancePlaceList(this.x + this.facing, this.y, oObject, awos, 0);
 		for (const awo of awos) {
 			if (inos.indexOf(awo) >= 0) continue;
-			if ((this.xspd > 0 && truthy(awo.thruRight)) || (this.xspd < 0 && truthy(this.thruLeft))) continue;
+			if ((this.xspd > 0 && awo.thruRight) || (this.xspd < 0 && this.thruLeft)) continue;
 			if (awo.ht <= this.z) continue;
 			this.atWall = true;
 			this.atWallObj = awo;
@@ -619,7 +619,7 @@ const Movers = {
 		this.instancePlaceList(this.x, this.y + this.facingy, oObject, awos, 0);
 		for (const awo of awos) {
 			if (inos.indexOf(awo) >= 0) continue;
-			if ((this.yspd > 0 && truthy(awo.thruDown)) || (this.yspd < 0 && truthy(this.thruUp))) continue;
+			if ((this.yspd > 0 && awo.thruDown) || (this.yspd < 0 && this.thruUp)) continue;
 			if (awo.ht <= this.z) continue;
 			this.atWally = true;
 			this.atWallyObj = awo;
@@ -688,7 +688,7 @@ const Movers = {
 		const los = this.instancePlaceList(this.x, this.y, objtype, mos, true);
 		for (let li = 0; li < los; li++) {
 			const ho = mos[li];
-			if (truthy(ho.thruable) || ho.ht <= this.z) continue;
+			if (ho.thruable || ho.ht <= this.z) continue;
 			this.pushOutOf(ho);
 		}
 		return los;
@@ -696,10 +696,10 @@ const Movers = {
 
 	// Rides along with whatever moving thing we hang from or stand on.
 	moveWithObjects() {
-		if (truthy(this.hanging) && this.hangingObj && truthy(this.hangingObj.moving)) {
+		if (this.hanging && this.hangingObj && this.hangingObj.moving) {
 			this.moveWithObject(this.hangingObj);
 		}
-		if (truthy(this.onFloor) && this.onFloorObj && truthy(this.onFloorObj.moving)) {
+		if (this.onFloor && this.onFloorObj && this.onFloorObj.moving) {
 			this.moveWithObject(this.onFloorObj);
 		}
 	},
@@ -820,11 +820,11 @@ const Movers = {
 	// Side or top down water check. Jumping up out of the water does not count as in it.
 	checkInWater() {
 		this.inwaterObj = this.instancePlace(this.x, this.y, oWater);
-		if (truthy(this.ch_side)) {
-			this.inwater = this.inwaterObj !== null && !(truthy(this.jumped) && this.yspd < 0);
+		if (this.ch_side) {
+			this.inwater = this.inwaterObj !== null && !(this.jumped && this.yspd < 0);
 		} else {
 			this.inwater = this.inwaterObj !== null && this.z <= 0 && this.onFloorObj === null
-				&& !(truthy(this.jumped) && this.yspd < 0);
+				&& !(this.jumped && this.yspd < 0);
 		}
 	},
 
@@ -836,9 +836,9 @@ const Movers = {
 		this.checkInWater();
 		this.swimming = this.inwater;
 
-		if (truthy(this.swimming) && !truthy(lastSwim)) {
+		if (this.swimming && !lastSwim) {
 			this.makeSplash();
-			if (truthy(this.ch_side)) {
+			if (this.ch_side) {
 				this.yspd = sign(this.yspd) * Math.min(Math.abs(this.yspd) / 1.5, 3);
 			}
 			this.diving = false;
@@ -848,7 +848,7 @@ const Movers = {
 		}
 
 		// bubbles every two seconds while swimming side view
-		if (truthy(this.ch_side) && truthy(this.swimming)) {
+		if (this.ch_side && this.swimming) {
 			if (this.step % 120 === 0) {
 				game.createObject(oBubble, { x: this.x + this.xspd, y: this.y + this.yspd - 5 }, this.mylayer);
 			}
@@ -859,7 +859,7 @@ const Movers = {
 	// start at the water's top and end on anything solid they land on, top down they start at our
 	// spot and fly free.
 	makeSplash() {
-		const side = truthy(this.ch_side);
+		const side = this.ch_side;
 		game.createObject(oFxParticlerOneShot, {
 			x: this.x, y: side ? this.inwaterObj.bbox_top + 2 : this.y,
 			amount: 7,

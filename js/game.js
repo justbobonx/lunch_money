@@ -121,7 +121,7 @@ const Hooks = {
 			trigger: caller !== undefined ? caller : null,
 			script: script,
 			actor: game.lookupInst(who, caller) || null,
-			skippable: truthy(skippable),
+			skippable: !!skippable,
 			skipScript: Array.isArray(skipScript) ? skipScript : -1,
 			onDone: done !== undefined ? done : null
 		}, game.etcLayer !== null ? game.etcLayer : undefined);
@@ -210,7 +210,7 @@ const Save = {
 	},
 
 	write() {
-		if (!this.enabled || game.curroom === null || game.guy === null || truthy(game.guy.dead)) return;
+		if (!this.enabled || game.curroom === null || game.guy === null || game.guy.dead) return;
 		const guy = game.guy;
 		const sv = {
 			world: WORLD_NAME, room: game.curroom.name, x: guy.x, y: guy.y,

@@ -3,6 +3,9 @@
 // Bounding boxes are whole pixels and include both edges, like the original.
 // Objects that are not active or are destroyed never collide, and an object never hits itself.
 
+// turned shapes closer than this along an axis only touch, so they do not count as overlapping
+const SHAPE_TOUCH_TOLERANCE = 0.00001;
+
 // Turns an object's mask at a given spot into a shape: a whole pixel box,
 // plus a polygon when a turning mask is rotated, or a circle.
 // Guess: box edges round to the nearest pixel, halves rounding up.
@@ -147,7 +150,7 @@ function shapesOverlap(a, b) {
 				if (d < bmin) bmin = d;
 				if (d > bmax) bmax = d;
 			}
-			if (amax <= bmin + REAL_EPSILON || bmax <= amin + REAL_EPSILON) return false;
+			if (amax <= bmin + SHAPE_TOUCH_TOLERANCE || bmax <= amin + SHAPE_TOUCH_TOLERANCE) return false;
 		}
 	}
 	return true;
@@ -204,7 +207,7 @@ const Collision = {
 			const s = maskShape(o, o.x, o.y);
 			if (s && shapesOverlap(me, s)) found.push(o);
 		}
-		if (truthy(ordered)) {
+		if (ordered) {
 			found.sort((a, b) => pointDistance(x, y, a.x, a.y) - pointDistance(x, y, b.x, b.y));
 		}
 		for (const o of found) list.push(o);
@@ -214,7 +217,7 @@ const Collision = {
 	// First object of the type covering a point, optionally skipping the asker.
 	collisionPoint(px, py, what, precise, notme) {
 		for (const o of game.instances) {
-			if ((truthy(notme) && o === this) || !o.active || o.destroyed || !matchesType(o, what)) continue;
+			if ((notme && o === this) || !o.active || o.destroyed || !matchesType(o, what)) continue;
 			const s = maskShape(o, o.x, o.y);
 			if (s && pointInShape(s, px, py)) return o;
 		}

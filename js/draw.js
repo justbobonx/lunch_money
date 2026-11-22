@@ -425,18 +425,18 @@ const Draw = {
 		const by = snap(s.y) - snap(s.exoffy);
 		let xo = -this.curdrawoffx;
 		let yo = -this.curdrawoffy;
-		if (!truthy(s.tiled)) {
-			if (truthy(s.inview) && !s.carriedBy) {
+		if (!s.tiled) {
+			if (s.inview && !s.carriedBy) {
 				const pulse = INVIEW_ALPHA + Math.sin(game.frames / GAME_FPS * INVIEW_PULSE_SPEED * Math.PI * 2) * INVIEW_PULSE;
 				this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, NO_TINT, s.alpha * pulse,
-					truthy(s.pickupable) ? INVIEW_PICKUP_COLOR : INVIEW_ACTON_COLOR);
+					s.pickupable ? INVIEW_PICKUP_COLOR : INVIEW_ACTON_COLOR);
 			}
 			this.spriteRaw(s.spi, s.ifr, bx + snap(xo), by + snap(yo), s.x_sc, s.y_sc, s.ang, s.col, s.alpha);
 			return;
 		}
-		const tx = truthy(s.tiledx);
-		const ty = truthy(s.tiledy);
-		if (truthy(s.tile_loop)) {
+		const tx = s.tiledx;
+		const ty = s.tiledy;
+		if (s.tile_loop) {
 			xo -= tx ? (game.cam.scrox % s.t_w) : 0;
 			yo -= ty ? (game.cam.scroy % s.t_h) : 0;
 		}
@@ -490,7 +490,7 @@ const Draw = {
 		s.xodd = (tw * Math.abs(s.x_sc)) % 2 !== 0;
 		s.yodd = (th * Math.abs(s.y_sc)) % 2 !== 0;
 		s.tiled = s.tiledx || s.tiledy;
-		if (truthy(s.tiled)) {
+		if (s.tiled) {
 			s.t_flipx = sign(s.x_sc);
 			s.t_flipy = sign(s.y_sc);
 			const ofx = rec ? rec.ox : 0;
@@ -551,7 +551,7 @@ const Draw = {
 		const ctx = this.ctx;
 		this.resetTransform();
 		ctx.globalAlpha = this.alpha;
-		if (truthy(outline)) {
+		if (outline) {
 			ctx.strokeStyle = this.color;
 			ctx.lineWidth = 1;
 			ctx.strokeRect(Math.min(l, r) + 0.5, Math.min(t, b) + 0.5, Math.abs(r - l), Math.abs(b - t));
@@ -735,8 +735,8 @@ const Draw = {
 		if (cam.shake > 0) {
 			cam.shake = Math.max(0, cam.shake - this.frameSteps);
 			const toDisplay = DISPLAY_W / ORIGINAL_SCREEN_W;
-			shx = round((Math.random() * 2 - 1) * cam.xmag) * 3 * toDisplay;
-			shy = round((Math.random() * 2 - 1) * cam.ymag) * 3 * toDisplay;
+			shx = Math.round((Math.random() * 2 - 1) * cam.xmag) * 3 * toDisplay;
+			shy = Math.round((Math.random() * 2 - 1) * cam.ymag) * 3 * toDisplay;
 		}
 
 		ctx.setTransform(this.screenScale, 0, 0, this.screenScale, 0, 0);
@@ -788,11 +788,11 @@ const Draw = {
 				ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 				ctx.globalAlpha = 1;
 			}
-			if (truthy(lyr.disabled)) continue;
+			if (lyr.disabled) continue;
 
 			let lyrw = lyr.wd;
 			let lyrh = lyr.ht;
-			if (!truthy(lyr.gui)) {
+			if (!lyr.gui) {
 				lyrw = Math.floor(lyr.wd / curzoom);
 				lyrh = Math.floor(lyr.ht / curzoom);
 			}
@@ -802,7 +802,7 @@ const Draw = {
 			const paraxing = plxXMod !== 0 || plxYMod !== 0;
 			// a layer on its own canvas is drawn at game pixels, so it stays snapped
 			const buffered = lyr.mask_list.length > 0;
-			this.subpixel = paraxing && !truthy(lyr.gui) && !buffered;
+			this.subpixel = paraxing && !lyr.gui && !buffered;
 
 			// A parallax layer follows the camera's own unsnapped spot, so the part of the scroll it
 			// keeps is a fraction of a pixel when the camera moves one. Other layers stay on whole pixels.
@@ -817,10 +817,10 @@ const Draw = {
 			lyr.lastscrox = scrollx;
 			lyr.lastscroy = scrolly;
 
-			if (truthy(lyr.zsort)) g.zsortLayer(lyr);
+			if (lyr.zsort) g.zsortLayer(lyr);
 
-			const lzoffw = truthy(lyr.gui) ? 0 : zoffw;
-			const lzoffh = truthy(lyr.gui) ? 0 : zoffh;
+			const lzoffw = lyr.gui ? 0 : zoffw;
+			const lzoffh = lyr.gui ? 0 : zoffh;
 			const destx = -Math.floor(lzoffw / 2) + shx;
 			const desty = -Math.floor(lzoffh / 2) + shy;
 			const destw = DISPLAY_W + lzoffw;
@@ -888,8 +888,8 @@ const Draw = {
 					obj.x -= oxdiff * plxXMod;
 					obj.y -= oydiff * plxYMod;
 				}
-				if (truthy(loopX)) obj.x = lpStx + ((obj.x - lpStx + loopX) % loopX);
-				if (truthy(loopY)) obj.y = lpSty + ((obj.y - lpSty + loopY) % loopY);
+				if (loopX) obj.x = lpStx + ((obj.x - lpStx + loopX) % loopX);
+				if (loopY) obj.y = lpSty + ((obj.y - lpSty + loopY) % loopY);
 
 				// hidden objects count too, so triggers and markers can be found
 				if (inspecting && obj instanceof oBaseObject && obj.active && !obj.destroyed) {
@@ -910,7 +910,7 @@ const Draw = {
 					if (shape && pointInShape(shape, mlx, mly)) hits.push({ obj: obj, layer: lyr, shape: shape });
 				}
 
-				if (!truthy(obj.visible) || truthy(obj.disabled)) continue;
+				if (!obj.visible || obj.disabled) continue;
 				this.totSpriteDrwn++;
 				// objects draw themselves, by default through the same sprite draw as pictures
 				if (obj instanceof oBaseObject) obj.draw();
@@ -1050,7 +1050,7 @@ const Draw = {
 
 		if (!g.drawStats) {
 			this.alpha = STATS_ALPHA_OFF;
-			this.textRaw(STATS_X - 1, STATS_Y, String(round(this.fpsHist)), -1, -1, 1, 1, 0);
+			this.textRaw(STATS_X - 1, STATS_Y, String(Math.round(this.fpsHist)), -1, -1, 1, 1, 0);
 			this.alpha = 1;
 			return;
 		}
@@ -1072,22 +1072,22 @@ const Draw = {
 		const guy = g.guy;
 		const f1 = (v) => Number(v).toFixed(1);
 		const f2 = (v) => Number(v).toFixed(2);
-		const on = (v) => (truthy(v) ? 1 : 0);
+		const on = (v) => (v ? 1 : 0);
 		const lines = [
-			round(this.fpsHist) + "  T:" + f1(g.frames / GAME_FPS) + "  s:" + this.totSpriteCnt + "/" + this.totSpriteDrwn
+			Math.round(this.fpsHist) + "  T:" + f1(g.frames / GAME_FPS) + "  s:" + this.totSpriteCnt + "/" + this.totSpriteDrwn
 				+ " (i:" + g.instances.length + ")"
 		];
 		if (guy) {
 			lines.push(f1(guy.x) + "," + f1(guy.y) + " Xs:" + f2(guy.xspd) + " Ys:" + f2(guy.yspd)
-				+ (truthy(guy.ch_topd) ? " Zs:" + f2(guy.zspd) + " Z:" + f2(guy.z) : ""));
+				+ (guy.ch_topd ? " Zs:" + f2(guy.zspd) + " Z:" + f2(guy.z) : ""));
 			lines.push("F:" + on(guy.onFloor) + " Hf:" + on(guy.hitFloor) + "  W:" + (on(guy.atWall) + on(guy.atWally))
-				+ " Hw:" + on(guy.hitWall) + " F:" + guy.facing + (truthy(guy.ch_topd) ? " Fy:" + guy.facingy : "")
+				+ " Hw:" + on(guy.hitWall) + " F:" + guy.facing + (guy.ch_topd ? " Fy:" + guy.facingy : "")
 				+ (guy.onFloorObj ? " Fo: " + guy.onFloorObj.constructor.name : "")
 				+ (guy.carrying ? " carry:" + guy.carrying.gname : "")
-				+ (truthy(guy.jumped) ? " jump" : "") + (truthy(guy.crawling) ? " crawl" : "")
-				+ (guy.rolling > 0 ? " roll" : "") + (guy.sliding > 0 ? " slide" : "") + (truthy(guy.diving) ? " dive" : "")
-				+ (truthy(guy.climbing) ? " climb" : "") + (truthy(guy.dead) ? " DEAD" : "") + (truthy(guy.hanging) ? " hang" : "")
-				+ (truthy(guy.pushing) ? " push" : ""));
+				+ (guy.jumped ? " jump" : "") + (guy.crawling ? " crawl" : "")
+				+ (guy.rolling > 0 ? " roll" : "") + (guy.sliding > 0 ? " slide" : "") + (guy.diving ? " dive" : "")
+				+ (guy.climbing ? " climb" : "") + (guy.dead ? " DEAD" : "") + (guy.hanging ? " hang" : "")
+				+ (guy.pushing ? " push" : ""));
 		}
 		const cam = g.cam;
 		lines.push(cam.curzoom + "  " + cam.x + "," + cam.y + "  " + (cam.curw / cam.curzoom) + "," + (cam.curh / cam.curzoom)

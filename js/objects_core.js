@@ -286,7 +286,7 @@ class oSpeckler extends oBaseObject {
 	}
 
 	update() {
-		if (!truthy(this.visible) || !this.mylayer) return;
+		if (!this.visible || !this.mylayer) return;
 		this.specks = this.specks.filter((sp) => !sp.destroyed);
 		if (this.nextspeck > 0) this.nextspeck--;
 		if (this.nextspeck > 0 || this.specks.length >= this.maxnum) return;
@@ -376,10 +376,10 @@ class oFxParticler extends oBaseObject {
 				p.y += p.yspd;
 
 				// only the first solid found counts, so lying in the followed object stops nothing
-				if (truthy(this.stoponobjs)) {
+				if (this.stoponobjs) {
 					const hit = Collision.instancePlace.call(p, p.x, p.y, oObject);
 					if (hit !== null && hit !== this.origObj) {
-						if (truthy(this.deadonland)) {
+						if (this.deadonland) {
 							gone = true;
 						} else {
 							p.go = false;
@@ -516,10 +516,10 @@ class oBubble extends oBaseObject {
 		// the wobble counts on once more, so the count rises two each update
 		this.step++;
 		const whx = this.x + this.rx + Math.sin((this.step % BUBBLE_WOBBLE_RESTART) / BUBBLE_WOBBLE_HALF * Math.PI) * BUBBLE_WOBBLE;
-		this.x = round(whx);
+		this.x = Math.round(whx);
 		this.rx = whx - this.x;
 		const why = this.y + this.ry - BUBBLE_RISE;
-		this.y = round(why);
+		this.y = Math.round(why);
 		this.ry = why - this.y;
 	}
 }
@@ -544,10 +544,13 @@ class oFader extends oBaseObject {
 		this.val_inc = (this.final_val - this.cur_val) / this.time;
 	}
 
+	// done once a step reaches or passes the end value in the way it is heading, then it lands exactly on it
 	update() {
 		this.cur_val += this.val_inc;
+		const done = this.val_inc > 0 ? this.cur_val >= this.final_val : this.cur_val <= this.final_val;
+		if (done) this.cur_val = this.final_val;
 		this.obj[this.obj_var] = this.cur_val;
-		if (eq(this.cur_val, this.final_val)) this.destroy();
+		if (done) this.destroy();
 	}
 }
 
@@ -680,20 +683,20 @@ class oLyrDoor extends oIaBgObject {
 
 	// Opens or closes, playing the animation or jumping to its end. A lock stops it unless overridden.
 	set_open(open, animate, lockOverride) {
-		if (truthy(this.locked) && !truthy(lockOverride)) return false;
+		if (this.locked && !lockOverride) return false;
 		this.open = open;
-		this.wall_obj.mask = truthy(open) ? "sNoMask" : this.spi;
-		if (truthy(animate)) {
+		this.wall_obj.mask = open ? "sNoMask" : this.spi;
+		if (animate) {
 			this.spd = 1;
 		} else {
-			this.ifr = truthy(open) ? Math.ceil(Sprites.frameCount(this.spi) / 2) : 0;
+			this.ifr = open ? Math.ceil(Sprites.frameCount(this.spi) / 2) : 0;
 		}
 		return true;
 	}
 
 	acton(action, who) {
-		const didit = this.set_open(!truthy(this.open), 1);
-		if (!didit && truthy(this.locked)) Hooks.say(who, this.locked_message);
+		const didit = this.set_open(!this.open, 1);
+		if (!didit && this.locked) Hooks.say(who, this.locked_message);
 		// working an automatic door by hand keeps it as left until the sensor clears
 		if (this.open_sensor !== undefined && this.sense_on !== null) this.manual_override = 1;
 	}
@@ -701,8 +704,8 @@ class oLyrDoor extends oIaBgObject {
 	update() {
 		const frames = Sprites.frameCount(this.spi);
 		if (this.spd > 0) {
-			if ((truthy(this.open) && Math.floor(this.ifr) === Math.ceil(frames / 2))
-				|| (!truthy(this.open) && Math.floor(this.ifr) === 0)) {
+			if ((this.open && Math.floor(this.ifr) === Math.ceil(frames / 2))
+				|| (!this.open && Math.floor(this.ifr) === 0)) {
 				this.spd = 0;
 			} else {
 				return;
@@ -710,9 +713,9 @@ class oLyrDoor extends oIaBgObject {
 		}
 
 		// coming in from another room, wait until we are clear before entering again
-		if (truthy(this.inTrigger)) {
+		if (this.inTrigger) {
 			this.inTrigger = this.instancePlace(this.x, this.y, oChar) !== null;
-		} else if (truthy(this.open)) {
+		} else if (this.open) {
 			const entering = this.instancePlace(this.x, this.y, oChar);
 			if (entering !== null && this.enter_lyrs !== "") {
 				game.saveLayersState();
@@ -726,13 +729,13 @@ class oLyrDoor extends oIaBgObject {
 			this.inTrigger = entering !== null;
 		}
 
-		if (this.open_sensor && !truthy(this.locked)) {
+		if (this.open_sensor && !this.locked) {
 			this.sense_on = this.open_sensor.instancePlace(this.open_sensor.x, this.open_sensor.y, oActor);
-			if (!truthy(this.manual_override)) {
-				if (this.sense_on !== null && !truthy(this.open)) this.set_open(1, 1);
-				else if (this.sense_on === null && truthy(this.open)) this.set_open(0, 1);
+			if (!this.manual_override) {
+				if (this.sense_on !== null && !this.open) this.set_open(1, 1);
+				else if (this.sense_on === null && this.open) this.set_open(0, 1);
 			}
-			this.manual_override = truthy(this.manual_override) && this.sense_on !== null;
+			this.manual_override = this.manual_override && this.sense_on !== null;
 		}
 	}
 
@@ -758,7 +761,7 @@ class oDoor extends oIaBgObject {
 	}
 
 	update() {
-		if (truthy(this.inview) && Math.floor(this.ifr) === 1 && game.guy.con.iUpP && this.conRoom !== undefined) {
+		if (this.inview && Math.floor(this.ifr) === 1 && game.guy.con.iUpP && this.conRoom !== undefined) {
 			game.gotoRoom(this.conRoom, this, this.roomEntInst, 1, 1);
 		}
 	}
@@ -798,7 +801,7 @@ class oIaBgObjScript extends oIaBgObject {
 	}
 
 	acton(action, who, pars) {
-		if (Array.isArray(this.actonScript) && (!truthy(this.onlyOnce) || this.has_ran === 0)) {
+		if (Array.isArray(this.actonScript) && (!this.onlyOnce || this.has_ran === 0)) {
 			this.has_ran++;
 			Hooks.runScript(this.actonScript, who, undefined, undefined, undefined, this);
 		}
@@ -846,14 +849,14 @@ class oSign extends oIaBgObject {
 
 		this.step = 0;
 
-		if (truthy(this.lookScript)) {
+		if (this.lookScript) {
 			Hooks.runScript(this.lookScript, this, this.skippable, this.skipScript, undefined, this);
 		}
 	}
 
 	// once out of view, the message jumps to its fade
 	update() {
-		if (!truthy(this.inview) && this.popupMsg !== null && !this.popupMsg.destroyed) {
+		if (!this.inview && this.popupMsg !== null && !this.popupMsg.destroyed) {
 			this.popupMsg.step = this.popupMsg.fadestart;
 			this.popupMsg.fadetime = this.outOfViewFade;
 			this.popupMsg = null;
@@ -938,7 +941,7 @@ class oText extends oBaseObject {
 	// Kept from the original: the width for centring is measured before this sign's font is set,
 	// so it uses whichever font was drawn last.
 	draw() {
-		if (truthy(this.blinkr)) {
+		if (this.blinkr) {
 			this.step = (this.step + 1) % (this.blinkr * 2);
 			if (this.step > this.blinkr) return;
 		}
@@ -949,7 +952,7 @@ class oText extends oBaseObject {
 		const yo = this.yoffset;
 
 		Draw.setFont(this.font);
-		if (truthy(this.shadow)) {
+		if (this.shadow) {
 			Draw.color = "#000000";
 			Draw.alpha = this.alpha * this.alphash;
 			Draw.textTransformed(this.x - this.exoffx + xo + 1, this.y - this.exoffy + yo + 1, this.text,
@@ -1153,16 +1156,16 @@ class oPuMsg extends oBaseObject {
 
 		Draw.setFont(this.font);
 		const fht = Draw.stringHeight("M") * this.lineShare;
-		Draw.halign = truthy(this.tx_center) ? "center" : "left";
+		Draw.halign = this.tx_center ? "center" : "left";
 		const twd = Draw.stringWidthExt(this.text, fht, this.max_width);
 		let tht = Draw.stringHeightExt(this.text, fht, this.max_width);
 
-		let tx = truthy(this.center) ? this.x - Math.floor(twd / 2) : this.x + 1;
+		let tx = this.center ? this.x - Math.floor(twd / 2) : this.x + 1;
 		const ty = this.y - tht - (this.choosing ? Draw.stringHeightExt(this.choice_list[0][0], fht, this.max_width) - 2 : 0);
-		const txwo = tx + (truthy(this.tx_center) ? Math.floor(twd / 2) : 0);
+		const txwo = tx + (this.tx_center ? Math.floor(twd / 2) : 0);
 		const buttonFrame = Math.floor(game.frames / this.buttonFrameUpdates) % 3;
 
-		if (truthy(this.drawbg)) {
+		if (this.drawbg) {
 			Draw.alpha = this.alphac * this.alphabg;
 			Draw.color = this.bgcolor;
 			Draw.bgSquare(tx - 3, ty + 2, twd + 5, tht - 2, this.bgSprite);

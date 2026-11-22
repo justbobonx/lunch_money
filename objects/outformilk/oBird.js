@@ -25,12 +25,12 @@ class oBird extends oGround {
 		let riding = false;
 		let rider = this.instancePlace(this.x, this.y - 1, game.guy);
 
-		if (rider !== null && truthy(rider.onFloor)) {
+		if (rider !== null && rider.onFloor) {
 			riding = true;
 		} else {
 			rider = this.instancePlace(this.x - 1, this.y, game.guy);
 			if (rider === null) rider = this.instancePlace(this.x + 1, this.y, game.guy);
-			if (rider !== null && truthy(rider.hanging)) riding = true;
+			if (rider !== null && rider.hanging) riding = true;
 		}
 
 		this.xspd = sign(this.xspd) * (riding ? this.ridingSpeed : this.idleSpeed);

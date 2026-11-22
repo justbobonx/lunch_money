@@ -151,7 +151,7 @@ class Inventory {
 	add(obj, pos, andswitch) {
 		this.inv_list.push(obj);
 		obj._inv_pos = pos !== undefined ? pos : this.inv_list.length - 1;
-		if (truthy(andswitch)) this.switch_held(this.inv_list.length - 1);
+		if (andswitch) this.switch_held(this.inv_list.length - 1);
 		return obj._inv_pos;
 	}
 
@@ -174,8 +174,8 @@ class Inventory {
 	// mask, keeping its own mask for when it is dropped. One that stows takes it out of every layer,
 	// so it is off, and leaves it otherwise as it is.
 	pickup(obj, inv_pos, noSwitch) {
-		if (!truthy(obj.pickupable)) return undefined;
-		if (truthy(this.owner.crawling) && this.owner.sliding > 0) return undefined;
+		if (!obj.pickupable) return undefined;
+		if (this.owner.crawling && this.owner.sliding > 0) return undefined;
 
 		obj.carriedBy = this.owner;
 		// out of its old place first, so the owner's place is counted without it
@@ -191,7 +191,7 @@ class Inventory {
 		obj.mask = "sNoMask";
 		obj.visible = false;
 
-		return this.add(obj, inv_pos, !truthy(noSwitch));
+		return this.add(obj, inv_pos, !noSwitch);
 	}
 
 	put_away_held() {
@@ -223,7 +223,7 @@ class Inventory {
 
 		this.release(obj);
 		obj.xspd = this.owner.xspd + sign(this.owner.xspd) * INV_DROP_PUSH;
-		obj.yspd = truthy(this.owner.ch_side) ? this.owner.yspd - INV_DROP_LIFT
+		obj.yspd = this.owner.ch_side ? this.owner.yspd - INV_DROP_LIFT
 			: this.owner.yspd + sign(this.owner.yspd) * INV_DROP_PUSH;
 		return obj;
 	}
@@ -233,7 +233,7 @@ class Inventory {
 	// crate, holds the hand until it is dropped, so nothing switches while it is carried; an item
 	// given then goes in the bag without coming out.
 	switch_held(newi) {
-		if (this.owner.carrying && !truthy(this.owner.carrying.holdable)) return;
+		if (this.owner.carrying && !this.owner.carrying.holdable) return;
 		if (this.owner.carrying) {
 			this.put_away_held();
 			this.owner.carrying = null;
@@ -298,7 +298,7 @@ class Inventory {
 		if (con.iBtnRd) {
 			this.bdown_time++;
 			if (this.bdown_time > QP_HOLD_UPDATES && !this.in_inv_sel
-				&& (!this.owner.carrying || truthy(this.owner.carrying.holdable))) {
+				&& (!this.owner.carrying || this.owner.carrying.holdable)) {
 				if (this.cur_held_i < 0) this.switch_back();
 				this.in_inv_sel = 1;
 			}
@@ -308,7 +308,7 @@ class Inventory {
 			this.bdown_time = 0;
 			if (this.in_inv_sel) {
 				this.in_inv_sel = 0;
-			} else if (!this.owner.carrying || truthy(this.owner.carrying.holdable)) {
+			} else if (!this.owner.carrying || this.owner.carrying.holdable) {
 				Screens.open(new InventoryScreen([this], "iBtnRr"));
 			}
 		}
@@ -547,7 +547,7 @@ class oGround extends oObject {
 // both ways at unit size, even when only one way was asked for, and leaves out the draw offset.
 class oSolidGr extends oGround {
 	draw() {
-		if (!truthy(this.tiled)) {
+		if (!this.tiled) {
 			Draw.lpSprite(this);
 			return;
 		}
@@ -646,7 +646,7 @@ class oFlFxRampH extends oFloorEffect {
 		this.up_dir = 1;
 	}
 	effect_obj(obj, acc, maxspd) {
-		if (!truthy(obj.onFloor)) return;
+		if (!obj.onFloor) return;
 		obj.yspd = clamp(obj.yspd - obj.xspd * FLOOR_RAMP_SHARE * acc * this.up_dir, -maxspd, maxspd);
 		obj.xspd *= FLOOR_RAMP_TRIM;
 		obj.yspd *= FLOOR_RAMP_TRIM;
@@ -668,7 +668,7 @@ class oFlFxHitter extends oFloorEffect {
 		this.hforce = 2;
 	}
 	effect_obj(obj, acc, maxspd) {
-		if (!truthy(obj.onFloor) || typeof obj.takeHit !== "function") return;
+		if (!obj.onFloor || typeof obj.takeHit !== "function") return;
 		obj.takeHit(this.sprite_cx(), this.sprite_cy(), this.hforce);
 	}
 }
@@ -680,7 +680,7 @@ class oFlFxJumper extends oFloorEffect {
 		this.boost = 3;
 	}
 	effect_obj(obj, acc, maxspd) {
-		if (!truthy(obj.onFloor)) return;
+		if (!obj.onFloor) return;
 		obj.zspd += this.boost;
 	}
 }
@@ -719,24 +719,24 @@ class oTrigger extends oBaseObject {
 	update() {
 		let tr = this.instancePlace(this.x, this.y, this.triggerer);
 		// wholly inside means every edge of its box within ours
-		if (tr !== null && truthy(this.only_inside) && !(tr.bbox_left >= this.bbox_left && tr.bbox_right <= this.bbox_right
+		if (tr !== null && this.only_inside && !(tr.bbox_left >= this.bbox_left && tr.bbox_right <= this.bbox_right
 			&& tr.bbox_top >= this.bbox_top && tr.bbox_bottom <= this.bbox_bottom)) tr = null;
 		if (tr !== null && this.check_height !== undefined && tr.z > this.ht) tr = null;
 
-		if (!truthy(this.inTrigger) && tr !== null && (!truthy(this.trigOnce) || this.trigtimes < 1)) {
+		if (!this.inTrigger && tr !== null && (!this.trigOnce || this.trigtimes < 1)) {
 			// Guess: the named thing in a requirement is looked up by name.
 			let trigGo = true;
 			if (Array.isArray(this.trigReqs)) {
 				for (const req of this.trigReqs) {
 					if (req[0] === "checkExists") {
 						const who = game.lookupInst(req[1], this);
-						if ((!!who && !who.destroyed) !== truthy(req[2])) {
+						if ((!!who && !who.destroyed) !== !!req[2]) {
 							trigGo = false;
 							break;
 						}
 					} else if (req[0] === "checkInstValEqu") {
 						const who = game.lookupInst(req[1], this);
-						if (!who || !eq(who[req[2]], req[3])) {
+						if (!who || who[req[2]] !== req[3]) {
 							trigGo = false;
 							break;
 						}
@@ -751,13 +751,13 @@ class oTrigger extends oBaseObject {
 			}
 		}
 
-		if (truthy(this.inTrigger) && !truthy(this.triggered) && this.step++ === this.triggerWaitToStart) {
+		if (this.inTrigger && !this.triggered && this.step++ === this.triggerWaitToStart) {
 			this.on_trigger();
 			this.triggered = true;
 			this.trigtimes++;
 		}
 
-		if (truthy(this.inTrigger) && tr === null) {
+		if (this.inTrigger && tr === null) {
 			this.off_trigger();
 			this.inTrigger = false;
 			this.whotriggered = tr;
@@ -933,11 +933,11 @@ class oActor extends oBaseObject {
 			Draw.alpha = 1;
 		}
 		const xscale = this.facing === 0 ? 1 : this.facing;
-		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
+		const xoadj = (this.xodd && xscale < 0) ? 1 : 0;
 		Draw.spriteExt(this.spi, this.ifr, this.x + xoadj, this.y, xscale, this.y_sc,
 			this.ang, this.col, this.alpha);
 		if (game.drawStats) {
-			Draw.color = truthy(this.facing) ? "#ff0000" : "#ff00ff";
+			Draw.color = this.facing > 0 ? "#ff0000" : "#ff00ff";
 			Draw.rectangle(this.x, this.y + this.z, this.x, this.y + this.z, 0);
 		}
 	}
@@ -956,12 +956,12 @@ class oActor extends oBaseObject {
 		this.diving = 0;
 		this.rolling = 0;
 
-		if (truthy(this.ch_side)) {
+		if (this.ch_side) {
 			this.xspd = sign(this.x - hitbyx) * hitbyf * 0.8;
 			this.yspd = -0.5 * hitbyf;
 			this.facing = sign(this.xspd);
 		} else {
-			if (truthy(bounce)) {
+			if (bounce) {
 				this.xspd = -this.xspd * hitbyf * 0.5;
 				this.yspd = -this.yspd * hitbyf * 0.5;
 			} else {
@@ -1043,14 +1043,14 @@ class oChar extends oActor {
 	// killing and passes through it, as in the original; with nobody named, scripts among them,
 	// that is the player. The spray goes in the player's layer and is given back.
 	kill(amount, time, xminmax, yminmax, leavevis, soundfx, killer) {
-		if (truthy(this.dead)) return null;
+		if (this.dead) return null;
 		this.dead = true;
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
 		if (amount === undefined) amount = 0;
 		if (time === undefined) time = 1;
 		let deathSpray = null;
-		if (truthy(this.visible)) {
+		if (this.visible) {
 			deathSpray = game.createObject(oFxParticlerOneShot, {
 				x: this.x, y: this.y,
 				amount: amount / time,
@@ -1070,13 +1070,13 @@ class oChar extends oActor {
 	// The same death with the spray as two pushes in direction ranges, its drops dying on landing
 	// or within a second or so, used by pits.
 	killTwoBursts(amount, time, dirminmax, dirspdminmax, dir2minmax, dir2spdminmax, leavevis, soundfx, killer) {
-		if (truthy(this.dead)) return;
+		if (this.dead) return;
 		this.dead = true;
 		this.yspd = Math.max(this.yspd / 2, 0);
 		this.xspd = this.xspd / 2;
 		if (amount === undefined) amount = 0;
 		if (time === undefined) time = 1;
-		if (truthy(this.visible)) {
+		if (this.visible) {
 			game.createObject(oFxParticlerOneShot, {
 				x: this.x, y: this.y,
 				amount: amount / time,
@@ -1109,7 +1109,7 @@ class oChar extends oActor {
 				this.lockface = 1;
 				const omi = this.carrying.mask;
 				this.carrying.mask = this.carrying.dmi;
-				if (truthy(this.ch_side)) {
+				if (this.ch_side) {
 					this.drop_offx = (this.carrying.x - this.x) * this.facing;
 					this.drop_offy = this.carrying.y - this.y;
 				} else {
@@ -1121,7 +1121,7 @@ class oChar extends oActor {
 			// release drops it, or gives it to whoever is in reach and wants it
 			if (this.con.iBtnYr) {
 				if (this.lookObjs.length > 0) {
-					if (truthy(this.lookObjs[0].acton("give", this, { item: this.carrying }))) {
+					if (this.lookObjs[0].acton("give", this, { item: this.carrying })) {
 						this.carrying = null;
 						this.cur_held_i = -1;
 					}
@@ -1138,7 +1138,7 @@ class oChar extends oActor {
 			}
 			// put it away, or let go of something that cannot go in the bag
 			if (this.con.iBtnB) {
-				if (truthy(this.carrying.holdable)) this.inv.switch_held(-1);
+				if (this.carrying.holdable) this.inv.switch_held(-1);
 				else this.inv.drop_held();
 			}
 			// an item can ask to be let go after its use; the original only cut it loose, leaving it
@@ -1155,7 +1155,7 @@ class oChar extends oActor {
 		} else if (this.lookObjs.length > 0) {
 			// only the one thing in view is acted on, the one drawn with the outline, and not when
 			// someone else is holding it
-			const lobj = this.lookObjs.find((o) => truthy(o.inview));
+			const lobj = this.lookObjs.find((o) => o.inview);
 			if (lobj && !lobj.carriedBy) {
 				if (this.con.iBtnX) {
 					lobj.acton("look", this);
@@ -1173,8 +1173,8 @@ class oChar extends oActor {
 		}
 
 		// open hand fighting, kept apart so the look list still gets used
-		if (truthy(this.canFight) && !truthy(this.punching) && !this.carrying && this.con.iBtnX) {
-			if (truthy(this.jumped)) {
+		if (this.canFight && !this.punching && !this.carrying && this.con.iBtnX) {
+			if (this.jumped) {
 				this.punching = 10;
 				// a kick pushes forward and loses some rise
 				let sadj = 0;
@@ -1183,7 +1183,7 @@ class oChar extends oActor {
 					this.yspd += sadj;
 				}
 				this.xspd = this.facing * Math.max(Math.abs(this.xspd) + sadj, 0.9);
-			} else if (truthy(this.crawling) || truthy(this.sliding)) {
+			} else if (this.crawling || this.sliding) {
 				this.punching = 10;
 				this.xspd = 0.9 * this.facing;
 			} else {

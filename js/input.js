@@ -10,6 +10,9 @@ const STICK_DEAD_ZONE = 0.3;
 // how far a stick must lean to count as a direction press
 const STICK_PRESS_THRESHOLD = 0.5;
 
+// the angle math leaves a tiny leftover on an axis the stick does not lean on; below this it is made exactly zero
+const STICK_ZERO_SNAP = 0.000000001;
+
 // standard gamepad layout positions
 const PAD_FACE1 = 0;
 const PAD_FACE2 = 1;
@@ -210,7 +213,7 @@ class Controller {
 
 	// The whole controller update, same order as the original.
 	poll() {
-		const off = truthy(this.conOff);
+		const off = this.conOff;
 		this.gpced = !off && Input.pad !== null;
 
 		// left stick and arrow keys
@@ -299,6 +302,9 @@ class Controller {
 			this.ljVp = 0;
 		}
 
+		if (Math.abs(this.ljHp) < STICK_ZERO_SNAP) this.ljHp = 0;
+		if (Math.abs(this.ljVp) < STICK_ZERO_SNAP) this.ljVp = 0;
+
 		if (this.rdirks_used) {
 			this.rjAngd = pointDirection(0, 0, this.irRight - this.irLeft, this.irDown - this.irUp);
 			this.rjAng = this.rjAngd / 180 * Math.PI;
@@ -313,6 +319,9 @@ class Controller {
 			this.rjHp = 0;
 			this.rjVp = 0;
 		}
+
+		if (Math.abs(this.rjHp) < STICK_ZERO_SNAP) this.rjHp = 0;
+		if (Math.abs(this.rjVp) < STICK_ZERO_SNAP) this.rjVp = 0;
 
 		this.shiftd = Input.key("ShiftLeft") || Input.key("ShiftRight") || (this.gpced && Input.button(PAD_TRIGGER_L));
 	}

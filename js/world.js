@@ -390,7 +390,7 @@ class World {
 
 		this.findAndGotoAreaAtGuy();
 
-		if (truthy(guy.ch_topd)) {
+		if (guy.ch_topd) {
 			guy.calcOnFloorAtWallTopd();
 			if (guy.onFloorObj !== null && guy.onFloorObj.ht < BIGGEST_INT) guy.z = guy.onFloorObj.ht;
 		}
@@ -423,7 +423,7 @@ class World {
 		let layer = null;
 		for (const lyr of rm.layers) {
 			if (lyr.name.charAt(0) === "_") continue;
-			if (layer === null || !truthy(lyr.disabled)) layer = lyr;
+			if (layer === null || !lyr.disabled) layer = lyr;
 		}
 		if (layer === null) layer = rm.layers[rm.layers.length - 1];
 		this.layerInsert(layer, guy);
@@ -654,7 +654,7 @@ class World {
 	// the room and layer. Each object is on only when the room, the layer and the object are.
 	// Triggers keep their state, so one never fires again until the guy leaves and comes back in.
 	layerSetEnabled(lyr, enabled) {
-		if (enabled !== undefined) lyr.disabled = truthy(enabled) ? 0 : 1;
+		if (enabled !== undefined) lyr.disabled = enabled ? 0 : 1;
 		for (const spr of lyr.lsprites) {
 			if (!(spr instanceof oBaseObject)) continue;
 			this.updateActive(spr);
@@ -681,7 +681,7 @@ class World {
 	// particle bursts, in every room and the shared layers alike, so none waits frozen for the
 	// player's return or carries on over the next room.
 	roomSetEnabled(rm, enabled) {
-		rm.disabled = truthy(enabled) ? 0 : 1;
+		rm.disabled = enabled ? 0 : 1;
 		for (const o of this.instances.slice()) {
 			if (o instanceof oFxOneShot || o instanceof oFxParticlerOneShot) o.destroy();
 		}
@@ -690,8 +690,8 @@ class World {
 
 	// One object on or off. Off also takes it out of its layer's order, on puts it back on top.
 	setObjEnabled(obj, enabled) {
-		const disabled = !truthy(enabled);
-		if (truthy(obj.disabled) !== disabled && obj.mylayer) {
+		const disabled = !enabled;
+		if (!!obj.disabled !== disabled && obj.mylayer) {
 			if (disabled) this.layerRemove(obj.mylayer, obj);
 			else obj.mylayer.lsprites.push(obj);
 		}
@@ -704,7 +704,7 @@ class World {
 	updateActive(obj) {
 		if (!(obj instanceof oBaseObject)) return;
 		const lyr = obj.mylayer;
-		obj.active = !!lyr && !truthy(this.curroom.disabled) && !truthy(lyr.disabled) && !truthy(obj.disabled);
+		obj.active = !!lyr && !this.curroom.disabled && !lyr.disabled && !obj.disabled;
 	}
 
 	groupSetEnabled(grp, enabled) {
@@ -732,7 +732,7 @@ class World {
 			const lyr = layers[li];
 			const c = copy[li];
 			lyr.visible = c.visible;
-			if (truthy(lyr.disabled) !== truthy(c.disabled)) this.layerSetEnabled(lyr, !truthy(c.disabled));
+			if (!!lyr.disabled !== !!c.disabled) this.layerSetEnabled(lyr, !c.disabled);
 		}
 	}
 
@@ -761,7 +761,7 @@ class World {
 		if (group.type === LGT_CONNECTED || group.type === LGT_EDGE) {
 			this.layerViz(group.name + ".*", enabled);
 		}
-		if (truthy(enabled)) {
+		if (enabled) {
 			this.cur_areas_inview.push(group);
 		} else {
 			const i = this.cur_areas_inview.indexOf(group);
@@ -984,7 +984,7 @@ class World {
 		}
 
 		for (const lyr of layers) {
-			if (truthy(lyr._idisabled)) this.layerSetEnabled(lyr, 0);
+			if (lyr._idisabled) this.layerSetEnabled(lyr, 0);
 		}
 
 		// Masks join the layers they name. A starred name would fail in the original and is skipped here.
@@ -1007,8 +1007,8 @@ class World {
 					// Guess: a layer naming an area the room lacks is kept with the layers in no area.
 					if (lgroup === undefined) {
 						sorted.push(lyr);
-					} else if (!truthy(lgroup.foundz)) {
-						if (truthy(lyr.zsort)) {
+					} else if (!lgroup.foundz) {
+						if (lyr.zsort) {
 							sorted.splice(sti[1], 0, lyr);
 							sti[1]++;
 							sti[2]++;
@@ -1102,7 +1102,7 @@ class World {
 	takeCarryOver() {
 		for (const lyr of this.curroom.layers) {
 			for (const obj of lyr.lsprites.slice()) {
-				if (!(obj instanceof oBaseObject) || !truthy(obj.persistent) || obj === this.guy) continue;
+				if (!(obj instanceof oBaseObject) || !obj.persistent || obj === this.guy) continue;
 				this.layerRemove(lyr, obj);
 				obj.mylayer = null;
 				obj.carryx = obj.x - this.guy.x;
@@ -1143,7 +1143,7 @@ class World {
 		}
 		let eox = 0;
 		let eoy = 0;
-		if (truthy(offsettoento)) {
+		if (offsettoento) {
 			eox = guy.x - leaveat.x;
 			eoy = guy.y - leaveat.y;
 		}
@@ -1169,7 +1169,7 @@ class World {
 			}
 			guy.x = enterato.x;
 			guy.y = enterato.y;
-			if (truthy(offsettoento)) {
+			if (offsettoento) {
 				guy.x += eox;
 				guy.y += eoy;
 			}

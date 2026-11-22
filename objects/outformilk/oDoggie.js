@@ -1,5 +1,5 @@
 // A dog that follows an actor close by and fetches the ball they throw; using it toggles following.
-// Kept from the original: giving up still remembers the ball, and it follows any actor, rats included.
+// Kept from the original: it follows any actor, rats included.
 // The inventory is a stand in, so it never really carries the ball yet.
 class oDoggie extends oActor {
 	constructor() {
@@ -56,8 +56,7 @@ class oDoggie extends oActor {
 
 	stop() {
 		this.followObj = null;
-		// the original named a different variable here, so the one it fetches stays set
-		this.fetchObj = null;
+		this.fetchObject = null;
 		this.fetching = 0;
 		this.returning = 0;
 		this.xspd = 0;
@@ -108,7 +107,7 @@ class oDoggie extends oActor {
 			}
 
 			// start the fetch once it is thrown
-			if (this.fetchObject !== null && !truthy(this.fetching) && this.fetchObject.carriedBy === null) {
+			if (this.fetchObject !== null && !this.fetching && this.fetchObject.carriedBy === null) {
 				this.lastFollowObj = this.followObj;
 				this.followObj = this.fetchObject;
 				this.fetching = 1;
@@ -126,20 +125,20 @@ class oDoggie extends oActor {
 
 			this.locObj(this.followObj);
 
-			if (truthy(this.returning) && this.locod < this.returnedDistance) {
+			if (this.returning && this.locod < this.returnedDistance) {
 				this.returning = 0;
 			}
 
 			let maxsp;
 
 			// too far, stop, but further when fetching or returning
-			if ((this.locod > this.giveUpDistance && !truthy(this.returning) && !truthy(this.fetching))
+			if ((this.locod > this.giveUpDistance && !this.returning && !this.fetching)
 				|| this.locod > this.fetchGiveUpDistance) {
 				this.stop();
 				maxsp = 0;
-			} else if (this.locod > this.catchUpDistance || truthy(this.fetching) || truthy(this.returning)) {
+			} else if (this.locod > this.catchUpDistance || this.fetching || this.returning) {
 				// linearly faster the farther behind
-				const spdboost = 1 + this.boostPerLevel * (truthy(this.fetching)
+				const spdboost = 1 + this.boostPerLevel * (this.fetching
 					? Math.max(this.locod / this.fetchBoostSpan, 1)
 					: ((this.locod - this.catchUpDistance) / this.boostSpan));
 				maxsp = Math.max(Math.abs(this.followObj.xspd) * spdboost, this.minCatchUpSpeed);
@@ -151,18 +150,18 @@ class oDoggie extends oActor {
 			maxsp = clamp(maxsp, this.followMinSpeed, this.followMaxSpeed);
 
 			// stop when close enough unless fetching
-			if (this.locod < this.stopDistance && !truthy(this.fetching)) {
+			if (this.locod < this.stopDistance && !this.fetching) {
 				this.xspd = 0;
 			} else {
 				this.xspd = clamp(this.xspd + sign(this.locodx) * this.acceleration, -maxsp, maxsp);
 			}
 
 			// wants to jump for a ball above it, or at a wall when falling behind
-			const wannajump = (truthy(this.fetching) && Math.abs(this.locodx) < this.jumpReachX
+			const wannajump = (this.fetching && Math.abs(this.locodx) < this.jumpReachX
 					&& this.locody < this.jumpBandNear && this.locody > this.jumpBandFar)
-				|| (truthy(this.atWall) && this.locod >= this.loco_lastd);
+				|| (this.atWall && this.locod >= this.loco_lastd);
 
-			if (wannajump && (truthy(this.onFloor) || truthy(this.swimming))) {
+			if (wannajump && (this.onFloor || this.swimming)) {
 				this.yspd = -(this.jumpSpeed + Math.min(Math.abs(this.xspd), 1) * this.jumpSpeedBonus);
 			}
 		}
@@ -187,9 +186,9 @@ class oDoggie extends oActor {
 	afterUpdate() {
 		let si = "sDoggie_";
 
-		if (truthy(this.swimming)) {
+		if (this.swimming) {
 			si += "run";
-		} else if (!truthy(this.onFloor)) {
+		} else if (!this.onFloor) {
 			si += "jump";
 		} else if (Math.abs(this.xspd) > 0) {
 			si += "run";
@@ -197,7 +196,7 @@ class oDoggie extends oActor {
 			si += "stand";
 		}
 
-		if (!truthy(this.dead) && this.carrying) {
+		if (!this.dead && this.carrying) {
 			this.carrying.x = this.x + Math.ceil(this.facing * (this.xspd !== 0 ? this.carryOffsetMoving : this.carryOffsetStill));
 			this.carrying.y = this.y - (this.xspd === 0 || Math.floor(this.ifr) === 0 ? this.carryHighY : this.carryLowY);
 			this.carrying.x_sc = this.facing;
@@ -210,7 +209,7 @@ class oDoggie extends oActor {
 	// the held item is hidden from the normal draw, so the dog draws it in its mouth, in front of itself
 	draw() {
 		super.draw();
-		if (!truthy(this.dead) && this.carrying) this.carrying.draw();
+		if (!this.dead && this.carrying) this.carrying.draw();
 	}
 }
 oDoggie.defaultSprite = "sDoggie_stand";

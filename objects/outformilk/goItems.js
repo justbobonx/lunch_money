@@ -137,7 +137,7 @@ function shotHit(shot, notWho) {
 	const actor = actors.find((a) => a !== notWho);
 	if (actor) return actor;
 	const solid = shot.instancePlace(shot.x, shot.y, oObject);
-	return solid && !(truthy(shot.thruground) && solid instanceof oGround) ? solid : null;
+	return solid && !(shot.thruground && solid instanceof oGround) ? solid : null;
 }
 
 // A quick lunge and slash. The jump button becomes a hop back, and holding it keeps the facing
@@ -170,7 +170,7 @@ class oSword extends oIaBgObject {
 			if (con.iBtnX || con.iBtnA) who.lockface = 1;
 			if (!con.iBtnA) return;
 			// a pretend jump that skips the real one
-			if (!truthy(who.crawling) && !truthy(who.jumped)) {
+			if (!who.crawling && !who.jumped) {
 				who.jumping = this.hopJumping;
 				who.jumped = 1;
 				who.xspd -= who.facing * this.hopBack;
@@ -184,7 +184,7 @@ class oSword extends oIaBgObject {
 
 	use(who) {
 		if (this.cooling > 0) return;
-		if (!truthy(who.crawling)) who.xspd = who.facing * this.lunge;
+		if (!who.crawling) who.xspd = who.facing * this.lunge;
 		Draw.setSprite(this, this.slashSprite);
 		this.mask = this.slashSprite;
 		this.nolook = true;
@@ -436,7 +436,7 @@ class oTnt extends oIaBgObject {
 		this.applyFrictionGravity();
 		if (!this.carriedBy) this.moveThroughObjectsSimple(this.xspd, this.yspd);
 
-		if (truthy(this.lit) && --this.fusetime === 0) {
+		if (this.lit && --this.fusetime === 0) {
 			this.blow();
 			return;
 		}
@@ -481,15 +481,14 @@ class oBall extends oIaBgObject {
 	update() {
 		this.calcOnFloorAtWall();
 
-		if (truthy(this.hitWall) || truthy(this.atWall)) {
+		if (this.hitWall || this.atWall) {
 			this.xspd = -sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.wallBounceLoss, 0);
 		}
-		if (truthy(this.hitFloor)) {
-			// the original wrapped this test in an absolute value, so it only ever tests the speed
-			this.yspd = this.yspd < this.restSpeed ? 0 : -sign(this.yspd) * Math.max(Math.abs(this.yspd) * this.bounceKeep, 0);
+		if (this.hitFloor) {
+			this.yspd = Math.abs(this.yspd) < this.restSpeed ? 0 : -sign(this.yspd) * Math.max(Math.abs(this.yspd) * this.bounceKeep, 0);
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) * this.landSideKeep, 0);
 		}
-		if (truthy(this.onFloor)) {
+		if (this.onFloor) {
 			this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) * this.floorSideKeep, 0);
 		} else {
 			this.yspd += this.fallGravity;
@@ -582,7 +581,7 @@ class oArrow extends oBgObject {
 		this.applyFrictionGravity();
 		this.moveThroughObjectsSimple(this.xspd, this.yspd);
 
-		if (truthy(this.hitWall) || truthy(this.hitFloor)) {
+		if (this.hitWall || this.hitFloor) {
 			this.xspd = 0;
 			this.yspd = 0;
 			const into = this.hitWallObj !== null ? this.hitWallObj : this.hitFloorObj;
@@ -763,9 +762,9 @@ class oChest extends oIaBgObject {
 	}
 
 	acton(action, who) {
-		if (truthy(this.open)) {
-			if (action !== "open" && !truthy(this.no_close)) this.close();
-		} else if (truthy(this.locked)) {
+		if (this.open) {
+			if (action !== "open" && !this.no_close) this.close();
+		} else if (this.locked) {
 			this.ifr = this.rattleFrame;
 			this.rattle = this.rattleTime;
 		} else {
@@ -781,7 +780,7 @@ class oChest extends oIaBgObject {
 	update() {
 		// the rattle frame stays until its time runs out
 		if (Math.floor(this.ifr) === this.rattleFrame && --this.rattle > 0) return;
-		this.ifr = truthy(this.open) ? this.openFrame : this.closedFrame;
+		this.ifr = this.open ? this.openFrame : this.closedFrame;
 		// someone took what was showing
 		if (this.open_inv !== null && this.open_inv.carriedBy) this.open_inv = null;
 		super.update();

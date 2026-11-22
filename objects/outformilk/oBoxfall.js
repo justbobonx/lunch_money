@@ -32,11 +32,11 @@ class oBoxFall extends oGround {
 			return;
 		}
 
-		if (truthy(this.landed)) return;
+		if (this.landed) return;
 
 		this.calcOnFloorAtWall();
 
-		if (truthy(this.onFloor)) {
+		if (this.onFloor) {
 			const ho = this.onFloorObj;
 			if (ho !== null && this.y < ho.y) {
 				if (this.x < ho.x && this.x < ho.bbox_left) {
@@ -51,7 +51,7 @@ class oBoxFall extends oGround {
 				this.calcOnFloorAtWall();
 			}
 		}
-		if (truthy(this.onFloor)) {
+		if (this.onFloor) {
 			Hooks.sound("sndThud");
 			this.landed = true;
 			game.cam.shakeit(this.shakeUpdates, this.shakeX, this.shakeY);

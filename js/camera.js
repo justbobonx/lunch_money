@@ -106,7 +106,7 @@ class oCamera extends oBaseObject {
 
 	// Eases to a new zoom over a number of frames, or at once with none.
 	switchZoom(newz, zoomtime) {
-		if (eq(newz, this.tarz)) return;
+		if (newz === this.tarz) return;
 		this.orz = this.curzoom;
 		this.tarz = newz;
 		this.orw = this.curw;
@@ -156,7 +156,7 @@ class oCamera extends oBaseObject {
 
 	// while zooming the smaller of the start and end zoom, else the current one
 	get_cur_minzoom() {
-		if (this.zoomtime > 0 || truthy(this.zoomoverride)) return Math.min(this.orz, this.tarz);
+		if (this.zoomtime > 0 || this.zoomoverride) return Math.min(this.orz, this.tarz);
 		return this.curzoom;
 	}
 
@@ -232,9 +232,9 @@ class oCamera extends oBaseObject {
 
 		// the original crashes with nobody to follow, here the camera just stays
 		if (this.follow) {
-			let folx = round(this.follow.x + this.foloffx + this.padx);
+			let folx = Math.round(this.follow.x + this.foloffx + this.padx);
 			// top down height lifts the spot
-			let foly = round(this.follow.y - this.follow.z + this.foloffy + this.pady);
+			let foly = Math.round(this.follow.y - this.follow.z + this.foloffy + this.pady);
 
 			if (this.pantime >= 0) {
 				this.pancurt++;
@@ -243,17 +243,17 @@ class oCamera extends oBaseObject {
 					ncy = foly;
 					this.pantime = -1;
 				} else {
-					ncx = round(this.easeOutCubic(this.pancurt, this.orx, folx, this.pantime));
-					ncy = round(this.easeOutCubic(this.pancurt, this.ory, foly, this.pantime));
+					ncx = Math.round(this.easeOutCubic(this.pancurt, this.orx, folx, this.pantime));
+					ncy = Math.round(this.easeOutCubic(this.pancurt, this.ory, foly, this.pantime));
 				}
 			} else {
-				if (!truthy(this.fastjump)) {
+				if (!this.fastjump) {
 					folx = clamp(this.x, folx - foledgew, folx + foledgew);
 					foly = clamp(this.y, foly - foledgeh, foly + foledgeh);
 				}
 				// the last test always holds, since the start spot is the camera's own,
 				// so following always lands on the windowed spot
-				if (this.zoomtime >= 0 || truthy(this.fastjump) || (Math.abs(ncx - this.x) < 2 && Math.abs(ncy - this.y) <= 2)) {
+				if (this.zoomtime >= 0 || this.fastjump || (Math.abs(ncx - this.x) < 2 && Math.abs(ncy - this.y) <= 2)) {
 					ncx = folx;
 					ncy = foly;
 				}
@@ -271,7 +271,7 @@ class oCamera extends oBaseObject {
 
 		// Kept from the original: a pan time of zero has already been turned to minus one above,
 		// so this limit never applies.
-		if (!truthy(this.fastjump) && this.pantime === 0) {
+		if (!this.fastjump && this.pantime === 0) {
 			this.limitSpeed(this.max_speed);
 		}
 		this.fastjump = 0;
@@ -350,7 +350,7 @@ class oCamOnMe extends oTrigScript {
 
 	on_trigger() {
 		game.cam.lockToStatic(this.x, this.y, CAM_ON_ME_PAN_TIME);
-		if (truthy(this.andzoom)) {
+		if (this.andzoom) {
 			let w = this.bbox_right - this.bbox_left + this.padding;
 			let h = this.bbox_bottom - this.bbox_top + this.padding;
 			// rounds the size to the view's shape

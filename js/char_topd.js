@@ -18,6 +18,9 @@ const TOPD_LADDER_JUMP_BOOST = 0.7;
 // above this move speed the run sprite is used instead of the walk
 const TOPD_RUN_SPRITE_SPEED = 1.4;
 
+// speeds set from an angle keep a tiny leftover on an axis we are not moving along; below this it is made exactly zero
+const TOPD_SPEED_ZERO_SNAP = 0.000000001;
+
 class oCharTopd extends oChar {
 	constructor() {
 		super();
@@ -151,7 +154,7 @@ class oCharTopd extends oChar {
 
 		this.y -= isup ? (this.z + sign(this.zspd)) : 0;
 
-		if (truthy(this.jumping)) {
+		if (this.jumping) {
 			// down and jump just drops
 			if (this.con.iDown) {
 				this.zspd = 0;
@@ -178,30 +181,30 @@ class oCharTopd extends oChar {
 
 		const dirSuffix = (this.facingy === -1 ? "_u" : "") + (this.facingy === 1 ? "_d" : "");
 
-		if (truthy(this.presenting)) {
+		if (this.presenting) {
 			si += "wow";
-		} else if (truthy(this.dead)) {
+		} else if (this.dead) {
 			si += "dead";
-		} else if (truthy(this.hit)) {
-			si += truthy(this.onFloor) ? "hit_d" : "hit";
-		} else if (truthy(this.riding)) {
+		} else if (this.hit) {
+			si += this.onFloor ? "hit_d" : "hit";
+		} else if (this.riding) {
 			si += this.ride_sprite;
 			si += this.facingy === -1 ? this.ride_spr_u : "";
 			si += this.facingy === 1 ? this.ride_spr_d : "";
-		} else if (truthy(this.swimming)) {
-			if (truthy(this.moving)) {
+		} else if (this.swimming) {
+			if (this.moving) {
 				// looks different from the side view swim
 				si += "swim_td" + dirSuffix;
 			} else {
 				si += "float_td";
 			}
-		} else if (truthy(this.diving)) {
+		} else if (this.diving) {
 			si += "dive" + dirSuffix;
-		} else if (truthy(this.climbing)) {
-			si += (ne(this.xspd, 0) || ne(this.zspd, 0)) ? "climb" : "climb_st";
-		} else if (!truthy(this.onFloor)) {
+		} else if (this.climbing) {
+			si += (this.xspd !== 0 || this.zspd !== 0) ? "climb" : "climb_st";
+		} else if (!this.onFloor) {
 			// jump on everything but a fall with no jump and no move
-			if (truthy(this.jumped) || truthy(this.moving)) {
+			if (this.jumped || this.moving) {
 				si += "jump" + dirSuffix;
 			} else {
 				// falls only have an up version
@@ -209,16 +212,16 @@ class oCharTopd extends oChar {
 			}
 		} else if (this.rolling > 0) {
 			si += "roll" + dirSuffix;
-		} else if (truthy(this.moving)) {
+		} else if (this.moving) {
 			si += this.curspdang > TOPD_RUN_SPRITE_SPEED ? "run" : "walk";
-			si += truthy(this.pushing) ? "_push" : "";
+			si += this.pushing ? "_push" : "";
 			si += dirSuffix;
 		} else {
 			si += "stand" + dirSuffix;
 		}
 
 		// carry the item along, drawn as its own object
-		if (this.carrying && !truthy(this.dead)) {
+		if (this.carrying && !this.dead) {
 			if (this.facing !== 0) {
 				this.carrying.x = this.x + (2 + this.carrying.holdoffx) * this.facing;
 				this.carrying.y = this.y - 2 + this.carrying.holdoffy;
@@ -231,7 +234,7 @@ class oCharTopd extends oChar {
 				this.carrying.y += this.carryofy_run[Math.floor(this.ifr)];
 			} else if (si === this.skin + "_crouch") {
 				this.carrying.y += -1;
-			} else if (truthy(this.jumped) || !truthy(this.onFloor)) {
+			} else if (this.jumped || !this.onFloor) {
 				this.carrying.y += this.carryofy_jump;
 			}
 
@@ -245,7 +248,7 @@ class oCharTopd extends oChar {
 			this.spd = 1;
 		}
 
-		this.y_sc = (truthy(this.dead) && truthy(this.swimming)) ? -1 : 1;
+		this.y_sc = (this.dead && this.swimming) ? -1 : 1;
 
 		const oldsp = this.drawSprite;
 		this.drawSprite = Sprites.exists(si) ? si : this.skin + "_stand_d";
@@ -270,18 +273,18 @@ class oCharTopd extends oChar {
 	}
 
 	update() {
-		if (truthy(this.paused)) return;
+		if (this.paused) return;
 
 		this.step++;
 
-		if (truthy(this.presenting)) {
+		if (this.presenting) {
 			if (this.con.iBtnAny) this.presenting = 0;
 			return;
 		}
 
 		// dead splatters for a while, nothing else runs
-		if (truthy(this.otherstate) || truthy(this.dead)) {
-			if (truthy(this.dead)) {
+		if (this.otherstate || this.dead) {
+			if (this.dead) {
 				if (this.deadTime > 0) {
 					this.deadTime--;
 					// the original never sets how much, so this never splatters there either
@@ -293,7 +296,7 @@ class oCharTopd extends oChar {
 
 		if (this.inv && this.inv.qp_handle_ui(this.con)) return;
 
-		if (truthy(this.riding)) {
+		if (this.riding) {
 			this.haf = this.z - (this.onFloorObj !== null ? this.onFloorObj.ht : 0);
 			return;
 		}
@@ -309,7 +312,7 @@ class oCharTopd extends oChar {
 
 		this.charActOnObjs();
 
-		if (truthy(this.aiming)) {
+		if (this.aiming) {
 			this.xspd = 0;
 			this.rx = 0;
 			this.yspd = 0;
@@ -318,7 +321,7 @@ class oCharTopd extends oChar {
 			return;
 		}
 
-		if (truthy(this.waitfornomove)) {
+		if (this.waitfornomove) {
 			if (!this.con.iBtnAnyDir) {
 				this.waitfornomove = 0;
 			} else {
@@ -326,23 +329,23 @@ class oCharTopd extends oChar {
 			}
 		}
 
-		if (!truthy(this.riding)) {
+		if (!this.riding) {
 			this.checkStartSwimming();
 		}
 
-		if (truthy(this.jumped) && (truthy(this.onFloor) || truthy(this.climbing) || truthy(this.hanging) || truthy(this.swimming))) {
+		if (this.jumped && (this.onFloor || this.climbing || this.hanging || this.swimming)) {
 			this.jumped = 0;
 		}
 
 		// letting go of up and down, or pressing up while falling to regrab, ends the just climbed state
-		if (truthy(this.wasclimbing) && ((!this.con.iUp && !this.con.iDown) || (this.con.iUp && this.zspd < 0))) {
+		if (this.wasclimbing && ((!this.con.iUp && !this.con.iDown) || (this.con.iUp && this.zspd < 0))) {
 			this.wasclimbing = false;
 		}
 
 		// the speed this frame aims for, also handed to floor effects
 		let curspd;
 
-		if (truthy(this.climbing)) {
+		if (this.climbing) {
 			// climbing moves sideways and in height
 			curspd = this.climbspd;
 			this.xspd = (this.con.iLeft ? -curspd : 0) + (this.con.iRight ? curspd : 0);
@@ -356,27 +359,27 @@ class oCharTopd extends oChar {
 
 			// no sideways off the edge or on a two way ladder
 			const clmbo = this.instancePlace(this.x + sign(this.xspd), this.y, oClimbableObj);
-			if (clmbo === null || truthy(clmbo.twoway)) {
+			if (clmbo === null || clmbo.twoway) {
 				this.xspd = 0;
 				this.rx = 0;
 			}
 
-			this.spd = truthy(this.climbing) ? this.zspd : 1;
+			this.spd = this.climbing ? this.zspd : 1;
 		} else {
 			// climb start: the ladder must be at our drawn height, then height replaces ladder distance
 			this.climbobj = this.instancePlace(this.x, this.y, oClimbableObj);
 
-			const ableClimb = !truthy(this.wasclimbing) && !this.carrying
+			const ableClimb = !this.wasclimbing && !this.carrying
 				&& (this.con.iUp || this.con.iDown)
-				&& !truthy(this.hit) && !truthy(this.diving) && this.sliding === 0 && this.rolling === 0;
-			if (!truthy(this.climbing) && ableClimb) {
+				&& !this.hit && !this.diving && this.sliding === 0 && this.rolling === 0;
+			if (!this.climbing && ableClimb) {
 				if (this.climbobj !== null) {
 					// not when jumping over the top of the ladder
 					if (!this.placeMeeting(this.x, this.y - this.z, this.climbobj)) {
 						this.climbobj = null;
 					} else {
 						this.climbing = true;
-						if (truthy(this.climbobj.twoway)) {
+						if (this.climbobj.twoway) {
 							this.x = this.climbobj.x;
 							this.rx = 0;
 							this.xspd = 0;
@@ -394,8 +397,8 @@ class oCharTopd extends oChar {
 			}
 
 			// dive: jump again in the air while moving, trading rise for a burst forward
-			if (!truthy(this.diving) && truthy(this.jumped) && !truthy(this.onFloor) && this.con.iBtnA && !truthy(this.spdis0)
-				&& (!this.carrying || truthy(this.carrying.can_diveroll))) {
+			if (!this.diving && this.jumped && !this.onFloor && this.con.iBtnA && !this.spdis0
+				&& (!this.carrying || this.carrying.can_diveroll)) {
 				const jdir = pointDirection(0, 0, this.xspd, this.yspd) / 180 * Math.PI;
 				const spdbst = this.divespdboost * this.runspd;
 				// capped a little higher so two in a row give a bit extra
@@ -406,9 +409,9 @@ class oCharTopd extends oChar {
 			}
 
 			// landing a dive starts a roll
-			const ableRoll = truthy(this.diving) && truthy(this.landed)
-				&& !truthy(this.wasclimbing) && (!this.carrying || truthy(this.carrying.can_diveroll));
-			if (truthy(this.canRoll) && ableRoll) {
+			const ableRoll = this.diving && this.landed
+				&& !this.wasclimbing && (!this.carrying || this.carrying.can_diveroll);
+			if (this.canRoll && ableRoll) {
 				this.rolling = this.rolltime;
 				this.diving = false;
 			}
@@ -417,12 +420,12 @@ class oCharTopd extends oChar {
 			}
 
 			// a hit slides to a stop, may die then, and ends on any input after
-			if (truthy(this.hit) && truthy(this.onFloor)) {
+			if (this.hit && this.onFloor) {
 				this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - this.fric / 4, 0);
 				this.yspd = sign(this.yspd) * Math.max(Math.abs(this.yspd) - this.fric / 4, 0);
-				if (truthy(this.spdis0)) {
+				if (this.spdis0) {
 					this.hit = 2;
-					if (truthy(this.hit_dead)) {
+					if (this.hit_dead) {
 						this.hit = 0;
 						this.dead = 1;
 					}
@@ -433,16 +436,16 @@ class oCharTopd extends oChar {
 			}
 
 			// walk and run: top speed scaled by the stick, halved while lining up a drop
-			curspd = truthy(this.crawling) ? this.crawlspd : this.runspd;
-			curspd *= truthy(this.drop_request) ? 0.5 : 1;
+			curspd = this.crawling ? this.crawlspd : this.runspd;
+			curspd *= this.drop_request ? 0.5 : 1;
 			const joy_per = pointDistance(0, 0, this.con.ljHp, this.con.ljVp);
 			curspd *= joy_per > 0 ? joy_per : 1;
 
 			this.curspdang = pointDistance(0, 0, this.xspd, this.yspd);
 
 			// slow each axis on its own when not steering it or too fast, so turns stay sharp
-			if (!truthy(this.hit) && !truthy(this.diving)) {
-				let fric_slow = (truthy(this.onFloor) && this.rolling === 0) ? this.fric : this.air_fric;
+			if (!this.hit && !this.diving) {
+				let fric_slow = (this.onFloor && this.rolling === 0) ? this.fric : this.air_fric;
 				// high above the floor there is little control
 				if (this.haf > TOPD_HIGH_ABOVE_FLOOR) {
 					const haf_adj = 1 + Math.min((this.haf - TOPD_HIGH_ABOVE_FLOOR) / 20, 3);
@@ -450,36 +453,36 @@ class oCharTopd extends oChar {
 					curspd /= haf_adj;
 				}
 
-				if (eq(this.con.ljHp, 0) || this.curspdang > curspd) {
+				if (this.con.ljHp === 0 || this.curspdang > curspd) {
 					this.xspd = sign(this.xspd) * Math.max(Math.abs(this.xspd) - fric_slow, 0);
 				}
-				if (eq(this.con.ljVp, 0) || this.curspdang > curspd) {
+				if (this.con.ljVp === 0 || this.curspdang > curspd) {
 					this.yspd = sign(this.yspd) * Math.max(Math.abs(this.yspd) - fric_slow, 0);
 				}
 				this.curspdang = pointDistance(0, 0, this.xspd, this.yspd);
 			}
 
 			// falling is in height
-			if (!truthy(this.onFloor)) {
+			if (!this.onFloor) {
 				this.zspd -= this.grav;
 			}
 
 			// speed up per axis, then replace the direction with the stick's own angle
-			if (!truthy(this.hit) && !truthy(this.diving) && this.sliding === 0 && this.rolling === 0 && !truthy(this.climbing)) {
+			if (!this.hit && !this.diving && this.sliding === 0 && this.rolling === 0 && !this.climbing) {
 				let dir_to_facing = (this.facing < 0 && this.con.iLeft) || (this.facing > 0 && this.con.iRight);
-				if (!truthy(this.atWall) || (truthy(this.atWallObj.pushable) && dir_to_facing)) {
+				if (!this.atWall || (this.atWallObj.pushable && dir_to_facing)) {
 					const gospd = TOPD_WALK_ACCEL * Math.abs(this.con.ljHp);
 					this.xspd += (this.con.iLeft ? -gospd : 0) + (this.con.iRight ? gospd : 0);
 				}
 				dir_to_facing = (this.facingy < 0 && this.con.iUp) || (this.facingy > 0 && this.con.iDown);
-				if (!truthy(this.atWally) || (truthy(this.atWallyObj.pushable) && dir_to_facing)) {
+				if (!this.atWally || (this.atWallyObj.pushable && dir_to_facing)) {
 					const gospd = TOPD_WALK_ACCEL * Math.abs(this.con.ljVp);
 					this.yspd += (this.con.iUp ? -gospd : 0) + (this.con.iDown ? gospd : 0);
 				}
 				let newspdang = pointDistance(0, 0, this.xspd, this.yspd);
 				let goang = pointDirection(0, 0, this.xspd, this.yspd);
 				// the per axis speed up spoils angled walking, the stick angle fixes it
-				if (ne(this.con.ljHp, 0) || ne(this.con.ljVp, 0)) {
+				if (this.con.ljHp !== 0 || this.con.ljVp !== 0) {
 					newspdang = pointDistance(0, 0, this.con.ljHp, this.con.ljVp) * curspd;
 					goang = pointDirection(0, 0, this.con.ljHp, this.con.ljVp);
 				}
@@ -487,22 +490,24 @@ class oCharTopd extends oChar {
 				this.curspdang = Math.min(newspdang, Math.max(curspd, this.curspdang));
 				this.xspd = this.curspdang * Math.cos(goang / 180 * Math.PI);
 				this.yspd = this.curspdang * -Math.sin(goang / 180 * Math.PI);
+				if (Math.abs(this.xspd) < TOPD_SPEED_ZERO_SNAP) this.xspd = 0;
+				if (Math.abs(this.yspd) < TOPD_SPEED_ZERO_SNAP) this.yspd = 0;
 			}
 		}
 
 		this.checkFloorFx(1, curspd);
 
-		if (truthy(this.landed) && this.rolling === 0) {
+		if (this.landed && this.rolling === 0) {
 			Hooks.sound("snd8bThudLil");
 		}
 
 		// pushing something we face, the other axis acts like a wall
-		const pushed = (truthy(this.atWall) && truthy(this.atWallObj.pushable)) ? this.atWallObj
-			: ((truthy(this.atWally) && truthy(this.atWallyObj.pushable)) ? this.atWallyObj : null);
+		const pushed = (this.atWall && this.atWallObj.pushable) ? this.atWallObj
+			: ((this.atWally && this.atWallyObj.pushable) ? this.atWallyObj : null);
 		if (pushed !== null
-			&& this.sliding === 0 && this.rolling === 0 && truthy(this.onFloor)
-			&& ((ne(this.xspd, 0) && sign(this.facing) === sign(this.xspd))
-				|| (ne(this.yspd, 0) && sign(this.facingy) === sign(this.yspd)))) {
+			&& this.sliding === 0 && this.rolling === 0 && this.onFloor
+			&& ((this.xspd !== 0 && sign(this.facing) === sign(this.xspd))
+				|| (this.yspd !== 0 && sign(this.facingy) === sign(this.yspd)))) {
 			if (this.facing !== 0) {
 				this.xspd *= pushed.pushAdj;
 				pushed.rx = this.rx;
@@ -523,7 +528,7 @@ class oCharTopd extends oChar {
 		}
 
 		// down and jump on a drop through floor
-		if (this.con.iBtnA && this.con.iDown && this.onFloorObj && truthy(this.onFloorObj.dropDown)) {
+		if (this.con.iBtnA && this.con.iDown && this.onFloorObj && this.onFloorObj.dropDown) {
 			this.jumping = 8;
 			this.jumped = 1;
 			this.crawling = false;
@@ -533,19 +538,19 @@ class oCharTopd extends oChar {
 			this.dropping = false;
 		}
 
-		const can_jump = this.con.iBtnA && truthy(this.canJump)
-			&& (truthy(this.onFloorL) || truthy(this.onFloor) || truthy(this.hanging) || truthy(this.climbing))
-			&& !truthy(this.hit) && !truthy(this.crawling) && this.sliding === 0
-			&& (!this.carrying || truthy(this.carrying.can_jump));
+		const can_jump = this.con.iBtnA && this.canJump
+			&& (this.onFloorL || this.onFloor || this.hanging || this.climbing)
+			&& !this.hit && !this.crawling && this.sliding === 0
+			&& (!this.carrying || this.carrying.can_jump);
 
-		if (can_jump || (this.con.iBtnAd && truthy(this.jumping))) {
+		if (can_jump || (this.con.iBtnAd && this.jumping)) {
 			this.jumping++;
 
 			if (this.jumping === 1) {
 				this.jumped = 1;
 				Hooks.sound("snd8bJump");
-				this.jumph = this.maxjumph + ((Math.abs(this.xspd) + Math.abs(this.yspd) > 0 && !truthy(this.swimming)) ? this.jumpRunBoost : 0);
-				this.jumph = truthy(this.swimming) ? this.jumph * 0.7 : this.jumph;
+				this.jumph = this.maxjumph + ((Math.abs(this.xspd) + Math.abs(this.yspd) > 0 && !this.swimming) ? this.jumpRunBoost : 0);
+				this.jumph = this.swimming ? this.jumph * 0.7 : this.jumph;
 				this.jumph = this.rolling > 0 ? this.jumph * 0.8 : this.jumph;
 				this.zspd = this.jumph;
 				// jumping out of a roll adds speed along the roll, up to double running
@@ -554,7 +559,7 @@ class oCharTopd extends oChar {
 					this.xspd = sign(this.xspd) * Math.min(Math.abs(this.xspd) + this.runspd, this.runspd * 2) * Math.abs(Math.cos(jdir));
 					this.yspd = sign(this.yspd) * Math.min(Math.abs(this.yspd) + this.runspd, this.runspd * 2) * Math.abs(Math.sin(jdir));
 				}
-				if (truthy(this.swimming)) {
+				if (this.swimming) {
 					this.makeSplash();
 				}
 
@@ -562,7 +567,7 @@ class oCharTopd extends oChar {
 				this.prejumpx = this.x;
 				this.prejumpy = this.y;
 
-				if (truthy(this.climbing)) {
+				if (this.climbing) {
 					this.offLadderTopd();
 					// a straight up ladder jump gets a little more, since this view is more sideways
 					if (this.con.iUp && !this.con.iLeft && !this.con.iRight) {
@@ -576,7 +581,7 @@ class oCharTopd extends oChar {
 			}
 		}
 		// the short jump pull back is switched off in the original, only the count resets
-		if (truthy(this.jumping) && !this.con.iBtnAd) {
+		if (this.jumping && !this.con.iBtnAd) {
 			this.jumping = 0;
 		}
 
@@ -585,14 +590,14 @@ class oCharTopd extends oChar {
 		this.ymoving = this.con.iUp || this.con.iDown;
 		this.moving = this.xmoving || this.ymoving;
 		// opposite speeds on the two axes also count as stopped, as in the original
-		this.spdis0 = eq(this.xspd + this.yspd, 0);
+		this.spdis0 = this.xspd + this.yspd === 0;
 
 		// face along whichever stick axis leans more
-		if (!truthy(this.hit) && !truthy(this.lockface) && this.rolling === 0 && !truthy(this.diving) && !truthy(this.sliding)) {
-			if (ne(this.con.ljHp, 0) && Math.abs(this.con.ljHp) >= Math.abs(this.con.ljVp)) {
+		if (!this.hit && !this.lockface && this.rolling === 0 && !this.diving && !this.sliding) {
+			if (this.con.ljHp !== 0 && Math.abs(this.con.ljHp) >= Math.abs(this.con.ljVp)) {
 				this.facing = sign(this.con.ljHp);
 				this.facingy = 0;
-			} else if (ne(this.con.ljVp, 0)) {
+			} else if (this.con.ljVp !== 0) {
 				this.facing = 0;
 				this.facingy = sign(this.con.ljVp);
 			}
@@ -608,7 +613,7 @@ class oCharTopd extends oChar {
 		}
 
 		if (lx !== this.x || ly !== this.y || lz !== this.z) {
-			Hooks.debugLine(lx, ly, this.x, this.y - this.z, truthy(this.swimming) ? "#33ff33" : (truthy(this.onFloor) ? "#ffff00" : "#ff8800"));
+			Hooks.debugLine(lx, ly, this.x, this.y - this.z, this.swimming ? "#33ff33" : (this.onFloor ? "#ffff00" : "#ff8800"));
 		}
 
 		this.haf = this.z - (this.onFloorObj !== null ? this.onFloorObj.ht : 0);
@@ -619,15 +624,15 @@ class oCharTopd extends oChar {
 			this.rolling = 0;
 		}
 
-		if (truthy(this.hitWall) && !truthy(this.pushing)) {
+		if (this.hitWall && !this.pushing) {
 			this.xspd = 0;
 		}
-		if (truthy(this.hitWally) && !truthy(this.pushing)) {
+		if (this.hitWally && !this.pushing) {
 			this.yspd = 0;
 		}
 		// diving or rolling into a wall shakes, hurts, and hits the wall too
-		if (truthy(this.hitWall) || truthy(this.hitWally)) {
-			if (truthy(this.diving) || truthy(this.rolling)) {
+		if (this.hitWall || this.hitWally) {
+			if (this.diving || this.rolling) {
 				const ho = this.hitWallObj ? this.hitWallObj : this.hitWallyObj;
 				game.cam.shakeit(20, 1, 2);
 				game.guy.takeHit(ho.x, ho.y, 2, 1);
@@ -636,8 +641,8 @@ class oCharTopd extends oChar {
 			this.diving = 0;
 			this.rolling = 0;
 		}
-		if (truthy(this.hitFloor)) {
-			if (this.hitFloorObj === null || truthy(this.hitFloorObj.standonable)) {
+		if (this.hitFloor) {
+			if (this.hitFloorObj === null || this.hitFloorObj.standonable) {
 				this.zspd = 0;
 			} else {
 				// cannot stand on it: bounce up and away, carrying on past its middle,
@@ -653,6 +658,8 @@ class oCharTopd extends oChar {
 				}
 				this.xspd = 1 * Math.cos(jumpgo / 180 * Math.PI);
 				this.yspd = 1 * -Math.sin(jumpgo / 180 * Math.PI);
+				if (Math.abs(this.xspd) < TOPD_SPEED_ZERO_SNAP) this.xspd = 0;
+				if (Math.abs(this.yspd) < TOPD_SPEED_ZERO_SNAP) this.yspd = 0;
 				this.zspd = 0.5;
 				this.hitFloor = false;
 			}
@@ -668,11 +675,11 @@ class oCharTopd extends oChar {
 		}
 
 		// remember the last place we stood still, and after a long idle face down
-		if (truthy(this.onFloor) && truthy(this.spdis0) && this.still > 10) {
+		if (this.onFloor && this.spdis0 && this.still > 10) {
 			this.lastsx = this.x;
 			this.lastsy = this.y;
 			this.lastsz = this.z;
-			if (this.still > TOPD_IDLE_FACE_DOWN_FRAMES && !truthy(this.drop_request)) {
+			if (this.still > TOPD_IDLE_FACE_DOWN_FRAMES && !this.drop_request) {
 				this.facing = 0;
 				this.facingy = 1;
 			}
@@ -718,10 +725,10 @@ class oCharTopd extends oChar {
 			Draw.alpha = 1;
 		}
 
-		const drawCarry = this.carrying && !truthy(this.presenting) && !truthy(this.diving) && !truthy(this.rolling);
+		const drawCarry = this.carrying && !this.presenting && !this.diving && !this.rolling;
 		if (drawCarry && this.facingy < 0) this.drawCarriedAtHeight();
 
-		if (truthy(this.aiming)) {
+		if (this.aiming) {
 			const cx = this.sprite_cx();
 			const cy = this.sprite_cy();
 			const bi = Math.floor(currentTime() / 100) % 4;
@@ -737,18 +744,18 @@ class oCharTopd extends oChar {
 
 		// Approximation: the original paints the drop spot through a tint shader in orange when it can
 		// be given, red when not. Here the picture is multiplied by those colours.
-		if (truthy(this.drop_request) && this.carrying) {
+		if (this.drop_request && this.carrying) {
 			const c = this.carrying;
-			const tcol = (this.lookObjs.length > 0 && truthy(this.lookObjs[0].cangive)) ? "#ff9900" : "#ff3300";
+			const tcol = (this.lookObjs.length > 0 && this.lookObjs[0].cangive) ? "#ff9900" : "#ff3300";
 			Draw.spriteExt(c.spi, c.ifr, this.x + this.drop_offx * this.facing, this.y + this.drop_offy * this.facingy,
 				c.x_sc, c.y_sc, c.ang, tcol, 0.6);
 		}
 
-		if (truthy(this.presenting) && this.carrying) this.drawPresenting();
+		if (this.presenting && this.carrying) this.drawPresenting();
 
 		const xscale = this.facing === 0 ? 1 : this.facing;
-		const xoadj = (truthy(this.xodd) && xscale < 0) ? 1 : 0;
-		if (this.shadowSprite !== null && !truthy(this.swimming) && !this.riding) {
+		const xoadj = (this.xodd && xscale < 0) ? 1 : 0;
+		if (this.shadowSprite !== null && !this.swimming && !this.riding) {
 			Draw.spriteExt(this.shadowSprite, this.ifr, this.x + xoadj, this.y - this.z + this.haf,
 				xscale, this.y_sc, this.ang, this.col, this.alpha);
 		}

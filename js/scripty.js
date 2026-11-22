@@ -37,8 +37,8 @@ const SCRIPT_OPS_NOT_YET = ["setSpotlight", "add_onefx", "playBgSound", "copyGro
 function scriptValIs(a, comp, b) {
 	if (typeof a === "boolean") a = a ? 1 : 0;
 	if (typeof b === "boolean") b = b ? 1 : 0;
-	if (comp === "equ") return eq(a, b);
-	if (comp === "notequ") return ne(a, b);
+	if (comp === "equ") return a === b;
+	if (comp === "notequ") return a !== b;
 	if (comp === "grth") return a > b;
 	if (comp === "grthequ") return a >= b;
 	if (comp === "lsth") return a < b;
@@ -129,7 +129,7 @@ const ScriptOps = {
 
 	// set by pause, holds until someone unpauses
 	paused(ca) {
-		if (truthy(this.pausedone)) {
+		if (this.pausedone) {
 			this.nexta = true;
 			this.pausedone = 0;
 		}
@@ -254,7 +254,7 @@ const ScriptOps = {
 	// shown, hidden, or the other way round
 	setVis(ca) {
 		const obj = this.lookup(ca[1]);
-		if (obj) obj.visible = ca[2] === "toggle" ? !truthy(obj.visible) : ca[2];
+		if (obj) obj.visible = ca[2] === "toggle" ? !obj.visible : ca[2];
 		this.nexta = true;
 	},
 
@@ -321,7 +321,7 @@ const ScriptOps = {
 	// The original asked about the name itself, here the name is looked up.
 	checkExists(ca) {
 		const obj = this.lookup(ca[1]);
-		if ((!!obj && !obj.destroyed) !== truthy(ca[2])) this.scrExit = true;
+		if ((!!obj && !obj.destroyed) !== !!ca[2]) this.scrExit = true;
 		else this.nexta = true;
 	},
 
@@ -446,7 +446,7 @@ const ScriptOps = {
 	// Kept from the original: only the first two values count, so a group that cannot be found
 	// does nothing.
 	groupViz(ca) {
-		if (game.obj_groups[ca[1]] !== undefined) game.groupSetEnabled(game.obj_groups[ca[1]], truthy(ca[2]));
+		if (game.obj_groups[ca[1]] !== undefined) game.groupSetEnabled(game.obj_groups[ca[1]], ca[2]);
 		this.nexta = true;
 	},
 
@@ -495,13 +495,13 @@ const ScriptOps = {
 		actor.y = to.y;
 		actor.rx = 0;
 		actor.ry = 0;
-		if (truthy(ca.length > 2 ? ca[2] : 1)) {
+		if ((ca.length > 2 ? ca[2] : 1)) {
 			actor.x += eox;
 			actor.y += eoy;
 		}
 
 		const syncCam = ca.length > 3 ? ca[3] : 0;
-		if (truthy(syncCam)) {
+		if (syncCam) {
 			if (syncCam === 2) {
 				cam.x = actor.x + cam.lastfolofx;
 				cam.y = actor.y + cam.lastfolofy;
@@ -608,7 +608,7 @@ class oScripty extends oBaseObject {
 		}
 		if (type === "instExists") {
 			const obj = this.lookup(check[1]);
-			return (!!obj && !obj.destroyed) === truthy(check[2]);
+			return (!!obj && !obj.destroyed) === !!check[2];
 		}
 		// how far from here to the nearest of a kind of object, or to a named one, edge to edge
 		if (type === "objDist") {
@@ -641,7 +641,7 @@ class oScripty extends oBaseObject {
 	update() {
 		// Cut short by a button: the skip script runs from its start instead, with nothing to
 		// return to. The original ran its first action twice and could return into what it left.
-		if (truthy(this.skippable) && (game.uiController.iBtnX || game.uiController.iBtnB)) {
+		if (this.skippable && (game.uiController.iBtnX || game.uiController.iBtnB)) {
 			this.script = Array.isArray(this.skipScript) ? this.skipScript : [];
 			this.upScripts.length = 0;
 			this.curai = 0;

@@ -1487,7 +1487,7 @@
 					"starta": 0.2,
 					"startaspd": 0.0001,
 					"velox": 0.03,
-					"veloy": 0.0-2,
+					"veloy": 0.02,
 					"depth_min": 1.1,
 					"depth_var": 0.9,
 					"field_loop":1,

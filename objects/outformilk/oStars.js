@@ -124,7 +124,7 @@ class oStarField extends oBaseObject {
 				depth: this.shdepth + rng.random(this.shdepthvar),
 				warpw: 1
 			};
-			if (truthy(this.warpspeed)) {
+			if (this.warpspeed) {
 				newshoo.warpw = this.warpspeed * newshoo.depth;
 			}
 			this.shooters.push(newshoo);

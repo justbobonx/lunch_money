@@ -19,14 +19,11 @@
 
 ### GM quirks kept for now (remove eventually)
 - Stand-ins: unported_object_list.json and the Standins class give unported objects their GM parent behavior; both go once everything rooms use is ported.
-- Dog stop clears a misspelled field, so it still remembers the ball.
 - oBoxFall never lowers its life, so it never destroys itself.
-- The ball bounce test only checks speed.
 - The swimming rat spawns a bubble every update.
 - oDoor's default room roomLIlHouse isn't in the room list, so a door goes nowhere unless its room entry sets one.
 - whynot: the player's layer starts disabled.
 - oPuzBox: the puzzle box minigame (colors, guys, letters, numbers; timer and score), about 1400 lines in the original. Pl_Autumn has eight trig_pb triggers along its left edge that each make one with a different box_type, into the pop up layer. Wanted on a high layer.
-- OFM_underwater: star field veloy is written as 0.0-2, probably meant 0.02.
 - Death sprays follow whoever did the killing and pass through it: every batch comes from the killer's spot (the rat, the log, the hard landing's own character). Script deaths have no killer here and follow the player; the original followed the script runner, which sits at its trigger.
 - Bubbles count up two each update (the original counts once and again for the wobble), so they fade after 300 updates and are gone at 350, and the wobble jumps back to its start every 80 updates, part way through a swing.
 - Placed sparks go off as soon as the room loads, since the room's saved frame and speed land over the spark's resting ones; a spark due again mid animation starts over.
@@ -35,6 +32,7 @@
 - A particle only checks the first solid it overlaps, so one inside the followed object stops on nothing else there.
 - Blood that stops on a solid with no lifetime stays until revive or a room switch, keeping its burst alive with it.
 - The top down death splatter never runs: the original never sets how much to splatter.
+- Angles still use GM's convention: degrees, counterclockwise, with y down (pointDirection, lengthdir and everything built on them). Convert to radians and the usual JS direction later.
 
 ## Question
 

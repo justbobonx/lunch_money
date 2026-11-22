@@ -43,11 +43,11 @@ class oShipDoor extends oSolidGr {
 	// Opens or closes, playing the animation or jumping to its end. Half way through the frames is fully open.
 	set_open(open, animate) {
 		this.open = open;
-		this.mask = truthy(open) ? "sNoMask" : null;
-		if (truthy(animate)) {
+		this.mask = open ? "sNoMask" : null;
+		if (animate) {
 			this.spd = 1;
 		} else {
-			this.ifr = truthy(open) ? Math.ceil(Sprites.frameCount(this.spi) / 2) : 0;
+			this.ifr = open ? Math.ceil(Sprites.frameCount(this.spi) / 2) : 0;
 		}
 	}
 
@@ -55,8 +55,8 @@ class oShipDoor extends oSolidGr {
 		// while sliding, wait for the animation to reach its open or closed frame
 		if (this.spd > 0) {
 			const frames = Sprites.frameCount(this.spi);
-			if ((truthy(this.open) && Math.floor(this.ifr) === Math.ceil(frames / 2))
-				|| (!truthy(this.open) && Math.floor(this.ifr) === 0)) {
+			if ((this.open && Math.floor(this.ifr) === Math.ceil(frames / 2))
+				|| (!this.open && Math.floor(this.ifr) === 0)) {
 				this.spd = 0;
 			} else {
 				super.update();
@@ -70,9 +70,9 @@ class oShipDoor extends oSolidGr {
 		const senseOn = this.instancePlace(this.x, this.y, oActor) !== null;
 		this.mask = ownMask;
 
-		if (!truthy(this.locked) && senseOn) {
-			if (!truthy(this.open)) this.set_open(1, 1);
-		} else if (truthy(this.open)) {
+		if (!this.locked && senseOn) {
+			if (!this.open) this.set_open(1, 1);
+		} else if (this.open) {
 			this.set_open(0, 1);
 		}
 		super.update();
@@ -124,7 +124,7 @@ class oShipLocker extends oIaObject {
 	// Only the player opens it, when it is shut and their hand holds nothing that cannot go in a bag.
 	acton(action, who) {
 		if (who !== game.guy || Math.floor(this.ifr) === LOCKER_OPEN_FRAME) return;
-		if (who.carrying && !truthy(who.carrying.holdable)) return;
+		if (who.carrying && !who.carrying.holdable) return;
 		if (!Screens.open(new InventoryScreen([this.inv, who.inv]))) return;
 		this.ifr = LOCKER_OPEN_FRAME;
 	}
