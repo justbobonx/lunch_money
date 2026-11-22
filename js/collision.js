@@ -226,5 +226,32 @@ const Collision = {
 
 	positionMeeting(px, py, what) {
 		return this.collisionPoint(px, py, what, false, false) !== null;
+	},
+
+	// Appends every object of the type whose box comes within a radius of a point, never the
+	// asker, and returns how many were found. Boxes only, turns and circles ignored. Ordered lists
+	// sort by distance from the point to each object's origin.
+	collisionCircleList(cx, cy, r, what, list, ordered) {
+		const found = [];
+		for (const o of game.instances) {
+			if (o === this || !o.active || o.destroyed || !matchesType(o, what)) continue;
+			const s = maskShape(o, o.x, o.y);
+			if (!s) continue;
+			const dx = cx - clamp(cx, s.l, s.r + 1);
+			const dy = cy - clamp(cy, s.t, s.b + 1);
+			if (dx * dx + dy * dy <= r * r) found.push(o);
+		}
+		if (ordered) {
+			found.sort((a, b) => pointDistance(cx, cy, a.x, a.y) - pointDistance(cx, cy, b.x, b.y));
+		}
+		for (const o of found) list.push(o);
+		return found.length;
+	},
+
+	// the first such object made, or nothing
+	collisionCircle(cx, cy, r, what) {
+		const found = [];
+		this.collisionCircleList(cx, cy, r, what, found, false);
+		return found.length > 0 ? found[0] : null;
 	}
 };

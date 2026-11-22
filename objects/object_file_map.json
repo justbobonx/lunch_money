@@ -1,5 +1,6 @@
 {
 	"outformilk": [
+		"goFarm.js",
 		"goItems.js",
 		"goJungle.js",
 		"goPlaceholders.js",

@@ -33,6 +33,18 @@ const QP_LABEL_BG_BOTTOM = 10;
 const FLOOR_RAMP_SHARE = 0.5;
 const FLOOR_RAMP_TRIM = 0.707;
 
+// Wandering actors: path walking speed, the default range of idle updates before a walk, the
+// chance in a hundred and the spread in degrees of a walk heading back toward the stay in area's
+// middle, and a walk's speed range and length range in updates.
+const WANDER_PATH_SPEED = 0.8;
+const WANDER_BORED_RANGE = [300, 420];
+const WANDER_HOME_CHANCE = 30;
+const WANDER_HOME_SPREAD = 30;
+const WANDER_WALK_SPEED_MIN = 0.3;
+const WANDER_WALK_SPEED_MAX = 0.4;
+const WANDER_WALK_MIN = 20;
+const WANDER_WALK_MAX = 60;
+
 // The debug revive leaves these alone: where it is, its name, its layer, and whether it is gone or
 // switched off.
 const REVIVE_KEEP_FIELDS = ["x", "y", "name", "mylayer", "destroyed", "pdis"];
@@ -890,10 +902,89 @@ class oActor extends oBaseObject {
 		this.initInteractive();
 
 		this.in_pose = null;
+
+		// Wandering, for actors that walk about on their own. The first four names are the ones room
+		// and object files set: wandering about an area at all, the path to start on by name, the
+		// paths by name as flat lists of spots ending in a loop flag, and the idle range.
+		this.wander_area = false;
+		this.start_path = null;
+		this.paths = null;
+		this.bored_range = null;
+		// the path being walked and the next spot's place in it
+		this.wanderPath = null;
+		this.pathIndex = 0;
+		// idle updates before the next walk, idle updates so far, and walk updates left; walking
+		// while any are left
+		this.bored = 0;
+		this.idleTime = 0;
+		this.walkTime = 0;
 	}
 
 	// override for behavior
 	acton(action, who) {}
+
+	// Wandering setup once the room settings are in: the start path if it names one, the idle
+	// range, and a random start into the first idle so a group does not set off together.
+	wanderInit() {
+		if (this.start_path !== null && this.paths !== null && this.paths[this.start_path] !== undefined) {
+			this.wanderPath = this.paths[this.start_path];
+			this.pathIndex = 0;
+		}
+		if (this.bored_range === null) this.bored_range = WANDER_BORED_RANGE;
+		this.bored = rng.irandomRange(this.bored_range[0], this.bored_range[1]);
+		this.idleTime = rng.irandomRange(0, this.bored - 1);
+		this.walkTime = 0;
+	}
+
+	// One update of wandering, which only sets speeds. On a path it heads for each spot in turn
+	// until our mask covers it, looping or stopping at the end. Otherwise, wandering an area, it
+	// idles until bored, then walks a short way, sometimes back toward the middle of the stay in
+	// area it is in, else any way. A walk counts down and stops, starting the idle again.
+	wanderUpdate() {
+		if (this.wanderPath !== null) {
+			const px = this.wanderPath[this.pathIndex];
+			const py = this.wanderPath[this.pathIndex + 1];
+			if (this.collisionPoint(px, py, this, false, false) !== null) {
+				this.pathIndex += 2;
+				// the last entry is the loop flag
+				const last = this.wanderPath.length - 1;
+				if (this.pathIndex >= last) {
+					if (this.wanderPath[last]) {
+						this.pathIndex = 0;
+					} else {
+						this.wanderPath = null;
+						this.xspd = 0;
+						this.yspd = 0;
+					}
+				}
+			} else {
+				const dir = pointDirection(this.x, this.y, px, py);
+				this.xspd = lengthdirX(WANDER_PATH_SPEED, dir);
+				this.yspd = lengthdirY(WANDER_PATH_SPEED, dir);
+			}
+		} else if (this.wander_area && this.walkTime === 0) {
+			if (this.idleTime >= this.bored) {
+				const home = this.cur_stayin;
+				const dir = (home !== null && rng.random(100) < WANDER_HOME_CHANCE)
+					? pointDirection(this.x, this.y, home.x, home.y) + rng.randomRange(-WANDER_HOME_SPREAD, WANDER_HOME_SPREAD)
+					: rng.random(360);
+				const spd = rng.randomRange(WANDER_WALK_SPEED_MIN, WANDER_WALK_SPEED_MAX);
+				this.xspd = lengthdirX(spd, dir);
+				this.yspd = lengthdirY(spd, dir);
+				this.walkTime = rng.irandomRange(WANDER_WALK_MIN, WANDER_WALK_MAX);
+				this.bored = rng.irandomRange(this.bored_range[0], this.bored_range[1]);
+			} else {
+				this.idleTime++;
+			}
+		} else if (this.walkTime > 0) {
+			this.walkTime--;
+			if (this.walkTime === 0) {
+				this.xspd = 0;
+				this.yspd = 0;
+				this.idleTime = 0;
+			}
+		}
+	}
 
 	// All an actor needs to follow things around: the distance and the way to whatever it follows,
 	// and the distance last time.
