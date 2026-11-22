@@ -187,11 +187,8 @@ class World {
 		this.etcLayer = null;
 		this.spotOn = false;
 		this.last_cp = null;
-		// weather is a later stage, it starts off in the original too
-		this.weather = {
-			on: false,
-			set_weather(type) {}
-		};
+		// none to start, as in the original
+		this.weather = new Weather();
 	}
 
 	// ------------------------------------------------------------ files
@@ -479,7 +476,7 @@ class World {
 		this.goto_room = null;
 		this.spotOn = false;
 		this.last_cp = null;
-		this.weather.on = false;
+		this.weather.set_weather(WEATHER_NONE);
 	}
 
 	// Plays from a room the way the editor's play button does: the world cleared, then the
@@ -1090,7 +1087,7 @@ class World {
 			this.reviveGuy();
 		}
 
-		this.weather.set_weather(0);
+		this.weather.set_weather(WEATHER_NONE);
 		this.spotOn = false;
 		if (this.curroom.enter_script !== undefined) Hooks.runScript(this.curroom.enter_script, this, undefined, undefined, undefined, this);
 		this.cam.fastjump = 1;
@@ -1194,7 +1191,7 @@ class World {
 
 	// One fixed step: the controller reads input first, then a waiting room change, then while play
 	// is not paused any screen over play, the room's own update, every object's update, every
-	// after update, and the animation of every shown object, then the camera. Every object updates before any settles in its after update, so
+	// after update, the animation of every shown object and the weather, then the camera. Every object updates before any settles in its after update, so
 	// an after update sees where everyone ended up: carried things following their carrier, riders
 	// and followers.
 	// The camera goes last so it frames where everything settled. A timer that runs out goes just
@@ -1242,6 +1239,7 @@ class World {
 				if (!o.active || o.destroyed || !o.visible) continue;
 				Draw.animate(o, 1);
 			}
+			this.weather.update();
 		}
 		this.cam.update();
 

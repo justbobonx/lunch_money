@@ -825,7 +825,7 @@ const Draw = {
 			const destw = DISPLAY_W + lzoffw;
 			const desth = DISPLAY_H + lzoffh;
 
-			// a mask needs the layer on its own canvas, weather would too once it exists
+			// a mask needs the layer on its own canvas
 			let screenCtx = null;
 			if (buffered) {
 				if (!lyr.layerSurf || zoomchange || lyr.layerSurf.width !== lyrw || lyr.layerSurf.height !== lyrh) {
@@ -944,6 +944,13 @@ const Draw = {
 				ctx.drawImage(lyr.layerSurf, destx, desty, destw, desth);
 			}
 
+			// The layer's share of the weather goes over it, after the mask as in the original, so the
+			// mask never cuts it. It is drawn at the layer's stretch even when the layer was buffered.
+			if (g.weather.on) {
+				this.base = { sx: destw / lyrw, sy: desth / lyrh, ox: destx, oy: desty };
+				g.weather.draw(lyr);
+			}
+
 			// outlines over everything the layer drew, at the layer's stretch even when it was buffered
 			if (hits.length > lyrHitsFrom) {
 				this.base = { sx: destw / lyrw, sy: desth / lyrh, ox: destx, oy: desty };
@@ -956,8 +963,6 @@ const Draw = {
 					ctx.strokeRect(s.l - Math.floor(this.curdrawoffx) + 0.5, s.t - Math.floor(this.curdrawoffy) + 0.5, s.r - s.l, s.b - s.t);
 				}
 			}
-
-			if (g.weather.on) Hooks.todo("weather");
 		}
 
 		// Areas whose bounds hold the mouse, tested on the layer their bounds sit in,

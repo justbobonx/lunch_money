@@ -32,12 +32,16 @@ const LOADING_BAR_H = 8;
 // With control (or command): restart the room fresh with the player alive at its start spot,
 // bring the player back alive where they stand with everything else about them reset,
 // switch scanlines, and switch pixel perfect scaling against the smooth fit to the window.
+// The weather key switches the weather on and off, with shift it steps to the next kind and turns
+// it on. The original used W, but the browser keeps control W (and with shift) to close the tab
+// and window and never lets the page have it.
 const DEBUG_KEY_OVERLAY = "Tab";
 const DEBUG_KEY_HELP = "Backspace";
 const DEBUG_KEY_RESTART_ROOM = "KeyR";
 const DEBUG_KEY_REVIVE_PLAYER = "KeyE";
 const DEBUG_KEY_SCANLINES = "KeyF";
 const DEBUG_KEY_PIXEL_PERFECT = "KeyS";
+const DEBUG_KEY_WEATHER = "KeyG";
 // With the arrows, the player hops this far that way, straight through anything in the way.
 const DEBUG_HOP_DIST = 30;
 
@@ -242,10 +246,11 @@ const Save = {
 };
 
 // The debug key table, the one list both the key catching and the help read. Each has the keys
-// that set it off, whether control is held, how the help names the keys and what it does, and
-// what it does, run between updates. Switches also have their setting, where it is kept between
-// visits and how it starts, and flipping one keeps the new setting. Holding a key down repeats only
-// the hops.
+// that set it off, whether control is held, whether shift is when that matters, how the help
+// names the keys and what it does, and what it does, run between updates. Switches also have
+// their setting, where it is kept between visits and how it starts, and flipping one keeps the
+// new setting. The weather switch shows its setting but is not kept. Holding a key down repeats
+// only the hops.
 const DEBUG_KEYS = [
 	{
 		codes: [DEBUG_KEY_OVERLAY], ctrl: false, keys: "Tab", label: "debug overlay",
@@ -309,6 +314,18 @@ const DEBUG_KEYS = [
 		}
 	},
 	{
+		codes: [DEBUG_KEY_WEATHER], ctrl: true, shift: false, keys: "ctrl G", label: "weather",
+		get: () => game.weather.on,
+		act: () => { game.weather.on = !game.weather.on; }
+	},
+	{
+		codes: [DEBUG_KEY_WEATHER], ctrl: true, shift: true, keys: "ctrl shift G", label: "next weather kind",
+		act: () => {
+			game.weather.set_weather((game.weather.type + 1) % WEATHER_KIND_COUNT);
+			game.weather.on = true;
+		}
+	},
+	{
 		codes: [DEBUG_KEY_HELP], ctrl: false, keys: "Backspace", label: "this help",
 		act: () => { Debug.helpOpen = !Debug.helpOpen; }
 	}
@@ -333,7 +350,8 @@ const Debug = {
 			d.set(kept === null ? d.start : kept === "1");
 		}
 		target.addEventListener("keydown", (e) => {
-			const d = DEBUG_KEYS.find((k) => k.codes.includes(e.code) && k.ctrl === (e.ctrlKey || e.metaKey));
+			const d = DEBUG_KEYS.find((k) => k.codes.includes(e.code) && k.ctrl === (e.ctrlKey || e.metaKey)
+				&& (k.shift === undefined || k.shift === e.shiftKey));
 			if (d === undefined) return;
 			e.preventDefault();
 			e.stopImmediatePropagation();
