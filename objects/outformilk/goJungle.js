@@ -31,6 +31,11 @@ class oJgLogShooter extends oGround {
 		this.spd = 0;
 		this.ifr = this.closedFrame;
 		this.on = true;
+		// the firing animation stops once it comes round to the closed frame
+		this.onAnimEnd = (self) => {
+			self.spd = 0;
+			self.ifr = self.closedFrame;
+		};
 	}
 
 	update() {
@@ -52,12 +57,6 @@ class oJgLogShooter extends oGround {
 			this.ifr = this.firingFrame;
 			this.spd = 1;
 		}
-	}
-
-	// Stops the animation once it comes round to the closed frame.
-	draw() {
-		Draw.lpSprite(this);
-		if (Math.floor(this.ifr) === this.closedFrame) this.spd = 0;
 	}
 }
 

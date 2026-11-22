@@ -938,13 +938,15 @@ class oText extends oBaseObject {
 		this.linesep = -1;
 	}
 
+	// a blinking sign counts through its on and off time, on for the first part
+	update() {
+		if (this.blinkr) this.step = (this.step + 1) % (this.blinkr * 2);
+	}
+
 	// Kept from the original: the width for centring is measured before this sign's font is set,
 	// so it uses whichever font was drawn last.
 	draw() {
-		if (this.blinkr) {
-			this.step = (this.step + 1) % (this.blinkr * 2);
-			if (this.step > this.blinkr) return;
-		}
+		if (this.blinkr && this.step > this.blinkr) return;
 		let xo;
 		if (this.xoffset === "c") xo = -Math.floor(Draw.stringWidth(this.text)) / 2;
 		else if (this.xoffset < 0) xo = -Math.floor(Draw.stringWidth(this.text));

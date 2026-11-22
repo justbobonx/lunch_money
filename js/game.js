@@ -178,8 +178,11 @@ function startRoomFromAddress() {
 	return m ? decodeURIComponent(m[1]) : undefined;
 }
 
-// The saved game. Nothing is saved while the player is dead, so a restore never puts them back
-// in the middle of a pit. A browser that will not keep data just means nothing is saved.
+// The saved game: the room, the player's spot, layer and facing, and whether each of the room's
+// layers is switched on, so the player comes back in a layer that runs. Every layer is kept, not
+// just those that differ from the room file, since starting a room already switches off the areas
+// away from where the player starts. Nothing is saved while the player is dead, so a restore never puts them back in the middle
+// of a pit. A browser that will not keep data just means nothing is saved.
 const Save = {
 	enabled: true,
 	updates: 0,
@@ -196,6 +199,7 @@ const Save = {
 	},
 
 	// The saved game, or nothing when there is none, it is off, or it does not read right.
+	// A save with no layer list just has no layers to switch.
 	read() {
 		if (!this.enabled) return null;
 		try {
@@ -203,18 +207,23 @@ const Save = {
 			if (text === null) return null;
 			const sv = JSON.parse(text);
 			if (sv.world !== WORLD_NAME || typeof sv.room !== "string" || typeof sv.x !== "number" || typeof sv.y !== "number") return null;
+			if (sv.layers === null || typeof sv.layers !== "object") sv.layers = {};
 			return sv;
 		} catch (e) {
 			return null;
 		}
 	},
 
+	// The layers are kept by name as switched on or not.
 	write() {
-		if (!this.enabled || game.curroom === null || game.guy === null || game.guy.dead) return;
+		if (!this.enabled || game.curroom === null || game.curroom.layers === null || game.guy === null || game.guy.dead) return;
 		const guy = game.guy;
+		const layers = {};
+		for (const lyr of game.curroom.layers) layers[lyr.name] = !lyr.disabled;
 		const sv = {
 			world: WORLD_NAME, room: game.curroom.name, x: guy.x, y: guy.y,
-			layer: guy.mylayer ? guy.mylayer.name : undefined, facing: guy.facing, facingy: guy.facingy
+			layer: guy.mylayer ? guy.mylayer.name : undefined, facing: guy.facing, facingy: guy.facingy,
+			layers: layers
 		};
 		try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { /* nothing kept */ }
 	},
@@ -402,9 +411,15 @@ const Shell = {
 		await Sprites.load(readJson, loadImage, spriteNamesInRoom(roomText), undefined, Loading);
 		await Draw.loadFonts(readJson, loadImage);
 		game.start(startName);
-		// back to where they were, unless the saved room was not there to start in
-		if (saved !== null && game.curroom !== null && game.guy !== null && game.curroom.name === saved.room) {
-			game.placeGuyAt(saved.x, saved.y, saved.layer, saved.facing, saved.facingy);
+		// Back to where they were, unless the saved room was not there to start in. The saved layers
+		// are switched first, through the same switch scripts use, so their objects run or stop with
+		// them; a layer the room no longer has is passed over.
+		if (saved !== null && game.curroom !== null && game.curroom.layers !== null && game.curroom.name === saved.room) {
+			for (const lyr of game.curroom.layers) {
+				const on = saved.layers[lyr.name];
+				if (on !== undefined) game.layerSetEnabled(lyr, on);
+			}
+			if (game.guy !== null) game.placeGuyAt(saved.x, saved.y, saved.layer, saved.facing, saved.facingy);
 		}
 
 		const stepMs = 1000 / GAME_FPS;

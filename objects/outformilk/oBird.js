@@ -1,5 +1,5 @@
 // A flying bird the player can stand on or hang from; it speeds up with a rider and dips as it flaps.
-// Its dip and rise follow its own animation frame, so they only advance while it is drawn.
+// Its dip and rise follow its own animation frame, which holds while it is hidden.
 class oBird extends oGround {
 	constructor() {
 		super();

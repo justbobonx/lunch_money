@@ -205,7 +205,7 @@ const Draw = {
 	// set while drawing a parallax layer, whose scroll and positions are not snapped to whole
 	// layer pixels, so it slides by screen pixels instead of hopping by game pixels
 	subpixel: false,
-	// how many updates the frame being drawn covers, so animation and shake keep update pace
+	// how many updates the frame being drawn covers, so decor animation keeps update pace
 	frameSteps: 1,
 	// the scroll of the layer being drawn, taken off every room position
 	curdrawoffx: 0,
@@ -456,16 +456,16 @@ const Draw = {
 		}
 	},
 
-	// Moves a placed sprite's animation on by one frame of play, at the asset's own pace times its
+	// Moves a placed sprite's animation on by a number of updates, at the asset's own pace times its
 	// speed, wrapping around both ways. Running past either end calls its end of animation function
-	// when it has one. The frame drawing calls this right after drawing each thing.
-	// A frame of drawing that covers several updates moves the animation on by that many.
-	animate(s) {
+	// when it has one. The world moves objects on by one each update; the frame drawing moves decor
+	// pictures on by the updates the frame covers, right after drawing each.
+	animate(s, steps) {
 		if (!s.spi) return;
 		const rec = Sprites.get(s.spi);
 		const n = rec.frameCount;
 		if (!(n > 0)) return;
-		s.ifr += s.spd * rec.imageSpeed * this.frameSteps;
+		s.ifr += s.spd * rec.imageSpeed * steps;
 		let ended = false;
 		if (s.ifr >= n) {
 			s.ifr -= n * Math.floor(s.ifr / n);
@@ -721,8 +721,8 @@ const Draw = {
 
 	// ------------------------------------------------------------ the frame
 
-	// The whole frame: every room layer, then the shake and the overlay. Each thing animates right
-	// after it draws, unless drawing is paused.
+	// The whole frame: every room layer, then the shake and the overlay. Decor pictures animate right
+	// after they draw, unless play is paused; objects animate in the world's update instead.
 	// Screen shake moves the room layers only, the overlay stays still, as in the original.
 	// Shake uses the page's own random numbers so drawing never moves the game's seeded ones.
 	frame(g) {
@@ -733,7 +733,6 @@ const Draw = {
 		let shx = 0;
 		let shy = 0;
 		if (cam.shake > 0) {
-			cam.shake = Math.max(0, cam.shake - this.frameSteps);
 			const toDisplay = DISPLAY_W / ORIGINAL_SCREEN_W;
 			shx = Math.round((Math.random() * 2 - 1) * cam.xmag) * 3 * toDisplay;
 			shy = Math.round((Math.random() * 2 - 1) * cam.ymag) * 3 * toDisplay;
@@ -913,9 +912,12 @@ const Draw = {
 				if (!obj.visible || obj.disabled) continue;
 				this.totSpriteDrwn++;
 				// objects draw themselves, by default through the same sprite draw as pictures
-				if (obj instanceof oBaseObject) obj.draw();
-				else this.lpSprite(obj);
-				if (!g.drawPaused) this.animate(obj);
+				if (obj instanceof oBaseObject) {
+					obj.draw();
+				} else {
+					this.lpSprite(obj);
+					if (!g.simPaused) this.animate(obj, this.frameSteps);
+				}
 				if (SHOW_UNPORTED_MARKERS && obj.constructor.ported === false) this.unportedMarker(obj);
 			}
 

@@ -160,7 +160,8 @@ class oCamera extends oBaseObject {
 		return this.curzoom;
 	}
 
-	// A shake for a number of frames. Shaking again keeps the stronger of the two.
+	// A shake for a number of updates. Shaking again keeps the stronger of the two.
+	// The camera's update counts it down; the drawing picks the random offset.
 	shakeit(len, xmag, ymag) {
 		if (this.shake > 0) {
 			xmag = Math.max(this.xmag, xmag);
@@ -197,9 +198,11 @@ class oCamera extends oBaseObject {
 	}
 
 	// The camera's turn each frame, run by the world after every object has updated and settled:
-	// out of any blocking box, zoom on, then toward the follow spot, sliding against blocking boxes,
-	// and the new view corner.
+	// the shake counted down, out of any blocking box, zoom on, then toward the follow spot, sliding
+	// against blocking boxes, and the new view corner. It runs while play is paused too.
 	update() {
+		if (this.shake > 0) this.shake--;
+
 		const boxes = [];
 		this.instancePlaceList(this.x, this.y, oCamBox, boxes, true);
 		for (const cbox of boxes) this.pushOutOfBox(cbox);

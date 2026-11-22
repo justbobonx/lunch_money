@@ -1,5 +1,5 @@
 // A field of twinkling, drifting stars with an optional dark cover and shooting stars, set by its room entry.
-// Like the original it all runs as it draws, and shooting stars wait in real time.
+// Shooting stars wait in real time.
 class oStarField extends oBaseObject {
 	constructor() {
 		super();
@@ -88,27 +88,29 @@ class oStarField extends oBaseObject {
 		}
 	}
 
-	draw() {
-		const ox = this.x - this.exoffx;
-		const oy = this.y - this.exoffy;
-
-		if (this.coveralpha > 0) {
-			Draw.color = this.covercolor;
-			Draw.alpha = this.coveralpha;
-			Draw.rectangle(this.x, this.y, this.x + this.starfw, this.y + this.starfh, 0);
-			Draw.alpha = this.alpha;
-		}
-
+	// Twinkles and drifts the stars, moves and fades the shooting stars, and lets out a new one
+	// when its time comes. A new one shows where it starts before it first moves.
+	update() {
 		for (const star of this.starfield) {
 			star.arot = (star.arot + star.tw_speed) % (2 * Math.PI);
 			star.x = (star.x + this.velox * star.depth + this.starfw) % this.starfw;
 			star.y = (star.y + this.veloy * star.depth + this.starfh) % this.starfh;
+		}
 
-			// brighter and dimmer as it turns, and stretched along the drift
-			const br = this.brightnessBase + this.brightnessSwing * Math.abs(Math.sin(star.arot));
-			Draw.spriteExt(star.sprite, 0, ox + star.x, oy + star.y,
-				1 + this.velox * star.depth, 1 + this.veloy * star.depth,
-				0, star.color, br * this.alpha);
+		for (let i = 0; i < this.shooters.length; i++) {
+			const shoot = this.shooters[i];
+			shoot.a += shoot.aspd;
+
+			if (shoot.aspd > 0 && shoot.a >= shoot.maxa) {
+				// at full strength it starts fading out, and does not move this update
+				shoot.aspd = -(this.fadeOutMin + rng.random(this.fadeOutRange));
+			} else if (shoot.a <= 0 || (this.sh_endx !== undefined && shoot.x > this.sh_endx)) {
+				this.shooters.splice(i, 1);
+				i--;
+			} else {
+				shoot.x += shoot.xspd * shoot.depth;
+				shoot.y += shoot.yspd * shoot.depth;
+			}
 		}
 
 		if (this.shooterFreq > 0 && currentTime() > this.nextShot) {
@@ -131,24 +133,29 @@ class oStarField extends oBaseObject {
 
 			this.nextShot = currentTime() + this.shooterFreq + rng.irandom(this.shooterFreqVar);
 		}
+	}
 
-		for (let i = 0; i < this.shooters.length; i++) {
-			const shoot = this.shooters[i];
+	draw() {
+		const ox = this.x - this.exoffx;
+		const oy = this.y - this.exoffy;
 
+		if (this.coveralpha > 0) {
+			Draw.color = this.covercolor;
+			Draw.alpha = this.coveralpha;
+			Draw.rectangle(this.x, this.y, this.x + this.starfw, this.y + this.starfh, 0);
+			Draw.alpha = this.alpha;
+		}
+
+		// brighter and dimmer as it turns, and stretched along the drift
+		for (const star of this.starfield) {
+			const br = this.brightnessBase + this.brightnessSwing * Math.abs(Math.sin(star.arot));
+			Draw.spriteExt(star.sprite, 0, ox + star.x, oy + star.y,
+				1 + this.velox * star.depth, 1 + this.veloy * star.depth,
+				0, star.color, br * this.alpha);
+		}
+
+		for (const shoot of this.shooters) {
 			Draw.spriteExt(shoot.sprite, 0, ox + shoot.x, oy + shoot.y, shoot.warpw, 1, 0, "#ffffff", shoot.a * this.alpha);
-
-			shoot.a += shoot.aspd;
-
-			if (shoot.aspd > 0 && shoot.a >= shoot.maxa) {
-				// at full strength it starts fading out, and does not move this update
-				shoot.aspd = -(this.fadeOutMin + rng.random(this.fadeOutRange));
-			} else if (shoot.a <= 0 || (this.sh_endx !== undefined && shoot.x > this.sh_endx)) {
-				this.shooters.splice(i, 1);
-				i--;
-			} else {
-				shoot.x += shoot.xspd * shoot.depth;
-				shoot.y += shoot.yspd * shoot.depth;
-			}
 		}
 
 		Draw.alpha = 1;

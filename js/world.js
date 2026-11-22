@@ -174,9 +174,8 @@ class World {
 		this.loading = 0;
 		// on while a room's own objects are being placed, so their setup waits until all of them exist
 		this.placingRoom = false;
-		// play paused stops every update, drawing paused stops animation, either way the frame still draws
+		// play paused stops every update and all animation, the frame still draws
 		this.simPaused = false;
-		this.drawPaused = false;
 		// objects that come along when the player changes rooms, waiting to be placed in the new one
 		this.carryOver = [];
 		this.curuid = 0;
@@ -350,7 +349,6 @@ class World {
 		cam.reset();
 		cam.roomlimit = false;
 		this.simPaused = false;
-		this.drawPaused = false;
 		cam.fastjump = 1;
 		this.controller.conOff = false;
 		this.uiController.conOff = false;
@@ -1195,8 +1193,8 @@ class World {
 	// ------------------------------------------------------------ the frame
 
 	// One fixed step: the controller reads input first, then a waiting room change, then while play
-	// is not paused any screen over play, the room's own update, every object's update, and every
-	// after update, then the camera. Every object updates before any settles in its after update, so
+	// is not paused any screen over play, the room's own update, every object's update, every
+	// after update, and the animation of every shown object, then the camera. Every object updates before any settles in its after update, so
 	// an after update sees where everyone ended up: carried things following their carrier, riders
 	// and followers.
 	// The camera goes last so it frames where everything settled. A timer that runs out goes just
@@ -1237,6 +1235,12 @@ class World {
 			for (const o of live) {
 				if (!o.active || o.destroyed || o.afterUpdate === undefined) continue;
 				o.afterUpdate();
+			}
+			// Animation goes after everyone has settled on a picture. Only what would draw moves on:
+			// active means its room and layer are on, and hidden ones hold their frame.
+			for (const o of live) {
+				if (!o.active || o.destroyed || !o.visible) continue;
+				Draw.animate(o, 1);
 			}
 		}
 		this.cam.update();
