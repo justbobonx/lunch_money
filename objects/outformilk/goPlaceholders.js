@@ -11,8 +11,5 @@ oBouncer.ported = false;
 class oGameBoxV extends oIaBgObject {}
 oGameBoxV.ported = false;
 
-class oBike extends oIaBgObject {}
-oBike.ported = false;
-
 class oNpcChar extends oActor {}
 oNpcChar.ported = false;

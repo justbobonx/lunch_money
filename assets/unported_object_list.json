@@ -58,7 +58,6 @@
 		"oBeeTree_Bee": "oBullet",
 		"oBench": "oIaObject",
 		"oBgObject": "oBaseObject",
-		"oBike": "oIaBgObject",
 		"oBikeKeys": "oHoldObject",
 		"oBikeTopd": "oIaBgObject",
 		"oBird": "oGround",
