@@ -897,18 +897,20 @@ class World {
 					spi = "sNoSprite";
 				}
 
-				// The entry as saved is the config, picture or object, under the same names. What it
-				// leaves out takes the default, the colour gets its mark, the speed is made a number
-				// since some files keep it as text, and the spot moves by the draw offset, so the thing
-				// stands at its footprint and its picture draws back where it was placed.
+				// The entry as saved is the config, picture or object, under the same names. Only what
+				// it actually saved goes in, so anything it leaves out keeps whatever the thing set up for
+				// itself, a plain picture's defaults or an object's own starting frame and speed. The
+				// colour gets its mark, the speed is made a number since some files keep it as text, and
+				// the spot moves by the draw offset, so the thing stands at its footprint and its picture
+				// draws back where it was placed.
 				// Its setup block goes on top, then any settings kept for its name in the object file.
 				const cfg = { name: oname };
-				for (const k of LP_SAVED_FIELDS) cfg[k] = spri[k] !== undefined ? spri[k] : LP_SPRITE_DEFAULTS[k];
+				for (const k of LP_SAVED_FIELDS) if (spri[k] !== undefined) cfg[k] = spri[k];
 				cfg.spi = spi;
 				if (spri.col !== undefined) cfg.col = "#" + spri.col;
-				cfg.spd = Number(cfg.spd);
-				cfg.x += cfg.exoffx;
-				cfg.y += cfg.exoffy;
+				if (spri.spd !== undefined) cfg.spd = Number(spri.spd);
+				cfg.x = (spri.x !== undefined ? spri.x : 0) + (spri.exoffx !== undefined ? spri.exoffx : 0);
+				cfg.y = (spri.y !== undefined ? spri.y : 0) + (spri.exoffy !== undefined ? spri.exoffy : 0);
 				if (spri.paths !== undefined) cfg.paths = spri.paths;
 				if (oimap) Object.assign(cfg, oimap);
 				if (this.object_defs[oname] !== undefined) Object.assign(cfg, this.object_defs[oname]);
