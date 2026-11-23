@@ -137,6 +137,12 @@ const ED_HELP_COLUMNS = [
 			["CTRL L", "read again"],
 			["CTRL Z", "undo"],
 			["CTRL Y, CTRL SHIFT Z", "redo"]
+		]],
+		["players", [
+			["click players", "list the open player tabs, ESC closes"],
+			["click a player", "on / off; on ones in the saved room reload in place on save"],
+			["CTRL P", "save, then show the tab it opened, or open one here from the room's start"],
+			["CTRL SHIFT P", "the same, the player dropped on the current layer at the mouse"]
 		]]
 	]
 ];

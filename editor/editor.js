@@ -142,6 +142,8 @@ const Editor = {
 		}, { passive: false });
 		canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 		window.addEventListener("keydown", (e) => {
+			// the browser's print never comes up, even while a question or the settings panel has the keys
+			if ((e.ctrlKey || e.metaKey) && e.code === "KeyP") e.preventDefault();
 			// a question, or typing in the settings panel, keeps every key from the editor
 			if (this.asking || EdPanel.el.contains(document.activeElement)) return;
 			mods(e);
@@ -179,6 +181,7 @@ const Editor = {
 		// the help first, so escape closes it before the settings panel
 		EdHelp.install();
 		EdPanel.install();
+		EdLink.start();
 		this.gate();
 		const tick = (now) => {
 			this.frame(now);
@@ -360,8 +363,9 @@ const Editor = {
 	},
 
 	// Saves the room, and the world when new names were handed out or the room list changed, each
-	// with a backup of the file before. Tells whether it all went.
-	async save() {
+	// with a backup of the file before, then tells the player tabs switched on, with control shift P's
+	// drop for the tab this editor opened when given one. Tells whether it all went.
+	async save(drop) {
 		const room = this.room;
 		if (room === null || this.saving) return false;
 		this.saving = true;
@@ -386,6 +390,8 @@ const Editor = {
 		this.saving = false;
 		EdEdit.savedRev = rev;
 		this.debugtxt = " saved " + room.name;
+		// player tabs switched on in the players list read it again
+		EdLink.saved(room.name, drop);
 		return true;
 	},
 
@@ -591,6 +597,21 @@ const Editor = {
 		if (inp.ctrl && !inp.shift && inp.keysPressed.has("KeyR")) {
 			this.save().then((ok) => {
 				if (ok) this.openRoom(room.index, true);
+			});
+		}
+		// Control P saves, then brings the player tab this editor opened to the front or opens one in
+		// this room, as the original's play did. With shift it is the original's start at the mouse:
+		// the player dropped on the current layer at the mouse, or at the view's middle when the mouse
+		// is off the view, in the opened tab as it reloads or in the new one.
+		if (inp.ctrl && inp.keysPressed.has("KeyP")) {
+			const lyr = room.layers[this.curlayeri];
+			let drop;
+			if (inp.shift && lyr !== undefined) {
+				const at = this.mouseIn ? EdView.mouseOn(lyr) : EdView.toLayer(lyr, this.cam.x + this.cam.w / 2, this.cam.y + EdView.camH() / 2);
+				drop = { x: at.x, y: at.y, layer: lyr.name };
+			}
+			this.save(drop).then((ok) => {
+				if (ok) EdLink.play(room.name, drop);
 			});
 		}
 		if (inp.ctrl && !inp.shift && inp.keysPressed.has("KeyL")) {

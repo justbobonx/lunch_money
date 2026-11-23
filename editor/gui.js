@@ -1,5 +1,5 @@
 // The editor's canvas overlay, a port of the original editor's: the room header and its room list,
-// the layer list down the upper left, the picker's fields and bar along the bottom, and the status
+// the layer list down the upper left with the players row and its list under it, the picker's fields and bar along the bottom, and the status
 // line and bars over everything. It is drawn on the same canvas as the room, laid out on the
 // original's 640 wide overlay grid scaled up by a whole number, and takes the mouse and wheel in the
 // same world as the room, so nothing traps them. The layer list keeps the original's rows, prefixes,
@@ -62,6 +62,18 @@ const ED_LIST_COLOR = "#aaaabb";
 const ED_LIST_HOVER_COLOR = "#ffff00";
 const ED_LIST_ADD_TEXT = " +room...";
 
+// The players row under the layer list, shown while any player tab is known, and its list, which
+// drops below it in the room list's look. Each player shows its mark, off or on, its name and its
+// room, in grey when off, orange when on in another room, and green when on in
+// the room being edited. The row under the mouse shows fully, the others a little faded.
+const ED_PLAYERS_TEXT = "players";
+const ED_PLAYERS_COLOR = "#aaaabb";
+const ED_PLAYER_OFF_MARK = "x  ";
+const ED_PLAYER_ON_MARK = "[] ";
+const ED_PLAYER_OFF_COLOR = "#888888";
+const ED_PLAYER_AWAY_COLOR = "#ffaa33";
+const ED_PLAYER_HERE_COLOR = "#55ee55";
+
 // The status line along the top and the bars above and below the room.
 const ED_HUD_X = 2;
 const ED_HUD_Y = -3;
@@ -89,6 +101,10 @@ const EdGui = {
 	// the room list, open or not, and its row under the mouse
 	listOpen: false,
 	listHover: -1,
+	// the players row's height on the overlay, and its list, open or not, and its row under the mouse
+	playersY: 0,
+	playersOpen: false,
+	playersHover: -1,
 	// set when folding changed which rows show, the next step pages again
 	needLyrGuiReset: false,
 	// an area to focus on at the end of the step, from a double click on its folded header
@@ -161,6 +177,7 @@ const EdGui = {
 			curacti++;
 		});
 		this.addY = ED_ROOM_Y + ED_ROWS_DY + curacti * ED_ROW_H;
+		this.playersY = this.addY + ED_ROW_H;
 		const numpages = Math.ceil(totact / ED_ROWS_PER_PAGE);
 		if (numpages > 1) {
 			const marks = "_".repeat(numpages - 1);
@@ -511,11 +528,12 @@ const EdGui = {
 				li === ed.curlayeri ? ED_ROW_CUR_COLOR : (lyr.txt.disabled ? ED_ROW_HIDDEN_COLOR : ED_ROW_COLOR), 0);
 		});
 		add("add", null, ED_ADD_X, this.addY, this.addPretext, " +", ED_ADD_COLOR, 0);
+		if (EdLink.players.length > 0) add("players", null, ED_ROOM_X + ED_ROW_DX, this.playersY, "", ED_PLAYERS_TEXT, ED_PLAYERS_COLOR, 0);
 		for (const f of EdPicker.fields(ed.canvas.height / this.scale)) add(f.kind, null, f.x, f.y, f.pretext, f.text, f.color, f.minw);
 		return list;
 	},
 
-	// The overlay's share of a step: the room list while it is open, else the field under the mouse
+	// The overlay's share of a step: the room list or the players list while open, else the field under the mouse
 	// and what its clicks and wheel do. Tells whether the mouse is on the overlay, so the room
 	// underneath leaves the input alone.
 	step() {
@@ -542,6 +560,22 @@ const EdGui = {
 			return true;
 		}
 
+		// The players list: a click on a player switches it, any press off the list or escape closes
+		// it, and it closes by itself when the last player tab goes.
+		if (this.playersOpen) {
+			const players = EdLink.players;
+			const ly = this.playersY + ED_ROW_H;
+			const inside = mx >= ED_ROOM_X + ED_ROW_DX && mx < ED_ROOM_X + ED_ROW_DX + ED_LIST_W + ED_LIST_PAD_W
+				&& my >= ly && my < ly + players.length * ED_LIST_ROW_H + ED_LIST_PAD_H;
+			this.playersHover = inside ? Math.min(Math.floor((my - ly) / ED_LIST_ROW_H), players.length - 1) : -1;
+			if (players.length > 0 && inside && inp.pressed.left) {
+				players[this.playersHover].on = !players[this.playersHover].on;
+			} else if (players.length === 0 || inp.pressed.left || inp.pressed.right || inp.pressed.middle || inp.keysPressed.has("Escape")) {
+				this.playersOpen = false;
+			}
+			return true;
+		}
+
 		// the overlay is hidden while showing as the player, and takes nothing then
 		this.hot = { kind: null, lyr: null };
 		if (ed.showAsPlayer && this.edit === null) return false;
@@ -557,6 +591,13 @@ const EdGui = {
 		if (EdPicker.step()) return true;
 		if (hit === null) return false;
 		this.hot = { kind: hit.kind, lyr: hit.lyr };
+		if (hit.kind === "players") {
+			if (inp.pressed.left) {
+				this.playersOpen = true;
+				this.playersHover = -1;
+			}
+			return true;
+		}
 		// control and a left click copies a field's text, as the original's fields did
 		if (inp.pressed.left && inp.ctrl && hit.kind !== "add") {
 			navigator.clipboard.writeText(hit.kind === "row" ? hit.lyr.name : (hit.kind === "header" ? room.name : hit.text)).catch(() => {});
@@ -677,7 +718,7 @@ const EdGui = {
 		return true;
 	},
 
-	// The overlay: the status line and bars, the fields and the room list.
+	// The overlay: the status line and bars, the fields, the room list and the players list.
 	draw() {
 		const ed = Editor;
 		const room = ed.room;
@@ -751,6 +792,23 @@ const EdGui = {
 			rows.forEach((text, i) => {
 				Draw.color = i === this.listHover ? ED_LIST_HOVER_COLOR : ED_LIST_COLOR;
 				Draw.textRaw(ED_LIST_X + ED_LIST_TEXT_DX, ED_LIST_Y + i * ED_LIST_ROW_H + ED_LIST_TEXT_DY, text, -1, -1, 1, 1, 0);
+			});
+		}
+
+		// the players list, drawn plainly like the room list
+		if (this.playersOpen && EdLink.players.length > 0) {
+			const players = EdLink.players;
+			const lx = ED_ROOM_X + ED_ROW_DX;
+			const ly = this.playersY + ED_ROW_H;
+			Draw.color = ED_FIELD_BACK_COLOR;
+			Draw.alpha = ED_FIELD_BACK_ALPHA;
+			Draw.rectangle(lx, ly, lx + ED_LIST_W + ED_LIST_PAD_W - 1, ly + players.length * ED_LIST_ROW_H + ED_LIST_PAD_H - 1, false);
+			Draw.setFont(ED_GUI_FONT);
+			players.forEach((p, i) => {
+				Draw.color = !p.on ? ED_PLAYER_OFF_COLOR : (p.room === room.name ? ED_PLAYER_HERE_COLOR : ED_PLAYER_AWAY_COLOR);
+				Draw.alpha = i === this.playersHover ? ED_FIELD_HOT_ALPHA : ED_FIELD_ALPHA;
+				Draw.textRaw(lx + ED_LIST_TEXT_DX, ly + i * ED_LIST_ROW_H + ED_LIST_TEXT_DY,
+					(p.on ? ED_PLAYER_ON_MARK : ED_PLAYER_OFF_MARK) + p.name + " " + p.room, -1, -1, 1, 1, 0);
 			});
 		}
 

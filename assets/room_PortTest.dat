@@ -11,7 +11,7 @@
 			"colheaderi":0
 		}
 	},
-	"camy":-16.023231,
+	"camy":-32.708215,
 	"camw":256,
 	"roomw":320,
 	"bd_color":"223762",
@@ -64,14 +64,18 @@
 			"wd":320,
 			"visible":1,
 			"name":"a.bg",
-			"spriteList":[]
-		},
-		{
-			"group":"a",
-			"wd":320,
-			"visible":1,
-			"name":"a.",
 			"spriteList":[{
+				"x":58,
+				"x_sc":-1,
+				"y":111,
+				"spi":"sDoggie_stand",
+				"name":"18D662"
+			},{
+				"x":-27,
+				"y":111,
+				"spi":"sDoggie_stand",
+				"name":"18D661"
+			},{
 				"x":-0.02046,
 				"y":-0.53197,
 				"spi":"dk_block",
@@ -88,17 +92,6 @@
 				"y":107.007673,
 				"spi":"s_bd_grass_long_et",
 				"name":"18D643"
-			},{
-				"objinit":»{
-					"objtype": "oCharSide",
-					"mainchar": 1,
-					"skin": "guy"
-				}«,
-				"x":2.618926,
-				"isobj":"oGuyPlacer",
-				"y":-14.87468,
-				"spi":"_guy_placer",
-				"name":"18D646"
 			},{
 				"spd":"0",
 				"x":19.762148,
@@ -198,6 +191,97 @@
 				"y":102,
 				"spi":"sBox1",
 				"name":"18D660"
+			},{
+				"x":44,
+				"y":83,
+				"spi":"sDoggie_jump",
+				"name":"18D662"
+			},{
+				"x":44,
+				"y":96,
+				"spi":"sDoggie_jump",
+				"name":"18D663"
+			},{
+				"x":57,
+				"y":96,
+				"spi":"sDoggie_jump",
+				"name":"18D664"
+			},{
+				"x":70,
+				"y":96,
+				"spi":"sDoggie_jump",
+				"name":"18D665"
+			},{
+				"spd":"0",
+				"x":-87,
+				"isobj":"oGround",
+				"y":26,
+				"spi":"sBox1",
+				"name":"18D666"
+			},{
+				"x":-68,
+				"col":"31BF54",
+				"y_sc":1.935463,
+				"x_sc":0.946326,
+				"isobj":"oFloor",
+				"y":10,
+				"spi":"sFloor",
+				"name":"18D667"
+			},{
+				"x":-38,
+				"col":"31BF54",
+				"y_sc":0.863109,
+				"x_sc":0.822487,
+				"isobj":"oFloor",
+				"y":10,
+				"spi":"sFloor",
+				"name":"18D668"
+			},{
+				"spd":"0",
+				"x":25.762148,
+				"isobj":"oGround",
+				"y":53.150896,
+				"spi":"eas_tree",
+				"name":"18D669"
+			},{
+				"spd":"0",
+				"x":47.762148,
+				"isobj":"oGround",
+				"y":62.150896,
+				"spi":"eas_tree",
+				"name":"18D66A"
+			},{
+				"spd":"0",
+				"x":24.762148,
+				"isobj":"oGround",
+				"y":82.150896,
+				"spi":"eas_tree",
+				"name":"18D66B"
+			},{
+				"spd":"0",
+				"x":-62.237852,
+				"isobj":"oGround",
+				"y":0.150896,
+				"spi":"eas_bush_sm",
+				"name":"18D66C"
+			}]
+		},
+		{
+			"group":"a",
+			"wd":320,
+			"visible":1,
+			"name":"a.",
+			"spriteList":[{
+				"objinit":»{
+					"objtype": "oCharSide",
+					"mainchar": 1,
+					"skin": "guy"
+				}«,
+				"x":2.618926,
+				"isobj":"oGuyPlacer",
+				"y":-14.87468,
+				"spi":"_guy_placer",
+				"name":"18D646"
 			}]
 		},
 		{
@@ -208,7 +292,7 @@
 			"spriteList":[]
 		}
 	],
-	"last_ob_flt":"ground",
-	"last_sp_flt":"box",
-	"camx":-113.013846
+	"last_ob_flt":"floo",
+	"last_sp_flt":"",
+	"camx":-130.934442
 }

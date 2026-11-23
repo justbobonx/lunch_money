@@ -178,13 +178,6 @@ const Loading = {
 	}
 };
 
-// The room to start in comes from the page address, as a room parameter, when one is given.
-function startRoomFromAddress() {
-	if (typeof location === "undefined") return undefined;
-	const m = /[?&]room=([^&]*)/.exec(location.search || "");
-	return m ? decodeURIComponent(m[1]) : undefined;
-}
-
 // The saved game: the room, the player's spot, layer and facing, and whether each of the room's
 // layers is switched on, so the player comes back in a layer that runs. Every layer is kept, not
 // just those that differ from the room file, since starting a room already switches off the areas
@@ -221,18 +214,39 @@ const Save = {
 		}
 	},
 
-	// The layers are kept by name as switched on or not.
-	write() {
-		if (!this.enabled || game.curroom === null || game.curroom.layers === null || game.guy === null || game.guy.dead) return;
+	// What a save keeps of play as it is now, or nothing when there is no room or the player is
+	// dead. The layers are kept by name as switched on or not. Writing the save takes it, and so
+	// does the editor's link, to carry on where it was after building the room again.
+	snapshot() {
+		if (game.curroom === null || game.curroom.layers === null || game.guy === null || game.guy.dead) return null;
 		const guy = game.guy;
 		const layers = {};
 		for (const lyr of game.curroom.layers) layers[lyr.name] = !lyr.disabled;
-		const sv = {
+		return {
 			world: WORLD_NAME, room: game.curroom.name, x: guy.x, y: guy.y,
 			layer: guy.mylayer ? guy.mylayer.name : undefined, facing: guy.facing, facingy: guy.facingy,
 			layers: layers
 		};
+	},
+
+	write() {
+		if (!this.enabled) return;
+		const sv = this.snapshot();
+		if (sv === null) return;
 		try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { /* nothing kept */ }
+	},
+
+	// Back to where a save was taken, in the room just started, unless that is not the save's room,
+	// as when the saved room was not there to start in. The saved layers are switched first, through
+	// the same switch scripts use, so their objects run or stop with them; a layer the room no
+	// longer has is passed over. The page's start and the editor's link both come back this way.
+	restore(sv) {
+		if (sv === null || game.curroom === null || game.curroom.layers === null || game.curroom.name !== sv.room) return;
+		for (const lyr of game.curroom.layers) {
+			const on = sv.layers[lyr.name];
+			if (on !== undefined) game.layerSetEnabled(lyr, on);
+		}
+		if (game.guy !== null) game.placeGuyAt(sv.x, sv.y, sv.layer, sv.facing, sv.facingy);
 	},
 
 	// Each update: saves on a change of room, and every so often.
@@ -285,6 +299,7 @@ const DEBUG_KEYS = [
 		act: () => {
 			if (game.curroom === null || game.guy === null) return;
 			game.guy.reviveInPlace();
+			game.findAndGotoAreaAtGuy();
 			game.settleGuy();
 			// every particle goes, the blood with the rest, as the original did on its revive
 			for (const o of game.instances) {
@@ -436,24 +451,33 @@ const Shell = {
 
 		Loading.draw();
 
-		// a room asked for in the address wins over the save
-		let startName = startRoomFromAddress();
-		const saved = startName === undefined ? Save.read() : null;
-		if (saved !== null) startName = saved.room;
+		// A room asked for in the address wins over the save's, and the save then comes back only
+		// when it is of that room. A drop asked for with it, a spot and a layer, wins over the save
+		// just this once, and the start puts the player there or, with that layer switched off in
+		// play, starts the room as usual. The drop then comes off the address, so a refresh starts
+		// the usual way.
+		const params = new URLSearchParams(location.search);
+		const saved = Save.read();
+		let startName = params.has(LINK_ROOM_PARAM) ? params.get(LINK_ROOM_PARAM) : undefined;
+		if (startName === undefined && saved !== null) startName = saved.room;
+		const dropx = parseFloat(params.get(LINK_X_PARAM));
+		const dropy = parseFloat(params.get(LINK_Y_PARAM));
+		const drop = startName !== undefined && isFinite(dropx) && isFinite(dropy) && params.has(LINK_LAYER_PARAM)
+			? { x: dropx, y: dropy, layer: params.get(LINK_LAYER_PARAM) } : undefined;
+		if (params.has(LINK_X_PARAM) || params.has(LINK_Y_PARAM) || params.has(LINK_LAYER_PARAM)) {
+			params.delete(LINK_X_PARAM);
+			params.delete(LINK_Y_PARAM);
+			params.delete(LINK_LAYER_PARAM);
+			const rest = params.toString();
+			history.replaceState(history.state, "", location.pathname + (rest !== "" ? "?" + rest : "") + location.hash);
+		}
 		const roomText = await game.loadFiles(readText, startName, loadScript, Loading);
 		await Sprites.load(readJson, loadImage, spriteNamesInRoom(roomText), undefined, Loading);
 		await Draw.loadFonts(readJson, loadImage);
-		game.start(startName);
-		// Back to where they were, unless the saved room was not there to start in. The saved layers
-		// are switched first, through the same switch scripts use, so their objects run or stop with
-		// them; a layer the room no longer has is passed over.
-		if (saved !== null && game.curroom !== null && game.curroom.layers !== null && game.curroom.name === saved.room) {
-			for (const lyr of game.curroom.layers) {
-				const on = saved.layers[lyr.name];
-				if (on !== undefined) game.layerSetEnabled(lyr, on);
-			}
-			if (game.guy !== null) game.placeGuyAt(saved.x, saved.y, saved.layer, saved.facing, saved.facingy);
-		}
+		game.start(startName, drop);
+		if (drop === undefined) Save.restore(saved);
+		// the editor can find this tab once it is playing; nothing happens when there is none
+		PlayerLink.start(window, params.get(LINK_NAME_PARAM));
 
 		const stepMs = 1000 / GAME_FPS;
 		const tick = (now) => {
@@ -468,6 +492,7 @@ const Shell = {
 					game.step();
 					Save.update();
 				}
+				PlayerLink.update();
 				this.acc -= stepMs;
 				steps++;
 			}

@@ -115,6 +115,9 @@ class Room {
 		this.text = null;
 		// the room's object settings file text, when it has one
 		this.objDefsText = null;
+		// set when the file was read again for the editor after the room was built, so the next
+		// time the player enters it the built copy goes and it is built again from the new file
+		this.textNewer = false;
 	}
 
 	// A room's own logic. Setup runs once the room is built, with everything in it made and set up.
@@ -285,9 +288,10 @@ class World {
 		return start && start.text ? start.text : "";
 	}
 
-	// Reads a room's file again, for the room picker and the restart from file, so the room is built
-	// from its file as it is now, then loads the sprites it places. Room changes by doors and scripts
-	// never come here; they go to the room as it is in memory. When the read fails the copy in memory stays, with a warning.
+	// Reads a room's file again, for the room picker, the restart from file and the editor's link,
+	// so the room is built from its file as it is now, then loads the sprites it places. Room changes
+	// by doors and scripts never come here; they go to the room as it is in memory, unless the
+	// editor's link marked it as read again since it was built. When the read fails the copy in memory stays, with a warning.
 	async freshenRoom(rmi) {
 		const rm = this.rooms[rmi];
 		try {
@@ -344,10 +348,17 @@ class World {
 	// ------------------------------------------------------------ start
 
 	// The player start: camera reset with room limits off, the start room entered, a top down
-	// stand in made if the room has no player, then the player settled into the room.
+	// stand in made if the room has no player, then the player moved into whatever area they stand
+	// in and settled into the room.
 	// The start room is given by number or name. With none given it is the set start room,
 	// and when the world has no room of that name, the world file's own.
-	start(startrmi) {
+	// A drop, the editor's start at the mouse as the original's was, gives a spot and a layer by
+	// name. When the start room is the one asked for and has that layer switched on, the player goes
+	// on that layer at the spot, keeping their facing, and stays on it rather than moving into the
+	// area there. The area kept is the one the layer belongs to, or for a layer in no area the one at
+	// the spot, and every other area is switched off as entering one does. Otherwise the drop is
+	// passed over and the room starts as usual.
+	start(startrmi, drop) {
 		const cam = this.cam;
 		cam.reset();
 		cam.roomlimit = false;
@@ -364,6 +375,7 @@ class World {
 			const fallback = info.startroomi !== undefined ? info.startroomi : 0;
 			console.log("start room not available, using room " + fallback);
 			rmi = fallback;
+			drop = undefined;
 		}
 		this.switchRoom(rmi);
 		this.loading = 0;
@@ -371,6 +383,17 @@ class World {
 
 		if (this.guy === null) this.placeStandInGuy();
 		Hooks.todo("loading the player's saved state and inventory");
+		const guy = this.guy;
+		const dropLyr = drop !== undefined ? this.findLayer(drop.layer) : undefined;
+		if (dropLyr !== undefined && !Array.isArray(dropLyr) && !dropLyr.disabled) {
+			if (guy.mylayer !== dropLyr) this.layerInsert(dropLyr, guy);
+			guy.x = drop.x;
+			guy.y = drop.y;
+			const grp = dropLyr.lgroup !== undefined && dropLyr.lgroup.type === LGT_CONNECTED ? dropLyr.lgroup : this.findGroupAt(guy.x, guy.y);
+			if (grp !== undefined) this.keepOnlyArea(grp.name);
+		} else {
+			this.findAndGotoAreaAtGuy();
+		}
 
 		this.settleGuy();
 		this.frames = 0;
@@ -379,17 +402,15 @@ class World {
 		this.last_cp = { x: this.guy.x, y: this.guy.y };
 	}
 
-	// What follows entering a room with the player in it: the camera takes the room's size, the
-	// player moves into whatever area they stand in, top down players are lifted onto what they
-	// stand on, and the camera jumps to them.
+	// What follows entering a room with the player in it, once they are in their area: the camera
+	// takes the room's size, top down players are lifted onto what they stand on, and the camera
+	// jumps to them.
 	settleGuy() {
 		const cam = this.cam;
 		const guy = this.guy;
 		// the original takes the size from the room the editor had open, the start room
 		cam.curw = this.curroom.wd;
 		cam.curh = this.curroom.wd * 9 / 16;
-
-		this.findAndGotoAreaAtGuy();
 
 		if (guy.ch_topd) {
 			guy.calcOnFloorAtWallTopd();
@@ -399,7 +420,8 @@ class World {
 	}
 
 	// Puts the player where a save says: the spot, the layer by name when the room has it, the way
-	// they face, then settled into the room as at the start, with the camera on them.
+	// they face, then moved into the area there and settled into the room as at the start, with the
+	// camera on them.
 	placeGuyAt(x, y, layerName, facing, facingy) {
 		const guy = this.guy;
 		const lyr = typeof layerName === "string" ? this.findLayer(layerName) : undefined;
@@ -408,6 +430,7 @@ class World {
 		guy.y = y;
 		if (facing !== undefined) guy.facing = facing;
 		if (facingy !== undefined) guy.facingy = facingy;
+		this.findAndGotoAreaAtGuy();
 		this.settleGuy();
 		this.last_cp = { x: guy.x, y: guy.y };
 	}
@@ -443,28 +466,13 @@ class World {
 		this.guy = null;
 		// a screen over play goes with the world it showed
 		Screens.forget();
-		// objects are destroyed, so they take what they own with them, pictures are just dropped
-		const remove = (obj) => {
+		for (const rm of this.rooms) this.dropRoom(rm);
+		// whatever was left in no layer, such as masks and objects that never run
+		for (const name of Object.keys(this.allObjects)) {
+			const obj = this.allObjects[name];
 			if (obj instanceof oBaseObject) obj.destroy();
 			else this.forgetObject(obj);
-		};
-		for (const rm of this.rooms) {
-			if (rm.layers !== null) {
-				rm.teardown();
-				for (const lyr of rm.layers) {
-					for (const obj of lyr.lsprites.slice()) remove(obj);
-				}
-			}
-			rm.layers = null;
-			rm.mainchar = null;
-			rm.disabled = 0;
-			rm.last_layer_st = null;
-			rm.lastlyr = undefined;
-			rm.lastx = undefined;
-			rm.lasty = undefined;
 		}
-		// whatever was left in no layer, such as masks and objects that never run
-		for (const name of Object.keys(this.allObjects)) remove(this.allObjects[name]);
 		this.instances.length = 0;
 		this.carryOver.length = 0;
 		this.allObjects = Object.create(null);
@@ -485,16 +493,44 @@ class World {
 		this.weather.set_weather(WEATHER_NONE);
 	}
 
+	// Takes a built room apart so it can be built again: its own teardown, then everything in its
+	// layers destroyed, so objects take what they own with them while pictures are just dropped, and
+	// gone from the named groups too, then the room back as before it was first entered. Clearing the
+	// world does this to every room; entering a room whose file was read again does it to that one.
+	dropRoom(rm) {
+		if (rm.layers !== null) {
+			rm.teardown();
+			for (const lyr of rm.layers) {
+				for (const obj of lyr.lsprites.slice()) {
+					if (obj instanceof oBaseObject) obj.destroy();
+					else this.forgetObject(obj);
+				}
+			}
+			for (const name of Object.keys(this.obj_groups)) {
+				const gp = this.obj_groups[name];
+				gp.spr_list = gp.spr_list.filter((obj) => !obj.destroyed);
+			}
+		}
+		rm.layers = null;
+		rm.mainchar = null;
+		rm.disabled = 0;
+		rm.last_layer_st = null;
+		rm.lastlyr = undefined;
+		rm.lastx = undefined;
+		rm.lasty = undefined;
+	}
+
 	// Plays from a room the way the editor's play button does: the world cleared, then the
 	// start run again with this room as the start room. The player comes from the room's own
 	// setup, or is made as a stand in if it has none. Starting fresh matters: a player kept from
 	// another room would be of the wrong kind, since players share a name across rooms.
-	// Gives back false when the room has no file, leaving everything as it was.
-	enterRoom(which) {
+	// A drop goes to the start. Gives back false when the room has no file, leaving everything as it
+	// was.
+	enterRoom(which, drop) {
 		const rmi = this.findRoomIndex(which);
 		if (rmi < 0 || this.rooms[rmi].text === null) return false;
 		this.clearWorld();
-		this.start(rmi);
+		this.start(rmi, drop);
 		return this.curroom !== null && this.curroom.layers !== null;
 	}
 
@@ -808,12 +844,15 @@ class World {
 	findAndGotoAreaAtGuy() {
 		const gb = this.findGroupAt(this.guy.x, this.guy.y);
 		if (gb === undefined) return;
-		const startGrp = gb.name;
-		this.moveObjToLayer(this.guy, this.findLayer(startGrp + "."));
+		this.moveObjToLayer(this.guy, this.findLayer(gb.name + "."));
+		this.keepOnlyArea(gb.name);
+	}
+
+	// Switches off the layers of every area but the one named, the system ones aside, leaving that
+	// one's as they are.
+	keepOnlyArea(name) {
 		for (const lyr of this.curroom.layers) {
-			if (lyr.group !== undefined && lyr.group !== startGrp && lyr.group.charAt(0) !== "_") {
-				this.layerViz(lyr, 0);
-			}
+			if (lyr.group !== undefined && lyr.group !== name && lyr.group.charAt(0) !== "_") this.layerViz(lyr, 0);
 		}
 	}
 
@@ -825,6 +864,7 @@ class World {
 	loadRoom(rmi) {
 		const rm = this.rooms[rmi];
 		if (rm.text === null) return;
+		rm.textNewer = false;
 		const smap = this.parseRoom(rm.text);
 		this.loadObjectDefs(rm);
 
@@ -1080,6 +1120,8 @@ class World {
 		}
 		this.cur_areas_inview.length = 0;
 
+		// a room whose file the editor saved since it was built is built again from that file
+		if (this.rooms[rmi].textNewer) this.dropRoom(this.rooms[rmi]);
 		this.curroomi = rmi;
 		this.curroom = this.rooms[rmi];
 		if (this.curroom.layers === null) {
