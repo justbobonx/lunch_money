@@ -472,7 +472,6 @@ const Editor = {
 		this.lastDevY = mouse.devy;
 		const wh = Math.sign(inp.wheel);
 
-		EdPanel.step();
 		if (EdGui.needLyrGuiReset) {
 			EdGui.needLyrGuiReset = false;
 			EdGui.page();
@@ -486,7 +485,11 @@ const Editor = {
 		if (inp.pressed.left) EdEdit.fromRoom = !ingui;
 		// the editing keys, unless a field took them; showing every hidden entry ends the step
 		const going = editing || EdGui.edit !== null || EdEdit.keys();
-		if (!editing && EdGui.edit === null && inp.keysPressed.has("Tab")) EdPicker.setMode((EdPicker.mode + 1) % ED_PICK_MODE_NAMES.length);
+		// tab switches the picker's mode, or with F held steps through what was found, back with shift
+		if (!editing && EdGui.edit === null && inp.keysPressed.has("Tab")) {
+			if (inp.keysDown.has("KeyF")) EdEdit.showFound(inp.shift ? -1 : 1);
+			else EdPicker.setMode((EdPicker.mode + 1) % ED_PICK_MODE_NAMES.length);
+		}
 
 		if (!ingui) {
 			if (inp.alt && wh !== 0) EdGui.rotate(wh, inp.shift);
@@ -549,6 +552,8 @@ const Editor = {
 			EdGui.focus(EdGui.focuson);
 			EdGui.focuson = null;
 		}
+		// last, so the panel sees whether this step's press opened it or should close it
+		EdPanel.step();
 	},
 
 	// The keys that work wherever the mouse is: the backdrops, folding every group, paging the layer

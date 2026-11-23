@@ -32,6 +32,8 @@ const ED_GRID_MAX = 64;
 const ED_GRID_FALL = 8;
 // new names are the world's next number in this many hex digits at least
 const ED_UID_DIGITS = 5;
+// the object marking the player start, which control F finds
+const ED_PLAYER_START_OBJECT = "oGuyPlacer";
 
 const EdEdit = {
 	// the selected entries, in the order they were selected, and the box round them in view space
@@ -70,6 +72,8 @@ const EdEdit = {
 	fromRoom: false,
 	// whether the wheel picked through the stack since the mouse last moved
 	hoverWheeled: false,
+	// which selected entry finding last centred on
+	foundi: 0,
 	lastPress: 0,
 
 	// A room just opened or read again: nothing selected, held or to undo.
@@ -174,17 +178,61 @@ const EdEdit = {
 		this.selects = [];
 	},
 
-	// The box round the selection in view space, from every picture's corners, stretched but not
-	// turned, as the original measured it.
+	// Finding, as the original's: selects every entry of an object type, also of one sprite when
+	// given, or every plain sprite entry of a sprite, on every layer that can be picked from, alt
+	// letting locked layers and visible folded groups through, and leaving out hidden entries. They
+	// are selected in layer order, then list order, and the view centres on the first.
+	find(match, alt) {
+		const room = Editor.room;
+		const found = [];
+		room.layers.forEach((lyr, li) => {
+			if (!EdView.pickable(lyr, li, alt)) return;
+			for (const rec of lyr.lsprites) {
+				if (rec.hidden) continue;
+				const hit = match.isobj !== undefined ? rec.isobj === match.isobj && (match.spi === undefined || rec.spi === match.spi)
+					: rec.isobj === undefined && rec.spi === match.spi;
+				if (hit) found.push(rec);
+			}
+		});
+		this.clear();
+		for (const rec of found) this.select(rec, false);
+		this.foundi = 0;
+		this.showFound(0);
+	},
+
+	// Centres the view on a selected entry, stepping from the last one centred on by the given
+	// count and wrapping round, makes its layer current, and tells in the status line which of
+	// how many it is.
+	showFound(step) {
+		const ed = Editor;
+		const n = this.selects.length;
+		if (n === 0) {
+			ed.debugtxt = " none found";
+			return;
+		}
+		this.foundi = (((this.foundi + step) % n) + n) % n;
+		const rec = this.selects[this.foundi];
+		const p = EdView.spot(rec);
+		const v = EdView.toView(rec.mylayer, p.x, p.y);
+		EdView.centerOn(v.x, v.y);
+		EdGui.selectLayer(ed.room.layers.indexOf(rec.mylayer));
+		ed.debugtxt = " found " + (this.foundi + 1) + "/" + n;
+	},
+
+	// The box round the selection in view space, from every picture's corners about its spot,
+	// stretched but not turned, as the original measured it. On a layer drawn on whole pixels the
+	// corners round to the pixels the picture covers.
 	updateBox() {
 		if (this.selects.length === 0) return;
 		const b = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
 		for (const rec of this.selects) {
 			const sr = Sprites.get(rec.spi);
-			const l = rec.x - rec.exoffx + rec.loopdx - sr.ox * rec.x_sc;
-			const t = rec.y - rec.exoffy + rec.loopdy - sr.oy * rec.y_sc;
-			const p = EdView.toView(rec.mylayer, l, t);
-			const q = EdView.toView(rec.mylayer, l + sr.w * rec.x_sc, t + sr.h * rec.y_sc);
+			const o = EdView.spot(rec);
+			const whole = rec.mylayer.lens.parax ? (v) => v : Math.round;
+			const l = o.x - sr.ox * rec.x_sc;
+			const t = o.y - sr.oy * rec.y_sc;
+			const p = EdView.toView(rec.mylayer, whole(l), whole(t));
+			const q = EdView.toView(rec.mylayer, whole(l + sr.w * rec.x_sc), whole(t + sr.h * rec.y_sc));
 			b.x1 = Math.min(b.x1, p.x, q.x);
 			b.y1 = Math.min(b.y1, p.y, q.y);
 			b.x2 = Math.max(b.x2, p.x, q.x);
@@ -408,6 +456,8 @@ const EdEdit = {
 			}
 			this.updateBox();
 		}
+		// control F with nothing under the mouse finds the player start
+		if (inp.ctrl && hit("KeyF") && ed.hovers.length === 0) this.find({ isobj: ED_PLAYER_START_OBJECT }, inp.alt);
 		if (hit("Escape")) this.clear();
 		if (hit("Delete") && !held("KeyO") && this.selects.length > 0) {
 			this.push();
@@ -480,7 +530,8 @@ const EdEdit = {
 						this.select(rec, false);
 					}
 				} else if (!this.lastPlaced.some((rec) => {
-					const s = maskShape(rec, rec.x - rec.exoffx, rec.y - rec.exoffy);
+					const p = EdView.spot(rec);
+					const s = maskShape(rec, p.x, p.y);
 					return s && pointInShape(s, gx, gy);
 				})) {
 					// Filling: copies laid on a grid the first copy's size in whole pixels, never less
@@ -513,7 +564,8 @@ const EdEdit = {
 				const my = Math.floor(ml.y);
 				const gone = lyr.lsprites.filter((rec) => {
 					if (rec.spi !== item.spi) return false;
-					const s = maskShape(rec, rec.x - rec.exoffx + rec.loopdx, rec.y - rec.exoffy + rec.loopdy);
+					const p = EdView.spot(rec);
+					const s = maskShape(rec, p.x, p.y);
 					return s && pointInShape(s, mx, my);
 				});
 				if (gone.length > 0) {
@@ -541,6 +593,10 @@ const EdEdit = {
 				const s0 = this.selects[0];
 				const p = EdView.toView(s0.mylayer, s0.x - s0.exoffx + s0.loopdx, s0.y - s0.exoffy + s0.loopdy);
 				this.rotateStAng = (s0.ang - Math.round(pointDirection(p.x, p.y, mouse.wx, mouse.wy)) + 720) % 360;
+			} else if (hovers.length > 0 && held("KeyF")) {
+				// F finds the type of the entry clicked; with control an object also of its sprite
+				const hover = hovers[ed.curhoveri];
+				this.find(hover.isobj !== undefined ? { isobj: hover.isobj, spi: inp.ctrl ? hover.spi : undefined } : { spi: hover.spi }, inp.alt);
 			} else if (hovers.length > 0) {
 				const hover = hovers[ed.curhoveri];
 				const seldown = this.hoverWheeled ? undefined : hovers.find((h) => h.selected);
@@ -555,8 +611,8 @@ const EdEdit = {
 						seldown.tiledy = t;
 						seldown.tile_loop = t && inp.shift ? 1 : 0;
 						EdRoom.refresh(seldown);
-					} else if (held("KeyF") || held("KeyG") || held("KeyP") || held("KeyB")) {
-						// finding, groups, paths and area backdrops come in a later phase
+					} else if (held("KeyG") || held("KeyP") || held("KeyB")) {
+						// groups, paths and area backdrops come in a later phase
 					} else if (held("KeyH")) {
 						seldown.hidden = 1;
 						this.clear();
@@ -609,7 +665,8 @@ const EdEdit = {
 				const rect = { l: a.x, t: a.y, r: b.x, b: b.y };
 				for (const rec of lyr.lsprites) {
 					if (rec.hidden || rec.selected) continue;
-					const s = maskShape(rec, rec.x - rec.exoffx + rec.loopdx, rec.y - rec.exoffy + rec.loopdy);
+					const p = EdView.spot(rec);
+					const s = maskShape(rec, p.x, p.y);
 					if (s && shapesOverlap(s, rect)) {
 						rec.selected = true;
 						this.selects.push(rec);
@@ -804,7 +861,8 @@ const EdEdit = {
 			const rect = { l: a.x, t: a.y, r: b.x, b: b.y };
 			const overlaps = lyr0.lsprites.filter((rec) => {
 				if (rec.hidden) return false;
-				const s = maskShape(rec, rec.x - rec.exoffx + rec.loopdx, rec.y - rec.exoffy + rec.loopdy);
+				const p = EdView.spot(rec);
+				const s = maskShape(rec, p.x, p.y);
 				return s && shapesOverlap(s, rect);
 			});
 			if (overlaps.length > sel.length) {
@@ -863,7 +921,7 @@ const EdEdit = {
 					this.clear();
 					this.select(rec, false);
 				}
-				EdPanel.open(rec, mouse.devx / ed.dpr, mouse.devy / ed.dpr);
+				EdPanel.open("entry", this.selects.slice(), rec, mouse.devx / ed.dpr, mouse.devy / ed.dpr);
 			} else {
 				this.clear();
 			}

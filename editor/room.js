@@ -39,6 +39,11 @@ const EdRoom = {
 			grid_size: smap.grid_size !== undefined ? smap.grid_size : ED_DEFAULT_GRID,
 			last_sp_flt: smap.last_sp_flt !== undefined ? smap.last_sp_flt : ED_DEFAULT_SPRITE_FILTER,
 			last_ob_flt: smap.last_ob_flt !== undefined ? smap.last_ob_flt : ED_DEFAULT_OBJECT_FILTER,
+			// the backdrop colour as hex digits, and the room's setup block as its raw text, with
+			// whether the panel wrote that block and it waits to be laid out in its place
+			bd_color: smap.bd_color,
+			room_init: smap.room_init,
+			initFresh: false,
 			layers: [],
 			lgroups: {},
 			objGroups: {},
@@ -51,7 +56,8 @@ const EdRoom = {
 			for (const spri of laymap.spriteList) lyr.lsprites.push(this.record(spri, lyr));
 		}
 
-		// the saved groups; the linking below adds the ones layer names need and drops unused ones
+		// The saved groups; the linking below adds the ones layer names need and drops unused ones.
+		// The backdrop sprite is kept by name as saved, and drawn only when the game has it.
 		const saved = smap.layer_groups || {};
 		for (const key of Object.keys(saved)) {
 			const g = saved[key];
@@ -60,6 +66,10 @@ const EdRoom = {
 				folded: g.folded ? 1 : 0, visible: g.visible ? 1 : 0, pre_grp_vis: g.pre_grp_vis ? 1 : 0,
 				type: g.type !== undefined ? g.type : LGT_CONNECTED,
 				bd_sprite: g.bd_sprite !== undefined && Sprites.exists(g.bd_sprite) ? g.bd_sprite : null,
+				bdName: g.bd_sprite,
+				bgcolor: g.bgcolor !== undefined ? g.bgcolor : "",
+				grp_init: g.grp_init,
+				initFresh: false,
 				size: 0, col_head_lyr: null, colheaderi: -1, layers: [], bounds: null
 			};
 		}
@@ -242,7 +252,7 @@ const EdRoom = {
 			if (lg === undefined) {
 				lg = room.lgroups[lyr.group] = {
 					saved: null, name: lyr.group, folded: 0, visible: 0, pre_grp_vis: 0, type: LGT_CONNECTED,
-					bd_sprite: null, size: 0, col_head_lyr: null, colheaderi: -1, layers: [], bounds: null
+					bd_sprite: null, bdName: undefined, bgcolor: "", grp_init: undefined, initFresh: false, size: 0, col_head_lyr: null, colheaderi: -1, layers: [], bounds: null
 				};
 			}
 			lg.size++;

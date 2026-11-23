@@ -317,7 +317,9 @@ const EdFile = {
 				visible: { v: g.visible ? 1 : 0 },
 				size: { v: g.size },
 				type: { v: g.type },
-				bgcolor: { v: g.saved && g.saved.bgcolor !== undefined ? g.saved.bgcolor : "" },
+				bgcolor: { v: g.bgcolor },
+				bd_sprite: { v: g.bdName },
+				grp_init: { v: g.grp_init, block: true, fresh: g.initFresh },
 				pre_grp_vis: { v: g.pre_grp_vis ? 1 : 0 },
 				colheaderi: { v: g.colheaderi }
 			});
@@ -354,7 +356,8 @@ const EdFile = {
 			last_ob_flt: { v: state.last_ob_flt, assumed: ED_DEFAULT_OBJECT_FILTER },
 			grid_lock: { v: room.grid_lock ? 1 : 0, assumed: 0 },
 			grid_size: { v: room.grid_size, assumed: ED_FILE_DEFAULT_GRID },
-			room_init: { v: base.room_init !== undefined ? base.room_init : ED_EMPTY_BLOCK, block: true, assumed: ED_EMPTY_BLOCK }
+			bd_color: { v: room.bd_color },
+			room_init: { v: room.room_init !== undefined ? room.room_init : ED_EMPTY_BLOCK, block: true, assumed: ED_EMPTY_BLOCK, fresh: room.initFresh }
 		});
 		return this.write(tree);
 	},

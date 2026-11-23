@@ -123,8 +123,10 @@ const ED_HELP_RIGHT = "CTRL wheel click - center on click\n"
 	+ "\n"
 	+ "CTRL F - find all guy\n"
 	+ "F click - find all clicked object\n"
-	+ "SHIFT F click - find all clicked object even locked\n"
+	+ "ALT F click - find all clicked object even locked\n"
+	+ "CTRL F click - find same object and sprite\n"
 	+ "F TAB - center on next hilited object\n"
+	+ "SHIFT F TAB - center on last hilited object\n"
 	+ "\n"
 	+ "Pg Up / Pg Dn - page layer list\n"
 	+ "\n"
@@ -134,7 +136,9 @@ const ED_HELP_RIGHT = "CTRL wheel click - center on click\n"
 	+ "wheel over picker - next / last page of items\n"
 	+ "drag picker item into room - place it\n"
 	+ "right click entry - settings panel, ESC closes\n"
-	+ "not yet: align, groups, find, bounds, layer and room panels\n";
+	+ "SHIFT click layer - layer panel, ALT too - its group\n"
+	+ "SHIFT click room name - room panel\n"
+	+ "not yet: align, groups, bounds\n";
 
 // sublayers that focusing on an area leaves hidden
 const ED_FOCUS_HIDDEN_SUBNAMES = ["w", "m"];
@@ -383,29 +387,35 @@ const EdGui = {
 			alltext: alltext, outpressgood: outpressgood, fresh: fresh };
 	},
 
+	// Names a room not saved yet, from the header or the room panel. A name left empty or another
+	// room's, in any letter case, is refused, since the name is also its file's; tells why, or gives
+	// nothing when it was taken. Not an undo step, as the world's room list changes with it.
+	renameRoom(text) {
+		const room = Editor.room;
+		if (text === room.name) return "";
+		const lower = text.toLowerCase();
+		if (text === "") return "a room needs a name";
+		if (game.rooms.some((rm, i) => i !== room.index && rm.name.toLowerCase() === lower)) return "a room is already named " + text;
+		delete game.roombyname[room.name];
+		game.rooms[room.index].name = text;
+		game.roombyname[text] = room.index;
+		room.name = text;
+		localStorage.setItem(ED_LAST_ROOM_KEY, text);
+		EdEdit.touch();
+		return "";
+	},
+
 	// Ends editing. Committing a layer row renames it; the filter keeps its text either way, but
 	// cancelling puts back what it had. The header names a room not saved yet: cancelling keeps the
-	// name it has, and a name left empty or another room's, in any letter case, is refused and the
-	// editing goes on, since the name is also its file's.
+	// name it has, and a refused name keeps the editing going.
 	endEdit(commit) {
 		const e = this.edit;
 		this.edit = null;
 		if (e.kind === "header") {
-			const room = Editor.room;
-			if (!commit || e.text === room.name) return;
-			const lower = e.text.toLowerCase();
-			if (e.text === "" || game.rooms.some((rm, i) => i !== room.index && rm.name.toLowerCase() === lower)) {
-				Editor.debugtxt = e.text === "" ? " a room needs a name" : " a room is already named " + e.text;
-				this.edit = e;
-				return;
-			}
-			delete game.roombyname[room.name];
-			game.rooms[room.index].name = e.text;
-			game.roombyname[e.text] = room.index;
-			room.name = e.text;
-			Editor.debugtxt = "";
-			localStorage.setItem(ED_LAST_ROOM_KEY, e.text);
-			EdEdit.touch();
+			if (!commit) return;
+			const why = this.renameRoom(e.text);
+			Editor.debugtxt = why === "" ? "" : " " + why;
+			if (why !== "") this.edit = e;
 		} else if (e.kind === "filter") {
 			EdPicker.filter.text = commit ? e.text : e.pre;
 			EdPicker.refilter();
@@ -633,6 +643,8 @@ const EdGui = {
 		const now = currentTime();
 		const pressed = inp.pressed.left || inp.pressed.right || inp.pressed.middle;
 		if (hit.kind === "header") {
+			// a shift click opens the room panel, or closes it again
+			if (inp.pressed.left && inp.shift) EdPanel.open("room", [room], room, ed.mouse.devx / ed.dpr, ed.mouse.devy / ed.dpr);
 			if (inp.pressed.right) {
 				this.listOpen = true;
 				this.listHover = -1;
@@ -680,15 +692,18 @@ const EdGui = {
 		}
 		// enter starts renaming the row
 		if (inp.keysPressed.has("Enter")) this.startEdit("row", lyr, lyr.txt.text, true, false, false);
-		// Z and D clicks toggle sorting and disabled; a shift click opens the layer settings, which
-		// come in a later phase; a plain click makes the layer current.
+		// Z and D clicks toggle sorting and disabled; a shift click opens the layer panel, or closes it
+		// again, with alt on every layer of the layer's group; a plain click makes the layer current.
 		if (inp.pressed.left && !inp.ctrl) {
 			if (inp.keysDown.has("KeyZ") || inp.keysDown.has("KeyD")) {
 				EdEdit.push();
 				const field = inp.keysDown.has("KeyZ") ? "zsort" : "disabled";
 				lyr[field] = lyr[field] ? 0 : 1;
 				this.pretext(lyr);
-			} else if (!inp.shift) {
+			} else if (inp.shift) {
+				const layers = inp.alt && lyr.group !== undefined ? room.layers.filter((l) => l.group === lyr.group) : [lyr];
+				EdPanel.open("layer", layers, lyr, ed.mouse.devx / ed.dpr, ed.mouse.devy / ed.dpr);
+			} else {
 				this.selectLayer(li);
 			}
 		}

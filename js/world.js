@@ -834,7 +834,7 @@ class World {
 
 		rm.wd = smap.roomw !== undefined ? smap.roomw : DEFAULT_ROOM_W;
 		rm.ht = rm.wd * 9 / 16;
-		// saved but never shown by the original, which always clears to black
+		// the colour the screen clears to; the original saved it but always cleared to black
 		rm.bd_color = smap.bd_color !== undefined ? "#" + smap.bd_color : SCREEN_CLEAR_COLOR;
 		rm.bd_sprite = undefined;
 		rm.camx = smap.camx;

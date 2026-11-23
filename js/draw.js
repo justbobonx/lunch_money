@@ -44,7 +44,8 @@ const GUI_H = 360;
 // the original's screen was this wide, its shake and debug sizes are in these pixels
 const ORIGINAL_SCREEN_W = 1920;
 
-// the original cleared to black under every room, its saved backdrop colours are never used
+// what the screen clears to with no room, or a room without a backdrop colour; the original
+// cleared to black under every room, never using the saved colours
 const SCREEN_CLEAR_COLOR = "#000000";
 
 // the blend colour that leaves a picture as it is
@@ -741,7 +742,8 @@ const Draw = {
 		ctx.setTransform(this.screenScale, 0, 0, this.screenScale, 0, 0);
 		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = "source-over";
-		ctx.fillStyle = SCREEN_CLEAR_COLOR;
+		// the room's backdrop colour behind everything, black with no room
+		ctx.fillStyle = rm && rm.bd_color ? rm.bd_color : SCREEN_CLEAR_COLOR;
 		ctx.fillRect(0, 0, DISPLAY_W, DISPLAY_H);
 		if (!rm || rm.layers === null) return;
 

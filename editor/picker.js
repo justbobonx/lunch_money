@@ -178,7 +178,8 @@ const EdPicker = {
 		if (inp.pressed.left && this.hoverCell >= 0) {
 			const it = this.item(this.hoverCell);
 			if (inp.keysDown.has("KeyF")) {
-				// finding every entry of an item comes in a later phase
+				// an object cell finds entries of that object type, a sprite cell plain sprites of it
+				EdEdit.find(it.isobj !== undefined ? { isobj: it.isobj } : { spi: it.spi }, inp.alt);
 			} else if (EdEdit.selects.length > 0 && inp.keysDown.has("KeyS")) {
 				EdEdit.push();
 				for (const rec of EdEdit.selects) {

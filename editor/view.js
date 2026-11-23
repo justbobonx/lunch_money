@@ -19,6 +19,7 @@ const ED_ZOOM_MAX = 640;
 // how far past the screen edge an entry may sit and still draw, in room pixels
 const ED_CULL_PAD = 2;
 
+// what the view clears to with no room, or a room without a backdrop colour
 const ED_CLEAR_COLOR = "#000000";
 
 // Marks, with the original editor's colours. Hit boxes on the current layer, objects and pictures
@@ -212,6 +213,20 @@ const EdView = {
 		}
 	},
 
+	// Where an entry's picture starts in its layer, its loop shift worked out first. On a layer drawn
+	// on whole pixels that is exactly where the picture draws: its place, its offset and its loop
+	// shift each rounded down as the drawing rounds them. On a parallax layer it is the exact spot.
+	// The hit box, the outline and the selection box all start from it.
+	spot(rec) {
+		const x = rec.x - rec.exoffx + rec.loopdx;
+		const y = rec.y - rec.exoffy + rec.loopdy;
+		if (rec.mylayer.lens.parax) return { x: x, y: y };
+		return {
+			x: Math.floor(rec.x) - Math.floor(rec.exoffx) + Math.floor(rec.loopdx),
+			y: Math.floor(rec.y) - Math.floor(rec.exoffy) + Math.floor(rec.loopdy)
+		};
+	},
+
 	// Everything under the mouse, as the original found hovers: on every layer that can be picked from,
 	// bottom layer first, by each entry's collision shape at its picture's spot.
 	findHovers(alt) {
@@ -226,7 +241,8 @@ const EdView = {
 			for (const rec of lyr.lsprites) {
 				if (rec.hidden) continue;
 				this.loopShift(lyr, rec);
-				const shape = maskShape(rec, rec.x - rec.exoffx + rec.loopdx, rec.y - rec.exoffy + rec.loopdy);
+				const p = this.spot(rec);
+				const shape = maskShape(rec, p.x, p.y);
 				if (shape && pointInShape(shape, mx, my)) found.push(rec);
 			}
 		});
@@ -242,7 +258,8 @@ const EdView = {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = "source-over";
-		ctx.fillStyle = ED_CLEAR_COLOR;
+		// the room's backdrop colour as in play, when it has one
+		ctx.fillStyle = room !== null && room.bd_color !== undefined ? "#" + room.bd_color : ED_CLEAR_COLOR;
 		ctx.fillRect(0, 0, cvs.width, cvs.height);
 		if (room === null) return;
 
@@ -294,19 +311,21 @@ const EdView = {
 			ctx.closePath();
 			ctx.stroke();
 		};
-		// the four corners of an entry's picture, stretched and turned about its origin, on the screen
+		// The four corners of an entry's picture, stretched and turned about its spot, on the screen.
+		// Upright on a layer drawn on whole pixels they round to the pixels the picture covers, as its
+		// hit box does.
 		const corners = (ln, rec) => {
 			const sr = Sprites.get(rec.spi);
-			const ox = rec.x - rec.exoffx + rec.loopdx;
-			const oy = rec.y - rec.exoffy + rec.loopdy;
+			const o = this.spot(rec);
 			const c = Math.cos(degToRad(rec.ang));
 			const s = Math.sin(degToRad(rec.ang));
 			const x0 = -sr.ox * rec.x_sc;
 			const x1 = (sr.w - sr.ox) * rec.x_sc;
 			const y0 = -sr.oy * rec.y_sc;
 			const y1 = (sr.h - sr.oy) * rec.y_sc;
+			const whole = rec.ang === 0 && !ln.parax ? Math.round : (v) => v;
 			return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]
-				.map((p) => ({ x: sx(ln, ox + p.x * c + p.y * s), y: sy(ln, oy - p.x * s + p.y * c) }));
+				.map((p) => ({ x: sx(ln, whole(o.x + p.x * c + p.y * s)), y: sy(ln, whole(o.y - p.x * s + p.y * c)) }));
 		};
 
 		// Area backdrops under everything, tiled on the room's grid of their size over their bounds,
@@ -430,8 +449,7 @@ const EdView = {
 			for (const rec of marks) {
 				const isObj = rec.isobj !== undefined;
 				const hot = rec.selected || rec.hover;
-				const ox = rec.x - rec.exoffx + rec.loopdx;
-				const oy = rec.y - rec.exoffy + rec.loopdy;
+				const { x: ox, y: oy } = this.spot(rec);
 				const turned = rec.ang !== 0;
 				const shape = maskShape(rec, ox, oy);
 				if (shape) {

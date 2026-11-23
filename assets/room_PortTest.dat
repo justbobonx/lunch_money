@@ -5,25 +5,59 @@
 			"folded":0,
 			"size":4,
 			"visible":0,
-			"pre_grp_vis":1,
+			"pre_grp_vis":0,
 			"type":1,
 			"name":"a",
 			"colheaderi":0
 		}
 	},
-	"camy":1.337791,
-	"camw":224,
+	"camy":-56.023231,
+	"camw":384,
 	"roomw":320,
+	"bd_color":"4D5A75",
 	"roomh":180,
-	"camh":140,
-	"curlyri":"2",
+	"camh":240,
+	"grid_lock":1,
+	"curlyri":"0",
 	"layers":[
 		{
 			"group":"a",
 			"wd":320,
-			"visible":1,
+			"plx_y":0.9,
+			"visible":0,
+			"plx_x":0.5,
 			"name":"a.bd",
-			"spriteList":[]
+			"spriteList":[{
+				"x":-112,
+				"y":0,
+				"spi":"sCloud3",
+				"name":"18D656"
+			},{
+				"x":-64,
+				"y":72,
+				"spi":"sCloud3",
+				"name":"18D657"
+			},{
+				"x":0,
+				"y":16,
+				"spi":"sCloud3",
+				"name":"18D658"
+			},{
+				"x":96,
+				"y":88,
+				"spi":"sCloud3",
+				"name":"18D659"
+			},{
+				"x":112,
+				"y":16,
+				"spi":"sCloud3",
+				"name":"18D65A"
+			},{
+				"x":152,
+				"y":64,
+				"spi":"sCloud3",
+				"name":"18D65B"
+			}]
 		},
 		{
 			"group":"a",
@@ -121,10 +155,14 @@
 				"name":"18D653"
 			},{
 				"spd":"0",
-				"x":35.762148,
+				"alpha":0.5,
+				"x":-130.674913,
+				"col":"996633",
+				"y_sc":1.511821,
+				"x_sc":9.170927,
 				"isobj":"oGround",
-				"y":74.150896,
-				"spi":"s_bd_grass_long_et",
+				"y":132.395624,
+				"spi":"sFloor",
 				"name":"18D654"
 			},{
 				"x":73,
@@ -143,6 +181,6 @@
 		}
 	],
 	"last_ob_flt":"ground",
-	"last_sp_flt":"",
-	"camx":-70.079746
+	"last_sp_flt":"cloud",
+	"camx":-155.658106
 }
