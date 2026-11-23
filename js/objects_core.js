@@ -943,17 +943,16 @@ class oText extends oBaseObject {
 		if (this.blinkr) this.step = (this.step + 1) % (this.blinkr * 2);
 	}
 
-	// Kept from the original: the width for centring is measured before this sign's font is set,
-	// so it uses whichever font was drawn last.
+	// The width for centring or right aligning is measured in the sign's own font.
 	draw() {
 		if (this.blinkr && this.step > this.blinkr) return;
+		Draw.setFont(this.font);
 		let xo;
 		if (this.xoffset === "c") xo = -Math.floor(Draw.stringWidth(this.text)) / 2;
 		else if (this.xoffset < 0) xo = -Math.floor(Draw.stringWidth(this.text));
 		else xo = this.xoffset;
 		const yo = this.yoffset;
 
-		Draw.setFont(this.font);
 		if (this.shadow) {
 			Draw.color = "#000000";
 			Draw.alpha = this.alpha * this.alphash;
