@@ -26,6 +26,7 @@
 - oShark is not ported; its turn poof and its float death spray (the original's killGuyFloat) come with it.
 
 ### GM quirks kept for now (remove eventually)
+
 - Stand-ins: unported_object_list.json and the Standins class give unported objects their GM parent behavior; both go once everything rooms use is ported.
 - oBoxFall never lowers its life, so it never destroys itself.
 - The swimming rat spawns a bubble every update.
@@ -41,6 +42,22 @@
 - The top down death splatter never runs: the original never sets how much to splatter.
 - Angles still use GM's convention: degrees, counterclockwise, with y down (pointDirection, lengthdir and everything built on them). Convert to radians and the usual JS direction later.
 
+### Changes from the original
+
+- Jumping out of water now makes the same splash as going in, at the player's spot on the water's top. The original let out a different, smaller burst from the water object's own spot, usually its top left corner.
+- A robin scared in the middle of a hop now just flies off. The original kept the hop going on top of the flight for that one trip, so the bird also fell by the hop's gravity while flying away.
+- A robin that has flown out of view is hidden by turning it invisible rather than the original's separate hidden flag. It keeps living while hidden, as before, so it can still hop, peck or be scared off again unseen.
+- Weather moves each update instead of each drawn frame, so it keeps update pace and stops while play is paused.
+- Weather is shared out only over the room's own layers that are switched on and not overlay layers, so areas switched off don't take a share that never shows, and it never draws over the HUD or popups. The original shared it over every layer, the switched off and overlay ones too.
+- Each weather drop takes its kind's random speed times its layer's; the original also sped each drop up a little more than the one before it in a layer, so the last of a layer's rain went about twice as fast as the first.
+- The weather debug keys are control G (on and off) and control shift G (next kind) instead of control W, which the browser keeps for closing the tab. They work any time, like the other debug keys; the original only took them when started from the editor.
+- Only looking at the bike gets the player on it. The original got him on for any action, touching and hitting it too.
+- A rider who dies or is hit falls off the bike, keeping the speed the death or the knock gave him. The original kept him pinned to it.
+
+### Notes
+
+- Room reloading while testing: control R restarts the current room from the copy read at startup; control shift R reads the room's file from the server again first, then restarts (the browser's hard reload is held back). Entering a room by the room picker also reads its file again first, falling back to the copy in memory with a console warning when the read fails. Room changes by doors and scripts always go to the room in memory, never read again. Every file the player reads asks the server whether it changed.
+
 ## Question
 
 - Sim pause still lets the camera run (following, zoom, pans and the shake countdown); should it freeze it?
@@ -50,16 +67,9 @@
 - Stand-in presets (like oGrGrass was): small classes or room config?
 - Start room is TestDev, overriding world.dat's OutForMilk; keep while testing?
 - The swim boost poof goes at the bottom of the player's layer as the original asked, so it draws behind everything there; in the original its particles were separate objects added on top of the layer, so they drew in front. Keep it behind, or put it on top?
-- Changed from the original: jumping out of water now makes the same splash as going in, at the player's spot on the water's top. The original let out a different, smaller burst from the water object's own spot, usually its top left corner.
-- Changed from the original: a robin scared in the middle of a hop now just flies off. The original kept the hop going on top of the flight for that one trip, so the bird also fell by the hop's gravity while flying away.
-- Changed from the original: a robin that has flown out of view is hidden by turning it invisible rather than the original's separate hidden flag. It keeps living while hidden, as before, so it can still hop, peck or be scared off again unseen.
-- Changed from the original: weather moves each update instead of each drawn frame, so it keeps update pace and stops while play is paused.
-- Changed from the original: weather is shared out only over the room's own layers that are switched on and not overlay layers, so areas switched off don't take a share that never shows, and it never draws over the HUD or popups. The original shared it over every layer, the switched off and overlay ones too.
-- Changed from the original: each weather drop takes its kind's random speed times its layer's; the original also sped each drop up a little more than the one before it in a layer, so the last of a layer's rain went about twice as fast as the first.
-- Changed from the original: the weather debug keys are control G (on and off) and control shift G (next kind) instead of control W, which the browser keeps for closing the tab. They work any time, like the other debug keys; the original only took them when started from the editor.
-- Changed from the original: only looking at the bike gets the player on it. The original got him on for any action, touching and hitting it too.
-- Changed from the original: a rider who dies or is hit falls off the bike, keeping the speed the death or the knock gave him. The original kept him pinned to it.
-- Particles use plain random, while the rest of the port uses its seeded generator; switch them if replays ever matter.
+- Should the editor only marks oCamBox, oGroupBounds, oVisBounds and oLayerMask move to objects/editor/, beside oGuyPlacer?
+- Should tools/make_asset_lists.py get a clearer name? It only writes assets/unported_object_list.json now.
+- Should the player's room picker show a "more below" hint?
 
 ## Fix
 
@@ -80,8 +90,119 @@
 
 ## Later
 
-- Sprite data editing: adding a loose sprite means hand-writing its json and keeping sprites/src/index.json in sync, which is extra steps for whoever makes the art. When the editor comes, give it a way to edit a sprite's data (size, frames, origin, mask, speed, group) and rebuild the index itself.
 - Layer name wildcards: the star only works as a suffix (starts with). Add more options, such as a leading star for ends with, stars on both ends for contains, or a star in the middle.
-- The font list is hardcoded in draw.js (FONT_NAMES); generate it from the fonts folder like the object file map or the asset lists.
+- The font list is hardcoded in draw.js (FONT_NAMES); generate it from the sprites/fonts/ folder (the glyph tables; assets/fonts/ only holds the ttf files) like the object file map or the object parent list.
 - Room picker has no gamepad support.
 - Drawing the room at 640×360 instead of full screen resolution, if fps is still poor in heavier rooms.
+- Particles use plain random, while the rest of the port uses its seeded generator; switch them if replays ever matter.
+
+## Editor
+
+Open editor.html in Chrome or Edge, served the same way as the player, and pick the lunch_money folder once. Phases one and two are in: world and room loading, the room list, the layer list, the room drawn close to play, panning and zooming, hovers, selecting and editing entries, the layer list's own editing, the picker bar, undo, and saving with backups. Of phase three the entry, layer and room settings panels are in, of phase four finding, and the F1 help overlay.
+
+### Still to do
+
+Phase four still to do: align, groups, area bounds and paths. G, P and B clicks do nothing yet.
+
+- Align and spread (the alt arrow combos); alt arrows do nothing for now.
+- Groups: entering and leaving (G click, G double click, right click on nothing), (un)grouping with control (shift) G.
+- Area bounds regeneration (control alt B, the lyr_bounds layer, and B click).
+- Paths (P click).
+- Show a saved room camera spot and the player start.
+- World settings (phase three).
+
+### What works
+
+- Selection: click, shift click, box select, control A and control shift A, escape. Selecting makes the entry's layer current and unfolds its group. Outlines, the white selection box and the four grabber corners.
+- Editing as the original: moving, control drag to duplicate, arrow nudges, Q grid lock and control Q grid size, corner resizing (control keeps the shape), alt drag turning, numpad minus and plus, delete, control C, X and V, control H and control shift H and H click, control J jitter, shift wheel z order, alt Home and End, alt page up and down, T and shift T, A click and A wheel, O drag for the picture offset, S click, O click and O delete.
+- Room list: right click on the header opens it; its last row, +room..., leaves the room (asking about unsaved changes as switching does) and adds a new room at the end of the world's list with the original's new room layers (a.bd, a.bg, a. current, a.fg), unsaved, and starts naming it in the header. A name left empty or already another room's, in any letter case, is refused and the naming goes on; escape keeps the name it has, "room" or "room2" and on. Enter over the header renames it again until it is first saved. Saving writes its room_<name>.dat and the world with it added to the room list; discarding it before it is ever saved takes it out of the list again.
+- Layer list: the + row adds a layer after the current one and starts naming it; enter renames with the original's text field keys; a cleared name deletes the layer, asking first when it has entries, and can be undone; Z click, D click, control right click lock (saved now); shift wheel and alt shift wheel move the layer.
+- Picker bar: tab cycles pointer, sprite and object, each mode keeping its pick and filter; the filter and name fields, a quick double right press on the filter clearing it and leaving it editing, whether or not it was being edited already; cells sized by how many there are; the wheel over the bar turns pages; hover outline; drag out from the bar into the room; placing with grid fill, shift scatter, one undo step per stroke; right drag erase; S click with the bar: a sprite cell replaces the selection's sprite, an object cell only its object type, each entry keeping its own picture, as the original. Every original object is offered, with its own sprite, from assets/editor_objects.json (made by tools/build_editor_object_list.js); unported ones place by name.
+- Undo and redo: control Z, control Y and control shift Z, "Us:" in the status line, a hundred steps kept.
+- Saving: control S saves the room, and the world when new names were handed out or a room was added; control R saves and reads the room again; control L reads it again, asking when that would lose changes. The writer gives the original's format exactly, and untouched values are written back as they were read; tools/test_editor_roundtrip.js checks every room and the world come back byte for byte. Every save first copies the old file to assets/backup/<name>.<YYYYMMDD-HHMMSS>.dat, keeping the newest 20 of each; the browser writes to a side file and swaps it in when complete.
+- Unsaved changes: leaving a room asks save, discard or cancel; leaving the page warns; the room's name and the status line show a star.
+- The entry settings panel (editor/panel.js). Letting go of the right button on an entry selects it (unless already selected) and opens one page panel by the mouse; escape or a press anywhere in the editor closes it (escape drops a change still being typed, a press elsewhere puts it on). While a panel field has the focus the editor takes no keys. It uses assets/fonts/m5x7.ttf at its own 16 pixel size, a whole number of screen pixels to each font pixel.
+  - Top half, the shared values as plain fields: name (unique in the room, a taken or empty one is refused with a note), type (read only), x and y (the entry's own spot, not its picture's), tile x and y boxes, x and y scale, size (read only), blend (hex digits and a swatch), alpha, angle, start frame (also the frame shown), image speed. Enter, tab or leaving a field puts it on; a bad number or colour is refused with a note.
+  - Bottom half, the setup block as a table: a row a key with its value and a remove button. Numbers and text edit in place and keep their type; true and false are a box; lists and maps edit as their text, and one that can't be read, or turns a list into a map, is refused. The add line offers the keys the selected types use across the room files and the keys their classes start with (less fields only running uses), with a value to show; a new value reads as a number, true, false, a list or a map when it is one, else as text. objtype and mainchar are marked as special. The text switch shows the right clicked entry's whole block, read the way the player reads blocks; control enter or leaving puts it on, and empty text removes the block. Works on sprites too.
+  - Several entries selected: a value they differ in shows blank as mixed, and only the fields actually changed go to all of them. Block changes go key by key: only the keys added, changed or removed go to every selected entry, and an entry they leave as it was is left alone. The text view of several shows the right clicked one's text and puts only its changed keys on the others. A block that can't be read is left alone in the table, with a note.
+  - Every change is one undo step, and the entries then draw, hit and link as their new settings say. Blocks the panel does not change keep their text byte for byte; one changed in the table is written anew, a key a line, lists of plain values on one line, as the room files lay blocks out; one typed in the text view keeps its lines as typed. Either is moved in to the depth it sits at in the file when saved.
+- One panel for everything. editor/panel.js is a settings editor for any kind of thing, entries, layers and the room, with the same look, the same commit rules, mixed values and one undo step a commit. Opening it again on what it is open on closes it.
+  - Layer panel: shift click a layer row; shift click it again or escape closes. Name (renamed as the row renames, so a cleared name deletes the layer; several layers can't share one), group (read only), parallax x and y, loop x and y, width (the height, read only, follows at nine sixteenths), sorted, disabled, visible, locked and gui boxes, entry count (read only). A layer in a group also shows the group's type (none, connected, popup, edge), colour (hex digits and a swatch, or empty), backdrop sprite (by name, with the sprite names offered; one the game lacks is kept but not drawn) and its setup block in the table. Alt shift click opens on every layer of the group: a value they differ in shows mixed and only the fields changed go to all.
+  - Room panel: shift click the room's name in the header (right click still opens the room list). Name (read only once the room is saved), width (the height follows, read only), backdrop colour, grid size, grid lock, area bounds made by hand or not (read only), and the room setup block in the table and the text view. Changing the width scales every layer's width by the same share, entries staying where they are, as one undo step.
+  - Room and group setup blocks are written anew like entry blocks when the panel changes them; untouched ones keep their text byte for byte. A room block removed is written as an empty one, which is what a room without one reads as.
+- Find: F click on a picker cell selects every match: an object cell that object type with any sprite, a sprite cell plain sprites only; F click on an entry in the room finds its type, with control only those with its sprite too; control F with nothing under the mouse finds the player starts. Layers that can't be picked are passed over (hidden unless current, folded, locked) as are hidden entries; alt takes locked layers and folded groups that show too. Matches go in layer order then list order; the view centres on the first and makes its layer current; F tab steps to the next, shift F tab back, wrapping round. The status line says found 3/12 or none found. Not an undo step.
+- Help: F1 opens the help overlay (see its note under the changes).
+
+### GM quirks to discuss
+
+- Right drag erase matches entries by the picker's sprite, as the original did, so an object showing that sprite goes too, whatever its type. It only erases in the current layer, as the original's did. Decide whether erasing should match objects by type instead.
+- Ctrl drag to duplicate overwrites the clipboard, as in the original.
+- Pasting names: a taken plain hex name gets a new number from the world's counter, and the original read any name made only of hex letters and digits as a number, so a name like "bad" or "face" gets a number too.
+- The arrow keys, Q, numpad minus and plus and the other single keys only work on the keyboard's own spots; numpad minus and plus have no other keys, as in the original.
+- Control shift J (triple jitter) opens the browser's developer tools in Chrome before the page sees it; it may need another key.
+- The world saves only when new names were handed out (its name counter moved) or a room was added, not for the camera alone; the original wrote it on every save.
+- Hovers come from every visible unlocked layer, not only the current one, as in the original; alt adds locked layers and the visible folded ones.
+- Objects saved with visible off still draw in the editor, as in the original; maybe show them faded.
+- Caret layers (names starting with ^) merge into the layer before them in play; the editor lists them on their own and draws them with that layer's settings.
+- Layer draw order: when a room saves any layer groups, play (the original's too, on purpose) collates every grouped layer into three bands across all areas: first each area's layers before its sorted layer, then every area's sorted layer, then each area's layers after it, each band in file order; layers in no group go after all three. An area with no sorted layer is all in the first band. So every area's floors draw under every area's objects, and every area's foregrounds over them. Of the current rooms only OutForMilk and OFM_caves come out in a different order. The editor, like the original's, draws in file order; decide whether it should show play's order.
+
+### Changes from the original
+
+- Text, floor, tiler and solid entries draw through the player's own draws, so flipped and turned tiling looks as in play; the original editor tiled them its own way and got flipped and turned ones wrong.
+- An entry's fade is read from its saved alpha; the original editor read a misspelled key and so never showed it.
+- An entry whose object type is unknown keeps its saved sprite; the original fell back to the first sprite.
+- Layer masks and area backdrops are drawn, close to play; the original editor showed neither. Backdrops are filled as repeating patterns lined up on the room grid as in play, which keeps the view fast zoomed far out. Mask entries also draw in their own layer, as they do in play.
+- Parallax and looping are worked out for the editor's camera as if the game's view were centred where the editor looks, so parallax layers line up as in play around the view's middle.
+- The screen clears to the room's backdrop colour, in play and in the editor (black when the room has none); the original saved the colour but had its use commented out and always cleared to black.
+- Marks and outlines are drawn one pixel of their layer wide as the original drew them, but on whole screen pixels and hugging the inside of a box's edge so they sit on the pixel grid, and never thinner than two page pixels (one setting at the top of the view file) so they still show zoomed far out. Labels are at the overlay's size. Their colours and fades are the original's. The overlay is scaled by the whole number nearest to fitting 640 across.
+- On layers drawn without fractions of a pixel, an entry's spot in the editor is the one its picture draws at, its spot and offset each rounded down plus the loop's shift; its hit area, outline and selection box all use it, so they line up with the picture. Parallax layers keep the exact spot. Play's own collision is unchanged. Stored positions are never rounded; fractional ones stay as saved.
+- On layers with no parallax at the room's width, the mouse points at whole room pixels: the cursor, the placing preview, placing, and moving (which moves by the whole pixels the mouse moved, so an entry on whole pixels stays on them). Drag filling steps by the first copy's size times its scale rounded to whole pixels, so copies butt up. The original used the mouse's exact spot, which left placed and moved entries on fractions. Parallax and scaled layers, the grid, nudges, resizing and zoom are unchanged.
+- The grid snaps each entry in its own layer's saved spots, so parallax layers snap to their own grid; a resized corner snaps where it shows.
+- The editor's mouse and the grabber corners grow with the zoom at the original mouse's half rate, rounded to a whole number scale so they stay pixel sharp (the original's grabbers grew at the full zoom). The mouse's middle sits on the middle of the current layer's pixel under it. The browser's arrow is hidden over the canvas.
+- Showing as the player (space) hides the overlay and it takes no clicks then; the original still caught clicks on its hidden fields.
+- Dragging the view keeps going over the overlay; the original froze the drag there.
+- The view only scrolls at the screen's edge for drags begun in the room, and the edge is measured on the overlay.
+- Alt and middle click switches between the whole room and one room pixel per screen pixel (the original's fixed 1920 wide view); whichever way zooms in first centres on the click exactly as control and middle click does, then zooms about that middle. Zooming out keeps the view's middle, as in the original.
+- The wheel turns the original's way round (down is one step forward; phase one had it the other way). In pointer mode the plain wheel picks through a stack of hovers as in the original, and zooms when there is no stack; in sprite and object mode it steps the pick by one; over the bar it turns pages. Control and the wheel always zooms.
+- Alt and the wheel only changes the layer, it no longer also picks through hovers.
+- With A held the wheel only changes the animation frame, not also the hover; shift wheel z order leaves out alt, which moves the layer.
+- Hovering, box select, right drag erasing, the fill's check for a copy already under the mouse and shift wheel z order go by an entry's whole picture frame, scaled and turned, the same box its outline shows; the original went by its collision mask, so a picture's clear border could not be grabbed and a fill could stack a copy on one it had just placed. The hit box marks and play still use the mask.
+- Box select lists each entry once; the original could add one twice.
+- A single turned entry's selection shows its own turned corners; the original turned the box about its corner.
+- Z order sorts the selection before pulling it out of its layers; the original sorted after pulling, which did nothing.
+- Resizing a tiled one way only now tiles that way; the original's branch for tiling across only never ran.
+- The clipboard keeps copies of the entries, so a pasted one doesn't change when the original entry does after copying.
+- Keys that work everywhere are held back while a field is being edited.
+- Picker cells scale the sprite's origin with the cell, so every picture fits its cell; the original drew them off when the origin wasn't at the corner.
+- The picker lists are sorted by name, case aside, and the current pick has a faint white outline as well as the hover outline.
+- The picker offers every class the port has, whatever original folder it sat in, so marks placed in rooms (the player start, camera boxes, group and view bounds, layer masks) are offered; the original editor's and level player's own folders are only left out for objects the port has no class for, which keeps the editor's machinery out. It also adds the port's own classes the original lacks.
+- An item dragged from the bar and let go in the room is placed there; the original's bar had no drag out.
+- A new layer that is cancelled or named nothing is taken out again with no undo step left over; deleting a layer with no entries needs no question.
+- A press on the add row adds the layer when let go, so the press does not end the naming.
+- Focusing on a folded area checks the focused group's own kind before centring; the original checked whichever group it looked at last.
+- Double clicking a layer centres on the middle of its entries' saved spots.
+- A room added from the room list starts by asking for its name in the header. The original named it "room" and never finished renaming it.
+- The entry settings are one page panel instead of the original's canvas fields and separate setup block box, opened by the right button let go on an entry (no second right click for the block). Fields are plain typed fields, without the original's wheel steps or numpad minus. With several selected, only the fields changed go to all of them (the original put every field you entered on all), and block changes go key by key (the original replaced every selected entry's whole block). A block changed in the table is laid out anew; the original kept it as typed.
+- Layer and room settings are the same page panel as entry settings, opened with shift click on a layer row or the room's name, instead of the original's canvas fields. Alt shift click on a layer opens on its whole group. The room panel's width scales every layer with it.
+- Alt F click finds in locked layers and folded groups too; the original used shift F click. Shift F tab steps back through what was found. Control F click on a room entry also matches its sprite.
+- The help is a page overlay, opened with F1 and closed with F1 or escape, in the settings panel's font and look (editor/help.js) instead of the original's two columns of canvas text. It lists every key and click the editor takes, by area in three columns, with the original's wrong and not yet working lines fixed or left out and one not yet line at the bottom; it fits the window's width, its lines wrapping, scrolls down only, with the wheel wherever the mouse is while open, and draws over everything; pointing at a line brightens its description and bands the line, so a key is easy to follow across to what it does.
+- Undo and redo hold whole snapshots of the room as its file text, a hundred steps. Every change to the room is a step: moves, sizes, turns, flips, z order, tiling, animation, offsets, placing, erasing, pasting, deleting, and the layer list's add, rename, delete, move, Z, D and lock. Hiding entries, folding, visibility and the grid only mark the room changed; the camera, the filters and the current layer change nothing.
+- What was selected and hidden comes back with an undo step, matched by entry name.
+- Questions (save before leaving, delete a layer, discard changes) are page dialogs, and leaving the page with changes warns first.
+- The world file keeps its object folder list, which the original no longer wrote.
+- New entries and layers are written with the original's full key list, as the original wrote them; untouched ones are written back as they were read.
+- Two saves in the same second get a count after the time in their backup names.
+- The last room looked at is remembered in the browser and opened next time, else the player's start room.
+- The folder is asked for with writing allowed already, so saving later needs no second prompt.
+- .gitignore leaves out assets/backup/ and the browser's .crswap side files.
+
+### Notes
+
+- Objects placed in rooms only as marks for loading and editing live in objects/editor/, which every world loads whatever object folders its world file names; the player start (oGuyPlacer) is there.
+
+### Later
+
+- Sprite data editing: adding a loose sprite means hand-writing its json and keeping sprites/src/index.json in sync, which is extra steps for whoever makes the art. The editor should get a way to edit a sprite's data (size, frames, origin, mask, speed, group) and rebuild the index itself.
+- Pixel snapping on parallax and scaled layers, which keep the exact spot and the mouse's exact spot for now.
+- Zoom that isn't a whole multiple.
+- Play test from the editor (low priority, two windows work fine): open index.html with ?room=X&nosave and an at= spot for the mouse.
