@@ -1,5 +1,5 @@
 {
-	"curuid":"18D637",
+	"curuid":"18D64A",
 	"object_folders":["outformilk","ship"],
 	"rooms":[{
 		"name":"TestDev",
@@ -64,11 +64,14 @@
 	},{
 		"name":"OnTheRun",
 		"index":20
+	},{
+		"name":"PortTest",
+		"index":21
 	}],
-	"camy":-431,
-	"camw":544,
-	"curroomi":14,
-	"camh":340,
+	"camy":-56.358056,
+	"camw":320,
+	"curroomi":21,
+	"camh":200,
 	"startroomi":14,
-	"camx":396
+	"camx":-122.803069
 }

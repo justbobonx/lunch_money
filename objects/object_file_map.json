@@ -1,4 +1,7 @@
 {
+	"editor": [
+		"oGuyPlacer.js"
+	],
 	"outformilk": [
 		"goFarm.js",
 		"goItems.js",

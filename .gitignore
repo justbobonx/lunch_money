@@ -1,0 +1,4 @@
+# the level editor keeps the files it replaced on saving here
+assets/backup/
+# the side files the browser writes a save into before it takes the file's place
+*.crswap

@@ -6,21 +6,20 @@
 // Switching something off is the engine's deactivation: it stops running and colliding,
 // and the layer drawing leaves out whole switched off layers.
 
-// The world file lists the rooms. Without one the generated room list stands in for it,
-// and without that the test room is the whole world.
+// The world file lists the rooms. Without one the test room is the whole world.
 const WORLD_FILE = "assets/world.dat";
 const ROOM_DIR = "assets/";
 const DEFAULT_WORLD = { rooms: [{ name: "TestDev" }], startroomi: 0 };
 
-// The page cannot list a folder, so a generated list says which room files and which optional
-// world files exist. Another generated list gives every original object's parent.
-const ROOM_LIST_FILE = "assets/rooms.json";
+// A generated list gives every original object's parent.
 const UNPORTED_OBJECT_FILE = "assets/unported_object_list.json";
 
-// The world file names the object folders it uses. A generated list says which files each folder
-// under the object directory holds, since the page cannot list a folder either.
+// The world file names the object folders it uses, and every world also loads these, the objects
+// placed in rooms only as marks for loading and editing. A generated list says which files each
+// folder under the object directory holds, since the page cannot list a folder either.
 const OBJECT_DIR = "objects/";
 const OBJECT_FILE_LIST = OBJECT_DIR + "object_file_map.json";
+const ALWAYS_OBJECT_FOLDERS = ["editor"];
 
 // The original's name for the world, which names its script and goal files.
 // The goal file keeps the original's spelling.
@@ -170,6 +169,8 @@ class World {
 		// the world's goal list, for the goal keeper that comes with a later stage
 		this.goals = [];
 		this.goto_room = null;
+		// how files are read, kept so a room's file can be read again when the room is built later
+		this.readText = null;
 		this.frames = 0;
 		this.loading = 0;
 		// on while a room's own objects are being placed, so their setup waits until all of them exist
@@ -195,11 +196,12 @@ class World {
 
 	// Reads the world: its room list, every file in its object folders, the object parents, the world's
 	// script and goal files, then every room's file and object settings, so switching rooms needs no
-	// waiting. The generated room list tells which optional files exist so the page does not ask for
-	// ones that are not there. Each object file counts on the progress as it arrives.
+	// waiting. Optional files are always asked for, and one that won't read counts as absent. Each
+	// object file counts on the progress as it arrives.
 	// Gives back the text of the room play starts in so the sprites it places can be loaded first,
 	// every other room's sprites load when it is entered.
 	async loadFiles(readText, startName, loadScript, progress) {
+		this.readText = readText;
 		const tryRead = async (path) => {
 			try {
 				return await readText(path);
@@ -208,16 +210,10 @@ class World {
 			}
 		};
 
-		const listText = await tryRead(ROOM_LIST_FILE);
-		const list = listText !== null ? JSON.parse(listText) : null;
-
 		const worldText = await tryRead(WORLD_FILE);
 		let info;
 		if (worldText !== null) {
 			info = JSON.parse(worldText);
-		} else if (list !== null) {
-			console.log("no world file, using the room list");
-			info = { rooms: list.rooms.map((r) => ({ name: r.name })), startroomi: 0 };
 		} else {
 			console.log("no world file, playing " + DEFAULT_WORLD.rooms[0].name + " alone");
 			info = DEFAULT_WORLD;
@@ -231,31 +227,31 @@ class World {
 			this.roombyname[r.name] = this.rooms.length - 1;
 		}
 
-		// Every file in the world's object folders, all at once. They only build on the two base files,
-		// so the order they arrive in does not matter. Classes still missing get stand ins later.
-		const folders = Array.isArray(info.object_folders) ? info.object_folders : [];
-		if (folders.length > 0) {
-			const filesText = await tryRead(OBJECT_FILE_LIST);
-			const fileList = filesText !== null ? JSON.parse(filesText) : null;
-			if (fileList === null) console.log("no object file list " + OBJECT_FILE_LIST + ", object folders not loaded");
-			const paths = [];
-			for (const folder of fileList !== null ? folders : []) {
-				if (!Array.isArray(fileList[folder])) {
-					console.log("object folder " + folder + " is not in " + OBJECT_FILE_LIST + ", run tools/build_object_list.js");
-					continue;
-				}
-				for (const file of fileList[folder]) paths.push(OBJECT_DIR + folder + "/" + file);
+		// Every file in the always loaded object folders and the world's own, all at once. They only
+		// build on the two base files, so the order they arrive in does not matter. Classes still
+		// missing get stand ins later.
+		const worldFolders = Array.isArray(info.object_folders) ? info.object_folders : [];
+		const folders = ALWAYS_OBJECT_FOLDERS.concat(worldFolders.filter((f) => !ALWAYS_OBJECT_FOLDERS.includes(f)));
+		const filesText = await tryRead(OBJECT_FILE_LIST);
+		const fileList = filesText !== null ? JSON.parse(filesText) : null;
+		if (fileList === null) console.log("no object file list " + OBJECT_FILE_LIST + ", object folders not loaded");
+		const paths = [];
+		for (const folder of fileList !== null ? folders : []) {
+			if (!Array.isArray(fileList[folder])) {
+				console.log("object folder " + folder + " is not in " + OBJECT_FILE_LIST + ", run tools/build_object_list.js");
+				continue;
 			}
-			progress.expect(paths.length);
-			await Promise.all(paths.map(async (path) => {
-				try {
-					await loadScript(path);
-				} catch (e) {
-					console.log("object file would not load: " + path);
-				}
-				progress.done();
-			}));
+			for (const file of fileList[folder]) paths.push(OBJECT_DIR + folder + "/" + file);
 		}
+		progress.expect(paths.length);
+		await Promise.all(paths.map(async (path) => {
+			try {
+				await loadScript(path);
+			} catch (e) {
+				console.log("object file would not load: " + path);
+			}
+			progress.done();
+		}));
 
 		const treeText = await tryRead(UNPORTED_OBJECT_FILE);
 		if (treeText !== null) {
@@ -265,16 +261,14 @@ class World {
 			standins.load(null);
 		}
 
-		// optional files are only asked for when the list says they exist, or when there is no list
-		const listed = (flag) => list === null || list[flag];
 		this.script_defs = {};
 		this.goals = [];
-		const scriptText = listed("world_scripts") ? await tryRead(WORLD_SCRIPTS_FILE) : null;
+		const scriptText = await tryRead(WORLD_SCRIPTS_FILE);
 		if (scriptText !== null) {
 			const defs = this.parseHandWritten(scriptText, WORLD_SCRIPTS_FILE);
 			if (defs) this.script_defs = defs;
 		}
-		const goalText = listed("world_goals") ? await tryRead(WORLD_GOALS_FILE) : null;
+		const goalText = await tryRead(WORLD_GOALS_FILE);
 		if (goalText !== null) {
 			const g = this.parseHandWritten(goalText, WORLD_GOALS_FILE);
 			if (g && Array.isArray(g.goals)) this.goals = g.goals;
@@ -284,12 +278,24 @@ class World {
 		await Promise.all(this.rooms.map(async (rm) => {
 			rm.text = await tryRead(ROOM_DIR + "room_" + rm.name + ".dat");
 			if (rm.text === null) console.log("room file missing: " + rm.name);
-			const entry = list !== null ? list.rooms.find((r) => r.name === rm.name) : null;
-			rm.objDefsText = (entry === null || entry.obj_defs) ? await tryRead(ROOM_DIR + rm.name + ROOM_OBJECT_DEFS_SUFFIX) : null;
+			rm.objDefsText = await tryRead(ROOM_DIR + rm.name + ROOM_OBJECT_DEFS_SUFFIX);
 		}));
 
 		const start = this.rooms[this.findRoomIndex(startName !== undefined ? startName : START_ROOM_NAME)];
 		return start && start.text ? start.text : "";
+	}
+
+	// Reads a room's file again, for the room picker and the restart from file, so the room is built
+	// from its file as it is now, then loads the sprites it places. Room changes by doors and scripts
+	// never come here; they go to the room as it is in memory. When the read fails the copy in memory stays, with a warning.
+	async freshenRoom(rmi) {
+		const rm = this.rooms[rmi];
+		try {
+			rm.text = await this.readText(ROOM_DIR + "room_" + rm.name + ".dat");
+		} catch (e) {
+			console.warn("room " + rm.name + " could not be read again, using the copy in memory", e);
+		}
+		await Sprites.ensure(this.roomSpriteNames(rmi));
 	}
 
 	// Every sprite name a room's file places, for loading before the room is entered.

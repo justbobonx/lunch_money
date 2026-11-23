@@ -1213,6 +1213,3 @@ class oPuMsg extends oBaseObject {
 		Draw.halign = "left";
 	}
 }
-
-// Only marks the player start in the editor, the room swaps it for the real player.
-class oGuyPlacer extends oBaseObject {}

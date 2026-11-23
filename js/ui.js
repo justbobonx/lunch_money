@@ -223,8 +223,9 @@ class RoomPicker {
 		return this.top + Math.floor((py - L.listTop) / PICKER_ROW_H);
 	}
 
-	// Goes to a room once its pictures are in. Gives back whether it got there; when it did the
-	// picker closes and play carries on in the room. Play stays paused while it waits.
+	// Goes to a room once its file is read again and its pictures are in. Gives back whether it got
+	// there; when it did the picker closes and play carries on in the room. Play stays paused while
+	// it waits.
 	async pick(rmi) {
 		const rm = game.rooms[rmi];
 		if (!rm) return false;
@@ -238,7 +239,7 @@ class RoomPicker {
 		this.messageIsError = false;
 		let ok = false;
 		try {
-			await Sprites.ensure(game.roomSpriteNames(rmi));
+			await game.freshenRoom(rmi);
 			ok = game.enterRoom(rmi);
 			if (!ok) this.message = rm.name + " would not load";
 		} catch (e) {

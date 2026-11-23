@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Writes objects/object_file_map.json, the list of object files in each folder under objects/, because the page
 // cannot list a folder. Run it after adding, moving or removing an object file. The two base files
-// sit at the top of objects/ and are not listed, since the page always loads them.
+// sit in js/ and are not listed, since the page always loads them; the editor folder is listed like
+// any other, and the page loads it for every world.
 //
 // usage: node tools/build_object_list.js [<lunch_money dir>]
 

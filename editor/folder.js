@@ -1,18 +1,23 @@
 // Reaching the game's files. The person picks the lunch_money folder once; the browser remembers that
 // choice between visits, and each new visit asks again with a single click. Everything the editor
 // reads goes through that folder and is read fresh every time, so a file changed on disk shows on its
-// next read. Only Chrome and Edge offer this kind of folder access.
+// next read. Saving keeps a copy of the file as it was in the backup folder first, and the browser
+// writes the new text to a side file that only takes the file's place once complete. Only Chrome and
+// Edge offer this kind of folder access.
 
 // where the chosen folder is remembered between visits
 const ED_FOLDER_DB = "lunch_money_editor";
 const ED_FOLDER_STORE = "handles";
 const ED_FOLDER_KEY = "repo";
-// Asked for with writing allowed, so saving, which comes in a later phase, needs no second prompt.
+// asked for with writing allowed, so saving needs no second prompt
 const ED_FOLDER_MODE = "readwrite";
 // the picker opens where it was last used for this
 const ED_FOLDER_PICKER_ID = "lunch_money";
 // a file the chosen folder must hold to count as the game's folder
-const ED_FOLDER_PROOF = "assets/rooms.json";
+const ED_FOLDER_PROOF = WORLD_FILE;
+// where saving keeps the files it replaced, and how many of each file it keeps, newest first
+const ED_BACKUP_DIR = "assets/backup";
+const ED_BACKUP_KEEP = 20;
 
 const EdFolder = {
 	handle: null,
@@ -70,13 +75,63 @@ const EdFolder = {
 		this.handle = handle;
 	},
 
-	// A file inside the folder by its path from the folder's top, walked one folder at a time.
-	async fileAt(path) {
+	// The folder a path leads to inside the game's folder, walked one folder at a time, made along
+	// the way when asked, and the last part of the path.
+	async dirAt(path, create) {
 		const parts = path.split("/").filter((p) => p !== "" && p !== ".");
 		let dir = this.handle;
-		for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i]);
-		const fh = await dir.getFileHandle(parts[parts.length - 1]);
+		for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i], { create: create });
+		return { dir: dir, name: parts[parts.length - 1] };
+	},
+
+	// a file inside the folder by its path from the folder's top
+	async fileAt(path) {
+		const at = await this.dirAt(path, false);
+		const fh = await at.dir.getFileHandle(at.name);
 		return fh.getFile();
+	},
+
+	// Writes a file's new text. What it held before goes to the backup folder first, named by the
+	// file and the time down to the second, counting on when two saves share a second, and only the
+	// newest of a file's backups are kept.
+	async save(path, text) {
+		const at = await this.dirAt(path, true);
+		const dot = at.name.lastIndexOf(".");
+		const base = dot > 0 ? at.name.substring(0, dot) : at.name;
+		const ext = dot > 0 ? at.name.substring(dot) : "";
+		let old = null;
+		try {
+			old = await (await (await at.dir.getFileHandle(at.name)).getFile()).text();
+		} catch (e) {
+			old = null;
+		}
+		if (old !== null) {
+			const bdir = (await this.dirAt(ED_BACKUP_DIR + "/" + at.name, true)).dir;
+			const d = new Date();
+			const two = (v) => String(v).padStart(2, "0");
+			const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + "-" + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds());
+			const taken = new Set();
+			for await (const key of bdir.keys()) taken.add(key);
+			let bname = base + "." + stamp + ext;
+			for (let n = 1; taken.has(bname); n++) bname = base + "." + stamp + "-" + n + ext;
+			const bw = await (await bdir.getFileHandle(bname, { create: true })).createWritable();
+			await bw.write(old);
+			await bw.close();
+			taken.add(bname);
+			// this file's backups by their time and count, oldest first, beyond the kept number removed
+			const mine = [];
+			const pat = /^(\d{8}-\d{6})(?:-(\d+))?$/;
+			for (const key of taken) {
+				if (!key.startsWith(base + ".") || !key.endsWith(ext)) continue;
+				const m = pat.exec(key.substring(base.length + 1, key.length - ext.length));
+				if (m !== null) mine.push({ key: key, stamp: m[1], n: m[2] === undefined ? 0 : parseInt(m[2], 10) });
+			}
+			mine.sort((a, b) => (a.stamp !== b.stamp ? (a.stamp < b.stamp ? -1 : 1) : a.n - b.n));
+			for (const b of mine.slice(0, Math.max(0, mine.length - ED_BACKUP_KEEP))) await bdir.removeEntry(b.key);
+		}
+		const w = await (await at.dir.getFileHandle(at.name, { create: true })).createWritable();
+		await w.write(text);
+		await w.close();
 	},
 
 	// The readers the player's loaders take, all reading through the folder. They are arrow functions

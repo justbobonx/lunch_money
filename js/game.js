@@ -6,6 +6,8 @@
 
 // the most steps run to catch up after a slow frame
 const MAX_CATCHUP_STEPS = 5;
+// every file read asks the server whether it changed, so edits show without clearing the cache
+const FILE_FETCH_CACHE = "no-cache";
 
 // The saved game, kept in the browser: the room and the player's spot, layer and facing.
 // The key it is kept under, and how many updates pass between saves. It is also saved when the room
@@ -29,7 +31,8 @@ const LOADING_BAR_H = 8;
 
 // Debug keys, all listed in the debug key table further down. The browser's own meaning of them
 // is blocked. Tab switches the debug overlay and backspace shows the list, both without control.
-// With control (or command): restart the room fresh with the player alive at its start spot,
+// With control (or command): restart the room fresh with the player alive at its start spot, from
+// the room as read before or, with shift too, from its file read again,
 // bring the player back alive where they stand with everything else about them reset,
 // switch scanlines, and switch pixel perfect scaling against the smooth fit to the window.
 // The weather key switches the weather on and off, with shift it steps to the next kind and turns
@@ -259,10 +262,22 @@ const DEBUG_KEYS = [
 		set: (on) => { game.drawStats = on; }
 	},
 	{
-		codes: [DEBUG_KEY_RESTART_ROOM], ctrl: true, keys: "ctrl R", label: "restart room",
-		// the world cleared and the room started again, as the room picker does
+		codes: [DEBUG_KEY_RESTART_ROOM], ctrl: true, shift: false, keys: "ctrl R", label: "restart room",
+		// the world cleared and the room started again from the copy in memory, as the room picker does
 		act: () => {
 			if (game.curroom !== null && game.enterRoom(game.curroomi)) Save.write();
+		}
+	},
+	{
+		codes: [DEBUG_KEY_RESTART_ROOM], ctrl: true, shift: true, keys: "ctrl shift R", label: "restart room from file",
+		// the room's file read again first, then restarted, unless another room was entered meanwhile;
+		// the browser's own hard reload is held back
+		act: () => {
+			if (game.curroom === null) return;
+			const rmi = game.curroomi;
+			game.freshenRoom(rmi).then(() => {
+				if (game.curroomi === rmi && game.enterRoom(rmi)) Save.write();
+			}, (e) => console.warn("room " + game.rooms[rmi].name + " sprites failed to load", e));
 		}
 	},
 	{
@@ -400,7 +415,7 @@ const Shell = {
 		Save.attach(window);
 		roomPicker.attach(canvas);
 
-		const readText = (path) => fetch(path).then((r) => {
+		const readText = (path) => fetch(path, { cache: FILE_FETCH_CACHE }).then((r) => {
 			if (!r.ok) throw new Error(path + " " + r.status);
 			return r.text();
 		});

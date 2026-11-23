@@ -4,8 +4,9 @@
 // sat centred where the editor is looking; layers with masks are cut by them, and area backdrops
 // tile their areas. Drawing goes straight onto the screen at the zoom, so far out every sprite still
 // draws, only small. On top come the editor's marks: the current layer's hit boxes and origins,
-// hover outlines, the room's origin, and the game sized frame around the view's middle. Marks are
-// drawn in screen pixels so they stay the same width and sharp at any zoom.
+// hover and selection outlines, the selection's box and its corner grabbers, a box being dragged out,
+// the picker's item at the mouse, the room's origin, and the game sized frame around the view's
+// middle. Marks are drawn in screen pixels so they stay the same width and sharp at any zoom.
 
 // The original editor zoomed in steps of a 32 by 20 view: one step at a time while close in,
 // then by a tenth at a time further out, between one step and six hundred and forty.
@@ -52,14 +53,25 @@ const ED_CENTER_ALPHA = 0.3;
 const ED_FRAME_OUTER_COLOR = "#000000";
 const ED_FRAME_INNER_COLOR = "#ffffff";
 const ED_FRAME_ALPHA = 0.15;
+// the editor's own mouse, drawn in place of the browser's arrow so its spot is exact
+const ED_MOUSE_SPRITE = "sle_Mouse";
 // the two letters over an object with no sprite or a sprite the game lacks, as the original's picker
 const ED_LABEL_FONT = "ftTiny";
 const ED_LABEL_COLOR = "#ffffff";
 const ED_LABEL_ALPHA = 0.6;
 const ED_LABEL_DY = -2;
-// How wide every mark's lines are, in page pixels, and so also the smallest a dot mark gets. The
-// original drew them one room pixel wide, which grew and shrank with the zoom.
-const ED_MARK_LINE_PX = 3;
+// the small mark under the picker's item at the mouse, as the original's: a dark rim, a light square
+// and a white middle, each a room pixel apart
+const ED_MOUSE_RIM_COLOR = "#000000";
+const ED_MOUSE_RIM_ALPHA = 0.2;
+const ED_MOUSE_MARK_COLOR = "#ffff88";
+const ED_MOUSE_MARK_ALPHA = 0.6;
+const ED_MOUSE_DOT_COLOR = "#ffffff";
+const ED_MOUSE_DOT_ALPHA = 0.8;
+// Marks are drawn in room pixels as the original drew them, so they sit on the pixel grid: lines
+// one pixel of their layer wide, hugging the pixels at a box's edge. This is the thinnest a line
+// or a dot mark gets, in page pixels, so they still show when zoomed far out.
+const ED_MARK_MIN_PX = 2;
 // how far the cross at the view's middle reaches, in room pixels, and at least in line widths
 const ED_CENTER_REACH = 1;
 const ED_CENTER_MIN_REACH = 2;
@@ -80,6 +92,8 @@ const EdView = {
 	patterns: {},
 	// entries looked at in the last frame, as the original counted them
 	totSpriteCnt: 0,
+	// the picker's item drawn at the mouse
+	preview: new lpSprite({ spi: null }),
 
 	camH() {
 		const c = Editor.canvas;
@@ -103,6 +117,37 @@ const EdView = {
 		const cam = Editor.cam;
 		cam.x = Math.floor(nx - cam.w / 2);
 		cam.y = Math.floor(ny - this.camH() / 2);
+	},
+
+	// The whole number scale the mouse and the grabbers draw at, given how many screen pixels a room
+	// pixel covers: as the original's mouse, halfway between its own size and the zoom, so it grows
+	// with the zoom but stays easy to see far out and not huge close in, its pixels on whole screen pixels.
+	markScale(pix) {
+		return Math.max(1, Math.round((pix + 1) / 2));
+	},
+
+	// A spot in a layer's own room pixels to view space, the room as the editor's camera sees it, and
+	// back. Editing measures boxes and the mouse in view space so layers of every mapping line up.
+	toView(lyr, x, y) {
+		const ln = lyr.lens;
+		const cam = Editor.cam;
+		return { x: (ln.s * (x - ln.offx) + ln.ox) / this.z + cam.x, y: (ln.s * (y - ln.offy) + ln.oy) / this.z + cam.y };
+	},
+
+	toLayer(lyr, wx, wy) {
+		const ln = lyr.lens;
+		const cam = Editor.cam;
+		return { x: ((wx - cam.x) * this.z - ln.ox) / ln.s + ln.offx, y: ((wy - cam.y) * this.z - ln.oy) / ln.s + ln.offy };
+	},
+
+	// Whether entries can be picked from a layer, as the original decided: not when it is hidden and
+	// not current, in a folded group, or locked; alt lets locked layers and visible folded groups
+	// through.
+	pickable(lyr, li, alt) {
+		const room = Editor.room;
+		const lg = lyr.group !== undefined ? room.lgroups[lyr.group] : undefined;
+		return !((!lyr.visible && li !== Editor.curlayeri) || (lg !== undefined && lg.folded && !(lg.visible && alt))
+			|| (!alt && lyr.locked));
 	},
 
 	// Works out, for this frame, the zoom, the game's scroll, and how every layer maps onto the
@@ -158,17 +203,13 @@ const EdView = {
 	},
 
 	// Everything under the mouse, as the original found hovers: on every layer that can be picked from,
-	// bottom layer first, by each entry's collision shape at its picture's spot. A layer can't be
-	// picked from when it is hidden and not current, in a folded group, or locked; holding the alt key
-	// lets locked layers and visible folded groups through.
+	// bottom layer first, by each entry's collision shape at its picture's spot.
 	findHovers(alt) {
 		const ed = Editor;
 		const room = ed.room;
 		const found = [];
 		room.layers.forEach((lyr, li) => {
-			const lg = lyr.group !== undefined ? room.lgroups[lyr.group] : undefined;
-			if ((!lyr.visible && li !== ed.curlayeri) || (lg !== undefined && lg.folded && !(lg.visible && alt))
-				|| (!alt && lyr.locked)) return;
+			if (!this.pickable(lyr, li, alt)) return;
 			const ln = lyr.lens;
 			const mx = Math.floor((ed.mouse.devx - ln.ox) / ln.s + ln.offx);
 			const my = Math.floor((ed.mouse.devy - ln.oy) / ln.s + ln.offy);
@@ -199,26 +240,45 @@ const EdView = {
 		const cam = ed.cam;
 		const z = this.z;
 		const camh = this.camH();
-		const line = ED_MARK_LINE_PX * ed.dpr;
+		const minLine = Math.max(1, Math.round(ED_MARK_MIN_PX * ed.dpr));
+		// a line one pixel wide on a layer showing this many screen pixels to its pixel
+		const thick = (pix) => Math.max(minLine, Math.round(pix));
 		Draw.targetScale = 1;
 		Draw.halign = "left";
 		Draw.valign = "top";
 
 		// Screen space marks. A room spot to the screen through a layer's mapping, a filled square of a
-		// size in room pixels but never smaller than a line is wide, and a closed outline through
-		// screen points, a line wide.
+		// size in room pixels but never smaller than the thinnest line, and a closed outline through
+		// screen points of a given width. An upright box's outline lies just inside its edges on whole
+		// screen pixels, so a box round a picture covers the picture's edge pixels; a turned one is
+		// stroked along its edges.
 		const sx = (ln, x) => ln.s * (x - ln.offx) + ln.ox;
 		const sy = (ln, y) => ln.s * (y - ln.offy) + ln.oy;
 		const dot = (x, y, size, color, alpha) => {
-			const d = Math.max(size, line);
+			const d = Math.max(size, minLine);
 			ctx.globalAlpha = alpha;
 			ctx.fillStyle = color;
 			ctx.fillRect(Math.round(x - d / 2), Math.round(y - d / 2), d, d);
 		};
-		const outline = (points, color, alpha) => {
+		const outline = (points, color, alpha, w) => {
 			ctx.globalAlpha = alpha;
 			ctx.strokeStyle = color;
-			ctx.lineWidth = line;
+			ctx.lineWidth = w;
+			const [p0, p1, p2, p3] = points;
+			if (points.length === 4 && p0.y === p1.y && p1.x === p2.x && p2.y === p3.y && p3.x === p0.x) {
+				const l = Math.round(Math.min(p0.x, p2.x));
+				const r = Math.round(Math.max(p0.x, p2.x));
+				const t = Math.round(Math.min(p0.y, p2.y));
+				const b = Math.round(Math.max(p0.y, p2.y));
+				// a box too small for its line inside it is filled instead
+				if (r - l <= w * 2 || b - t <= w * 2) {
+					ctx.fillStyle = color;
+					ctx.fillRect(l, t, Math.max(r - l, w), Math.max(b - t, w));
+				} else {
+					ctx.strokeRect(l + w / 2, t + w / 2, r - l - w, b - t - w);
+				}
+				return;
+			}
 			ctx.beginPath();
 			points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
 			ctx.closePath();
@@ -372,7 +432,7 @@ const EdView = {
 					outline(shape.poly ? shape.poly.map((p) => ({ x: sx(ln, p.x), y: sy(ln, p.y) }))
 						: [{ x: l, y: t }, { x: r, y: t }, { x: r, y: b }, { x: l, y: b }],
 					turned ? (isObj ? ED_HITBOX_TURNED_OBJ_COLOR : ED_HITBOX_TURNED_SPR_COLOR) : (isObj ? ED_HITBOX_OBJ_COLOR : ED_HITBOX_SPR_COLOR),
-					turned ? ED_HITBOX_TURNED_ALPHA : ED_HITBOX_ALPHA);
+					turned ? ED_HITBOX_TURNED_ALPHA : ED_HITBOX_ALPHA, thick(ln.s));
 				}
 				dot(sx(ln, ox), sy(ln, oy), ln.s, hot ? ED_ORIGIN_HOT_COLOR : ED_ORIGIN_COLOR,
 					hot ? ED_ORIGIN_HOT_ALPHA : (turned ? ED_ORIGIN_TURNED_ALPHA : ED_ORIGIN_ALPHA));
@@ -385,24 +445,100 @@ const EdView = {
 
 		// Hover and selection outlines over everything, still shown when showing as the player.
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		const edit = EdEdit;
 		room.layers.forEach((lyr, li) => {
 			if (!lyr.visible && li !== ed.curlayeri && !ed.showAsPlayer) return;
 			for (const rec of lyr.lsprites) {
 				if (!rec._in_frame) continue;
-				if (rec.hover || (rec.selected && !ed.showAsPlayer)) {
-					outline(corners(lyr.lens, rec), rec.selected ? ED_SELECT_COLOR : ED_HOVER_COLOR, ED_OUTLINE_ALPHA);
+				if (rec.hover || (rec.selected && (!ed.showAsPlayer || edit.boxSelect))) {
+					outline(corners(lyr.lens, rec), rec.selected ? ED_SELECT_COLOR : ED_HOVER_COLOR, ED_OUTLINE_ALPHA, thick(lyr.lens.s));
 				}
 			}
 		});
 
+		// The selection's box while nothing is held, a single turned entry's turned with it, and the
+		// grabbers at its corners, the one under the mouse brighter and still shown while it drags.
+		const vx = (x) => (x - cam.x) * z;
+		const vy = (y) => (y - cam.y) * z;
+		const sel = edit.selects;
+		const b = edit.box;
+		const showgrab = !ed.showAsPlayer && !edit.moving && !edit.resizing && sel.length > 0;
+		if (showgrab) {
+			if (sel.length === 1 && sel[0].ang !== 0) {
+				outline(corners(sel[0].mylayer.lens, sel[0]), ED_SEL_BOX_COLOR, ED_SEL_BOX_ALPHA, thick(sel[0].mylayer.lens.s));
+			} else {
+				outline([{ x: vx(b.x1), y: vy(b.y1) }, { x: vx(b.x2), y: vy(b.y1) }, { x: vx(b.x2), y: vy(b.y2) }, { x: vx(b.x1), y: vy(b.y2) }],
+					ED_SEL_BOX_COLOR, ED_SEL_BOX_ALPHA, thick(z));
+			}
+		}
+		if (showgrab || (edit.resizing && edit.grab !== null)) {
+			const gs = this.markScale(z);
+			Draw.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
+			Draw.curdrawoffx = 0;
+			Draw.curdrawoffy = 0;
+			ctx.imageSmoothingEnabled = false;
+			for (const g of ED_GRABBERS) {
+				const hot = g === edit.grab;
+				if (!showgrab && !hot) continue;
+				// a grabber being dragged follows the mouse
+				const held = hot && edit.resizing;
+				const gx = held ? vx(edit.grabX + ed.mouse.wx - edit.downX) : vx(g.xo < 0 ? b.x1 : b.x2);
+				const gy = held ? vy(edit.grabY + ed.mouse.wy - edit.downY) : vy(g.yo < 0 ? b.y1 : b.y2);
+				Draw.spriteRaw(ED_GRAB_SPRITE, 0, Math.round(gx + g.xo * gs), Math.round(gy + g.yo * gs),
+					g.xo < 0 ? gs : -gs, g.yo < 0 ? gs : -gs, 0, NO_TINT, hot ? ED_GRAB_HOT_ALPHA : ED_GRAB_ALPHA);
+			}
+			// the grabbers leave the last one's placement on the canvas; the marks after them are in plain screen pixels
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+		}
+		if (edit.boxSelect) {
+			const m = ed.mouse;
+			const x1 = vx(Math.min(edit.downX, m.wx));
+			const y1 = vy(Math.min(edit.downY, m.wy));
+			const x2 = vx(Math.max(edit.downX, m.wx));
+			const y2 = vy(Math.max(edit.downY, m.wy));
+			outline([{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 }], ED_BOX_SELECT_COLOR, ED_BOX_SELECT_ALPHA, thick(z));
+		}
+
+		// The picker's item at the mouse, at the current layer's mapping, with its small mark, unless
+		// the mouse is on the overlay.
+		const item = EdPicker.current();
+		if (item !== null && !ed.ingui && room.layers[ed.curlayeri] !== undefined) {
+			const lyr = room.layers[ed.curlayeri];
+			const ln = lyr.lens;
+			const ml = this.toLayer(lyr, ed.mouse.wx, ed.mouse.wy);
+			const pv = this.preview;
+			if (pv.spi !== item.spi) {
+				Draw.setSprite(pv, item.spi);
+				pv.ifr = 0;
+			}
+			pv.x = ml.x;
+			pv.y = ml.y;
+			Draw.base = { sx: ln.s, sy: ln.s, ox: ln.ox, oy: ln.oy };
+			Draw.curdrawoffx = ln.offx;
+			Draw.curdrawoffy = ln.offy;
+			ctx.imageSmoothingEnabled = ln.s < 1;
+			Draw.subpixel = true;
+			Draw.lpSprite(pv);
+			Draw.animate(pv, ed.steps);
+			if (!ed.showAsPlayer) {
+				const px = Math.floor(ml.x);
+				const py = Math.floor(ml.y);
+				dot(sx(ln, px + 0.5), sy(ln, py + 0.5), ln.s * 4 + 2 * ed.dpr, ED_MOUSE_RIM_COLOR, ED_MOUSE_RIM_ALPHA);
+				dot(sx(ln, px + 1), sy(ln, py + 1), ln.s * 2, ED_MOUSE_MARK_COLOR, ED_MOUSE_MARK_ALPHA);
+				dot(sx(ln, px + 0.5), sy(ln, py + 0.5), ln.s, ED_MOUSE_DOT_COLOR, ED_MOUSE_DOT_ALPHA);
+			}
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+		}
+
 		// the room's origin, then the cross at the view's middle and the frame the game would show there
 		const wl = { s: z, ox: 0, oy: 0, offx: cam.x, offy: cam.y };
 		// its dark rim one room pixel round the dot, and at least a screen pixel
-		dot(sx(wl, 0), sy(wl, 0), Math.max(z, line) + 2 * Math.max(z, ed.dpr), ED_ROOM_ORIGIN_BACK_COLOR, ED_ROOM_ORIGIN_BACK_ALPHA);
+		dot(sx(wl, 0), sy(wl, 0), Math.max(z, minLine) + 2 * Math.max(z, ed.dpr), ED_ROOM_ORIGIN_BACK_COLOR, ED_ROOM_ORIGIN_BACK_ALPHA);
 		dot(sx(wl, 0), sy(wl, 0), z, ED_ROOM_ORIGIN_COLOR, ED_ROOM_ORIGIN_ALPHA);
 		if (!ed.showAsPlayer) {
 			const cx = Math.round(sx(wl, this.midx));
 			const cy = Math.round(sy(wl, this.midy));
+			const line = thick(z);
 			const reach = Math.max(ED_CENTER_REACH * z, ED_CENTER_MIN_REACH * line);
 			const half = Math.floor(line / 2);
 			ctx.globalAlpha = ED_CENTER_ALPHA;
@@ -416,8 +552,8 @@ const EdView = {
 			const r = sx(wl, this.scrox + room.roomw);
 			const b = sy(wl, this.scroy + room.roomh);
 			outline([{ x: l - line, y: t - line }, { x: r + line, y: t - line }, { x: r + line, y: b + line }, { x: l - line, y: b + line }],
-				ED_FRAME_OUTER_COLOR, ED_FRAME_ALPHA);
-			outline([{ x: l, y: t }, { x: r, y: t }, { x: r, y: b }, { x: l, y: b }], ED_FRAME_INNER_COLOR, ED_FRAME_ALPHA);
+				ED_FRAME_OUTER_COLOR, ED_FRAME_ALPHA, line);
+			outline([{ x: l, y: t }, { x: r, y: t }, { x: r, y: b }, { x: l, y: b }], ED_FRAME_INNER_COLOR, ED_FRAME_ALPHA, line);
 		}
 
 		// two letters over markers, at the overlay's own size so they read at any zoom
@@ -433,5 +569,44 @@ const EdView = {
 		Draw.subpixel = false;
 		Draw.curdrawoffx = 0;
 		Draw.curdrawoffy = 0;
+	},
+
+	// The editor's mouse, over everything, in place of the browser's hidden arrow, always at a whole
+	// number scale so it stays sharp. Over the overlay it is at the overlay's scale on the overlay
+	// pixel under the mouse; over the room it grows with the current layer's zoom and its middle sits
+	// on the middle of that layer's pixel under the mouse, so the pixel being pointed at is exact. As in the original it
+	// hides while a selection moves and over a grabber, which shows full strength instead, and over
+	// the room a picked item's preview stands in for it.
+	drawMouse() {
+		const ed = Editor;
+		if (!ed.mouseIn) return;
+		const edit = EdEdit;
+		const room = ed.room;
+		const m = ed.mouse;
+		let k = EdGui.scale;
+		let x = Math.floor(m.gx) * k + Math.floor(k / 2);
+		let y = Math.floor(m.gy) * k + Math.floor(k / 2);
+		if (!ed.ingui && room !== null) {
+			if (edit.moving || edit.grab !== null || EdPicker.current() !== null) return;
+			const lyr = room.layers[ed.curlayeri];
+			if (lyr !== undefined && lyr.lens !== undefined) {
+				const ln = lyr.lens;
+				k = this.markScale(ln.s);
+				const ml = this.toLayer(lyr, m.wx, m.wy);
+				x = Math.floor(ln.s * (Math.floor(ml.x) + 0.5 - ln.offx) + ln.ox);
+				y = Math.floor(ln.s * (Math.floor(ml.y) + 0.5 - ln.offy) + ln.oy);
+			} else {
+				x = Math.floor(m.devx);
+				y = Math.floor(m.devy);
+			}
+		}
+		const ctx = ed.ctx;
+		Draw.ctx = ctx;
+		Draw.targetScale = 1;
+		Draw.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
+		ctx.imageSmoothingEnabled = false;
+		// the sprite's middle texel lands on the spot, its texels on whole screen pixels
+		Draw.spriteRaw(ED_MOUSE_SPRITE, 0, x - Math.floor(k / 2), y - Math.floor(k / 2), k, k, 0, NO_TINT, 1);
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
 	}
 };

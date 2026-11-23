@@ -5,7 +5,7 @@
 <title>Lunch Money editor</title>
 <style>
 	html, body { margin: 0; height: 100%; background: #000000; overflow: hidden; }
-	canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+	canvas { display: block; width: 100vw; height: 100vh; cursor: none; }
 	#ed_gate { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
 		background: #000000cc; font: 14px sans-serif; color: #ccccdd; }
 	#ed_gate .box { background: #1a1a22; border: 1px solid #44445a; padding: 20px 26px; max-width: 460px; }
@@ -13,6 +13,10 @@
 	#ed_gate p { margin: 0 0 14px; white-space: pre-line; }
 	#ed_gate button { font: 14px sans-serif; padding: 6px 12px; margin-right: 8px; cursor: pointer; }
 	#ed_gate button[hidden] { display: none; }
+	#ed_ask { background: #1a1a22; border: 1px solid #44445a; color: #ccccdd; font: 14px sans-serif; padding: 18px 22px; max-width: 460px; }
+	#ed_ask::backdrop { background: #00000088; }
+	#ed_ask p { margin: 0 0 14px; white-space: pre-line; }
+	#ed_ask button { font: 14px sans-serif; padding: 6px 12px; margin-right: 8px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -25,6 +29,11 @@
 		<button id="ed_pick">Pick the lunch_money folder</button>
 	</div>
 </div>
+<!-- questions the editor asks, such as whether to save before leaving a room -->
+<dialog id="ed_ask">
+	<p id="ed_ask_msg"></p>
+	<div id="ed_ask_buttons"></div>
+</dialog>
 <!-- the player's own code: sprites, drawing, the object classes and the world's file loading.
      Nothing here starts the player; the editor only calls into it. -->
 <script src="js/utils.js"></script>
@@ -43,8 +52,11 @@
 <script src="js/scripty.js"></script>
 <!-- the editor -->
 <script src="editor/folder.js"></script>
+<script src="editor/roomfile.js"></script>
 <script src="editor/room.js"></script>
 <script src="editor/view.js"></script>
+<script src="editor/edit.js"></script>
+<script src="editor/picker.js"></script>
 <script src="editor/gui.js"></script>
 <script src="editor/editor.js"></script>
 <script>
