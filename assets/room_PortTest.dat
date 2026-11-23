@@ -11,14 +11,14 @@
 			"colheaderi":0
 		}
 	},
-	"camy":-56.023231,
-	"camw":384,
+	"camy":-16.023231,
+	"camw":256,
 	"roomw":320,
-	"bd_color":"4D5A75",
+	"bd_color":"223762",
 	"roomh":180,
-	"camh":240,
-	"grid_lock":1,
-	"curlyri":"0",
+	"camh":160,
+	"grid_lock":0,
+	"curlyri":"2",
 	"layers":[
 		{
 			"group":"a",
@@ -170,6 +170,34 @@
 				"y":50,
 				"spi":"eas_hud_diamond",
 				"name":"18D655"
+			},{
+				"spd":"0",
+				"x":-80,
+				"isobj":"oGround",
+				"y":88,
+				"spi":"sBox1",
+				"name":"18D65D"
+			},{
+				"spd":"0",
+				"x":-66,
+				"isobj":"oGround",
+				"y":88,
+				"spi":"sBox1",
+				"name":"18D65E"
+			},{
+				"spd":"0",
+				"x":-80,
+				"isobj":"oGround",
+				"y":102,
+				"spi":"sBox1",
+				"name":"18D65F"
+			},{
+				"spd":"0",
+				"x":-66,
+				"isobj":"oGround",
+				"y":102,
+				"spi":"sBox1",
+				"name":"18D660"
 			}]
 		},
 		{
@@ -181,6 +209,6 @@
 		}
 	],
 	"last_ob_flt":"ground",
-	"last_sp_flt":"cloud",
-	"camx":-155.658106
+	"last_sp_flt":"box",
+	"camx":-113.013846
 }

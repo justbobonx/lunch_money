@@ -1,6 +1,6 @@
 // The editor's canvas overlay, a port of the original editor's: the room header and its room list,
 // the layer list down the upper left, the picker's fields and bar along the bottom, and the status
-// line, bars and help over everything. It is drawn on the same canvas as the room, laid out on the
+// line and bars over everything. It is drawn on the same canvas as the room, laid out on the
 // original's 640 wide overlay grid scaled up by a whole number, and takes the mouse and wheel in the
 // same world as the room, so nothing traps them. The layer list keeps the original's rows, prefixes,
 // colours, paging and clicks, and its rows edit as the original's text fields did: adding, renaming,
@@ -73,73 +73,6 @@ const ED_HUD_TOP_H = 10;
 const ED_HUD_BOTTOM_H = 30;
 // the grid tag at the top right
 const ED_HUD_TAG_DX = 20;
-// the help box's margins from the overlay's edges, its two columns, and its look
-const ED_HELP_MARGIN_X = 30;
-const ED_HELP_MARGIN_Y = 20;
-const ED_HELP_COL1_X = 40;
-const ED_HELP_COL2_X = 330;
-const ED_HELP_TEXT_Y = 22;
-const ED_HELP_BACK_ALPHA = 0.8;
-const ED_HELP_ALPHA = 1;
-
-// the original's help text, word for word, then the keys this editor adds and what is still to come
-const ED_HELP_LEFT = "SPACE - hide / show guis\n"
-	+ "TAB - toggle pointer / sprite / object\n"
-	+ "CTRL S / L / R - save / load / save + reload\n"
-	+ "\n"
-	+ "shift click - add / remove from selection group\n"
-	+ "ALT - hovers from any vizible layer\n"
-	+ "    - ignores grabber corners\n"
-	+ "H click - hide hovered object\n"
-	+ "CTRL A - select all in current layer\n"
-	+ "CTRL shift A - select all in all visible/unlocked layers\n"
-	+ "\n"
-	+ "CTRL drag - lock aspect ratio\n"
-	+ "ALT drag - rotates\n"
-	+ "\n"
-	+ "ALT ^ v < > - align top, bottom, left, right\n"
-	+ "ALT (<|>) + v - align horz center\n"
-	+ "ALT (^|v) + (<|>) - align vert middle\n"
-	+ "ALT < + > - align spread horz\n"
-	+ "ALT ^ + V - align spread vert\n"
-	+ "\n"
-	+ "S click - change sprite\n"
-	+ "A click - stop/start animation\n"
-	+ "A wheel - changes ani frame\n"
-	+ "\n";
-const ED_HELP_RIGHT = "CTRL wheel click - center on click\n"
-	+ "ALT wheel click - reset zoom\n"
-	+ "double wheel click - reset center/zoom\n"
-	+ "\n"
-	+ "CTRL (shift) G - (un)group\n"
-	+ "G click or double click - enter group\n"
-	+ "right click empty - exit group\n"
-	+ "\n"
-	+ "ALT wheel - change layer\n"
-	+ "ALT shift - move layer up/down\n"
-	+ "ALT Home / End - sprite to top/bottom of layer\n"
-	+ "ALT Pg Up / Pg Down - sprite up/down a layer\n"
-	+ "SHIFT wheel - sprite zorder\n"
-	+ "\n"
-	+ "CTRL F - find all guy\n"
-	+ "F click - find all clicked object\n"
-	+ "ALT F click - find all clicked object even locked\n"
-	+ "CTRL F click - find same object and sprite\n"
-	+ "F TAB - center on next hilited object\n"
-	+ "SHIFT F TAB - center on last hilited object\n"
-	+ "\n"
-	+ "Pg Up / Pg Dn - page layer list\n"
-	+ "\n"
-	+ "CTRL ALT B - create lyr_bounds layer\n"
-	+ "\n"
-	+ "CTRL Z - undo   CTRL Y / CTRL shift Z - redo\n"
-	+ "wheel over picker - next / last page of items\n"
-	+ "drag picker item into room - place it\n"
-	+ "right click entry - settings panel, ESC closes\n"
-	+ "SHIFT click layer - layer panel, ALT too - its group\n"
-	+ "SHIFT click room name - room panel\n"
-	+ "not yet: align, groups, bounds\n";
-
 // sublayers that focusing on an area leaves hidden
 const ED_FOCUS_HIDDEN_SUBNAMES = ["w", "m"];
 
@@ -733,7 +666,7 @@ const EdGui = {
 		return true;
 	},
 
-	// The overlay: the status line and bars, the fields, the room list, and the help on top while held.
+	// The overlay: the status line and bars, the fields and the room list.
 	draw() {
 		const ed = Editor;
 		const room = ed.room;
@@ -810,14 +743,6 @@ const EdGui = {
 			});
 		}
 
-		// the help while held, over everything else
-		if (!ed.showAsPlayer && ed.inp.keysDown.has("F1")) {
-			Draw.color = ED_FIELD_BACK_COLOR;
-			Draw.alpha = ED_HELP_BACK_ALPHA;
-			Draw.rectangle(ED_HELP_MARGIN_X, ED_HELP_MARGIN_Y, gw - ED_HELP_MARGIN_X, gh - ED_HELP_MARGIN_Y, false);
-			Draw.guiText(ED_HELP_COL1_X, ED_HELP_TEXT_Y, ED_HELP_LEFT, ED_HUD_COLOR, ED_HELP_ALPHA, ED_GUI_FONT);
-			Draw.guiText(ED_HELP_COL2_X, ED_HELP_TEXT_Y, ED_HELP_RIGHT, ED_HUD_COLOR, ED_HELP_ALPHA, ED_GUI_FONT);
-		}
 		Draw.color = "#ffffff";
 		Draw.alpha = 1;
 	}

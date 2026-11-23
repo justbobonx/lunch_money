@@ -22,7 +22,7 @@ const ED_NEW_ROOM_TEXT = '{ "curlyri": "2", "layers": [ { "name": "a.bd", "sprit
 	+ '{ "name": "a.", "spriteList": [] }, { "name": "a.fg", "spriteList": [] } ] }';
 const ED_NEW_ROOM_NAME = "room";
 // keys whose browser meaning would get in the way, always, and while a field is being edited
-const ED_KEPT_KEYS = ["F1", "Space", "Tab", "PageUp", "PageDown", "AltLeft", "AltRight", "Escape", "F12",
+const ED_KEPT_KEYS = ["Space", "Tab", "PageUp", "PageDown", "AltLeft", "AltRight", "Escape", "F12",
 	"Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Delete", "Backspace", "Quote", "Slash"];
 
 const Editor = {
@@ -176,6 +176,8 @@ const Editor = {
 			e.returnValue = "";
 		});
 
+		// the help first, so escape closes it before the settings panel
+		EdHelp.install();
 		EdPanel.install();
 		this.gate();
 		const tick = (now) => {
@@ -431,7 +433,8 @@ const Editor = {
 		EdGui.scale = Math.max(1, Math.round(c.width / ED_GUI_W));
 	},
 
-	// One frame: animation time, the step, the room, the overlay, then this step's input cleared.
+	// One frame: animation time, the step, the room, the overlay, the help closed when showing as the
+	// player, then this step's input cleared.
 	frame(now) {
 		const dt = this.lastTime === 0 ? 0 : now - this.lastTime;
 		this.lastTime = now;
@@ -442,6 +445,7 @@ const Editor = {
 		EdView.draw();
 		EdGui.draw();
 		EdView.drawMouse();
+		if (this.showAsPlayer) EdHelp.show(false);
 
 		const inp = this.inp;
 		for (const b of ["left", "middle", "right"]) {
