@@ -227,8 +227,42 @@ const EdView = {
 		};
 	},
 
-	// Everything under the mouse, as the original found hovers: on every layer that can be picked from,
-	// bottom layer first, by each entry's collision shape at its picture's spot.
+	// An entry's whole picture frame at its spot, stretched and turned about it, as a shape the
+	// collision tests take: the pixels it covers when upright, its turned corners otherwise. Grabbing,
+	// box select, erasing and the stamp check of filling go by it, as the outlines and the fill's
+	// steps do, so a picture's clear border counts as the picture; the hit box and play keep the mask.
+	frameShape(rec, x, y) {
+		const sr = Sprites.get(rec.spi);
+		const x0 = Math.min(-sr.ox * rec.x_sc, (sr.w - sr.ox) * rec.x_sc);
+		const x1 = Math.max(-sr.ox * rec.x_sc, (sr.w - sr.ox) * rec.x_sc);
+		const y0 = Math.min(-sr.oy * rec.y_sc, (sr.h - sr.oy) * rec.y_sc);
+		const y1 = Math.max(-sr.oy * rec.y_sc, (sr.h - sr.oy) * rec.y_sc);
+		if (rec.ang % 360 === 0) {
+			return {
+				l: Math.floor(x + x0 + 0.5), t: Math.floor(y + y0 + 0.5),
+				r: Math.floor(x + x1 + 0.5) - 1, b: Math.floor(y + y1 + 0.5) - 1,
+				poly: null, circle: null
+			};
+		}
+		const c = Math.cos(degToRad(rec.ang));
+		const s = Math.sin(degToRad(rec.ang));
+		const poly = [
+			{ x: x + x0 * c + y0 * s, y: y - x0 * s + y0 * c },
+			{ x: x + x1 * c + y0 * s, y: y - x1 * s + y0 * c },
+			{ x: x + x1 * c + y1 * s, y: y - x1 * s + y1 * c },
+			{ x: x + x0 * c + y1 * s, y: y - x0 * s + y1 * c }
+		];
+		const xs = poly.map((q) => q.x);
+		const ys = poly.map((q) => q.y);
+		return {
+			l: Math.floor(Math.min(...xs) + 0.5), t: Math.floor(Math.min(...ys) + 0.5),
+			r: Math.floor(Math.max(...xs) + 0.5) - 1, b: Math.floor(Math.max(...ys) + 0.5) - 1,
+			poly: poly, circle: null
+		};
+	},
+
+	// Everything under the mouse: on every layer that can be picked from, bottom layer first, by each
+	// entry's whole picture frame at its spot. The original went by the collision shape.
 	findHovers(alt) {
 		const ed = Editor;
 		const room = ed.room;
@@ -242,8 +276,7 @@ const EdView = {
 				if (rec.hidden) continue;
 				this.loopShift(lyr, rec);
 				const p = this.spot(rec);
-				const shape = maskShape(rec, p.x, p.y);
-				if (shape && pointInShape(shape, mx, my)) found.push(rec);
+				if (pointInShape(this.frameShape(rec, p.x, p.y), mx, my)) found.push(rec);
 			}
 		});
 		return found;

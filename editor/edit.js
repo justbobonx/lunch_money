@@ -531,8 +531,7 @@ const EdEdit = {
 					}
 				} else if (!this.lastPlaced.some((rec) => {
 					const p = EdView.spot(rec);
-					const s = maskShape(rec, p.x, p.y);
-					return s && pointInShape(s, gx, gy);
+					return pointInShape(EdView.frameShape(rec, p.x, p.y), gx, gy);
 				})) {
 					// Filling: copies laid on a grid the first copy's size in whole pixels, never less
 					// than one, starting from the first, so each butts right against the one before.
@@ -565,8 +564,7 @@ const EdEdit = {
 				const gone = lyr.lsprites.filter((rec) => {
 					if (rec.spi !== item.spi) return false;
 					const p = EdView.spot(rec);
-					const s = maskShape(rec, p.x, p.y);
-					return s && pointInShape(s, mx, my);
+					return pointInShape(EdView.frameShape(rec, p.x, p.y), mx, my);
 				});
 				if (gone.length > 0) {
 					if (!this.erasing) this.push();
@@ -666,8 +664,7 @@ const EdEdit = {
 				for (const rec of lyr.lsprites) {
 					if (rec.hidden || rec.selected) continue;
 					const p = EdView.spot(rec);
-					const s = maskShape(rec, p.x, p.y);
-					if (s && shapesOverlap(s, rect)) {
+					if (shapesOverlap(EdView.frameShape(rec, p.x, p.y), rect)) {
 						rec.selected = true;
 						this.selects.push(rec);
 					}
@@ -862,8 +859,7 @@ const EdEdit = {
 			const overlaps = lyr0.lsprites.filter((rec) => {
 				if (rec.hidden) return false;
 				const p = EdView.spot(rec);
-				const s = maskShape(rec, p.x, p.y);
-				return s && shapesOverlap(s, rect);
+				return shapesOverlap(EdView.frameShape(rec, p.x, p.y), rect);
 			});
 			if (overlaps.length > sel.length) {
 				this.restack((sorted) => {
