@@ -127,11 +127,11 @@ const ED_HELP_COLUMNS = [
 			["CTRL F, nothing under", "every player start"],
 			["F TAB / SHIFT F TAB", "centre on the next / last found"]
 		]],
-		["panels", [
-			["right click entry", "entry panel"],
-			["SHIFT click layer", "layer panel, again closes"],
-			["ALT SHIFT click layer", "panel for its whole group"],
-			["SHIFT click room name", "room panel"],
+		["prop editor", [
+			["right click entry", "entry prop editor"],
+			["SHIFT click layer", "layer prop editor, again closes"],
+			["ALT SHIFT click layer", "prop editor for its whole group"],
+			["SHIFT click room name", "room prop editor"],
 			["ENTER", "puts a field on, CTRL ENTER the text view"],
 			["ESC", "close, dropping what is typed"]
 		]],
