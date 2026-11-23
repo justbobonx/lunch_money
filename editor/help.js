@@ -14,6 +14,8 @@ const ED_HELP_HEAD_COLOR = "#ffff33";
 const ED_HELP_KEY_COLOR = "#ccccdd";
 const ED_HELP_TEXT_COLOR = "#8888a0";
 const ED_HELP_LATER_COLOR = "#666680";
+const ED_HELP_HOVER_TEXT_COLOR = "#e8e8f0";
+const ED_HELP_HOVER_BACK_COLOR = "#2a2a3c";
 
 // the areas, column by column, each a heading and its keys with what they do
 const ED_HELP_COLUMNS = [
@@ -95,7 +97,8 @@ const ED_HELP_COLUMNS = [
 			["ENTER on header", "name a room not saved yet"],
 			["CTRL click field", "copy its text"],
 			["click filter", "edit the filter"],
-			["right click editing", "cancel, twice quickly clears"]
+			["double right click filter", "clear it"],
+			["right click editing", "cancel"]
 		]]
 	],
 	[
@@ -159,10 +162,13 @@ const EdHelp = {
 			+ " -webkit-font-smoothing: none; -moz-osx-font-smoothing: grayscale; font-smooth: never; text-rendering: optimizeSpeed; }\n"
 			+ "#ed_help .cols { display: flex; align-items: flex-start; column-gap: " + px(ED_HELP_COL_GAP) + "; }\n"
 			+ "#ed_help .cols > div { flex: 1 1 auto; min-width: 0; }\n"
-			+ "#ed_help .area { display: grid; grid-template-columns: fit-content(50%) minmax(0, 1fr); column-gap: " + px(ED_HELP_KEY_GAP) + ";"
+			+ "#ed_help .area { display: grid; grid-template-columns: fit-content(50%) minmax(0, 1fr);"
 			+ " margin-bottom: " + px(ED_HELP_GROUP_GAP) + "; }\n"
 			+ "#ed_help .head { grid-column: 1 / -1; color: " + ED_HELP_HEAD_COLOR + "; }\n"
-			+ "#ed_help .key { color: " + ED_HELP_KEY_COLOR + "; overflow-wrap: anywhere; }\n"
+			+ "#ed_help .row { display: contents; }\n"
+			+ "#ed_help .row:hover > div { background: " + ED_HELP_HOVER_BACK_COLOR + "; }\n"
+			+ "#ed_help .row:hover .does { color: " + ED_HELP_HOVER_TEXT_COLOR + "; }\n"
+			+ "#ed_help .key { color: " + ED_HELP_KEY_COLOR + "; overflow-wrap: anywhere; padding-right: " + px(ED_HELP_KEY_GAP) + "; }\n"
 			+ "#ed_help .does { overflow-wrap: anywhere; }\n"
 			+ "#ed_help .later { color: " + ED_HELP_LATER_COLOR + "; }\n";
 		document.head.appendChild(style);
@@ -182,9 +188,12 @@ const EdHelp = {
 			for (const [heading, rows] of column) {
 				const area = add(col, "area", "");
 				add(area, "head", heading);
+				// each key and what it does share one row, laid out as the area's two cells, so pointing at either
+				// lights up the line; the gap is the key's own padding so the band has no hole
 				for (const [key, does] of rows) {
-					add(area, "key", key);
-					add(area, "does", does);
+					const row = add(area, "row", "");
+					add(row, "key", key);
+					add(row, "does", does);
 				}
 			}
 		}

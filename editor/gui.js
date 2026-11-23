@@ -563,11 +563,22 @@ const EdGui = {
 			return true;
 		}
 		// The filter switches pointing to sprites and starts editing at any press; the name field
-		// only shows.
+		// only shows. A quick double right press clears it and leaves it editing, whether the first
+		// press started the edit or, while editing, cancelled it.
 		if (hit.kind === "filter") {
 			if (inp.pressed.left || inp.pressed.right) {
 				if (EdPicker.mode === 0) EdPicker.setMode(1);
 				this.startEdit("filter", null, EdPicker.filter.text, false, true, false);
+				if (inp.pressed.right) {
+					const now = currentTime();
+					if (now - this.lastRightPress < ED_DOUBLE_MS) {
+						this.edit.text = "";
+						this.edit.pos = 0;
+						EdPicker.filter.text = "";
+						EdPicker.refilter();
+					}
+					this.lastRightPress = now;
+				}
 			}
 			return true;
 		}
