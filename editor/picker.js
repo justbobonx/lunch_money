@@ -182,9 +182,10 @@ const EdPicker = {
 			} else if (EdEdit.selects.length > 0 && inp.keysDown.has("KeyS")) {
 				EdEdit.push();
 				for (const rec of EdEdit.selects) {
-					// an object takes the new object and its look, a sprite only the new look
+					// an object cell gives only its object type, the picture staying as it was; a sprite
+					// cell gives only its picture, as the original did
 					if (it.isobj !== undefined) rec.isobj = it.isobj;
-					rec.spi = it.spi;
+					else rec.spi = it.spi;
 					EdRoom.refresh(rec);
 				}
 				EdRoom.relink(ed.room);

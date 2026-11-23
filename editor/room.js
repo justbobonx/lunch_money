@@ -110,6 +110,8 @@ const EdRoom = {
 		rec.saved = spri;
 		rec.isobj = spri.isobj;
 		rec.objinit = spri.objinit;
+		// set while a setup block written by the panel waits to be laid out in its place
+		rec.initFresh = false;
 		rec.initText = undefined;
 		rec.init = null;
 		rec.start_ifr = rec.ifr;

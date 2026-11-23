@@ -11,11 +11,11 @@
 			"colheaderi":0
 		}
 	},
-	"camy":-16.358056,
-	"camw":192,
+	"camy":1.337791,
+	"camw":224,
 	"roomw":320,
 	"roomh":180,
-	"camh":120,
+	"camh":140,
 	"curlyri":"2",
 	"layers":[
 		{
@@ -38,18 +38,6 @@
 			"visible":1,
 			"name":"a.",
 			"spriteList":[{
-				"spd":"0",
-				"x":-14.89514,
-				"y":79.897699,
-				"spi":"eas_tree",
-				"name":"18D642"
-			},{
-				"spd":"0",
-				"x":13.585678,
-				"y":74.987213,
-				"spi":"eas_tree",
-				"name":"18D63D"
-			},{
 				"x":-0.02046,
 				"y":-0.53197,
 				"spi":"dk_block",
@@ -61,51 +49,17 @@
 				"spi":"sBlankGr",
 				"name":"18D639"
 			},{
-				"spd":"0",
-				"x":2.29156,
-				"y":79.897699,
-				"spi":"eas_tree",
-				"name":"18D63C"
-			},{
-				"spd":"0",
-				"x":22.179028,
-				"y":76.214834,
-				"spi":"eas_tree",
-				"name":"18D63E"
-			},{
-				"spd":"0",
-				"x":42.066496,
-				"y":76.460359,
-				"spi":"eas_tree",
-				"name":"18D63F"
-			},{
-				"spd":"0",
-				"x":30.772379,
-				"y":82.352942,
-				"spi":"eas_tree",
-				"name":"18D640"
-			},{
-				"spd":"0",
-				"x":-6.547314,
-				"y":86.035806,
-				"spi":"eas_tree",
-				"name":"18D641"
-			},{
 				"x":-32,
+				"isobj":"oGround",
 				"y":107.007673,
 				"spi":"s_bd_grass_long_et",
 				"name":"18D643"
 			},{
-				"x":-0.040921,
-				"y":107.069054,
-				"spi":"s_bd_grass_long_et",
-				"name":"18D644"
-			},{
-				"x":31.058824,
-				"y":107.069054,
-				"spi":"s_bd_grass_long_et",
-				"name":"18D645"
-			},{
+				"objinit":»{
+					"objtype": "oCharSide",
+					"mainchar": 1,
+					"skin": "guy"
+				}«,
 				"x":2.618926,
 				"isobj":"oGuyPlacer",
 				"y":-14.87468,
@@ -113,28 +67,71 @@
 				"name":"18D646"
 			},{
 				"spd":"0",
-				"x":60.071611,
-				"y":16.102303,
-				"spi":"eas_tree",
-				"name":"18D647"
-			},{
-				"spd":"0",
-				"x":42.762148,
-				"y":16.150896,
+				"x":19.762148,
+				"isobj":"oGround",
+				"y":23.150896,
 				"spi":"eas_tree",
 				"name":"18D648"
 			},{
 				"spd":"0",
-				"x":78.982097,
-				"y":16.560103,
+				"x":39.762148,
+				"isobj":"oGround",
+				"y":14.150896,
 				"spi":"eas_tree",
-				"name":"18D649"
+				"name":"18D64D"
 			},{
 				"spd":"0",
-				"x":52.624041,
-				"y":31.381075,
+				"x":62.762148,
+				"isobj":"oGround",
+				"y":32.150896,
 				"spi":"eas_tree",
-				"name":"18D64A"
+				"name":"18D64E"
+			},{
+				"spd":"0",
+				"x":-19.237852,
+				"isobj":"oGround",
+				"y":63.150896,
+				"spi":"eas_tree",
+				"name":"18D64F"
+			},{
+				"spd":"0",
+				"x":5.762148,
+				"isobj":"oGround",
+				"y":65.150896,
+				"spi":"eas_tree",
+				"name":"18D651"
+			},{
+				"spd":"0",
+				"x":-4.237852,
+				"isobj":"oGround",
+				"y":79.150896,
+				"spi":"eas_tree",
+				"name":"18D650"
+			},{
+				"x":0,
+				"isobj":"oGround",
+				"y":107.007673,
+				"spi":"s_bd_grass_long_et",
+				"name":"18D652"
+			},{
+				"x":31,
+				"isobj":"oGround",
+				"y":107.007673,
+				"spi":"s_bd_grass_long_et",
+				"name":"18D653"
+			},{
+				"spd":"0",
+				"x":35.762148,
+				"isobj":"oGround",
+				"y":74.150896,
+				"spi":"s_bd_grass_long_et",
+				"name":"18D654"
+			},{
+				"x":73,
+				"isobj":"oGround",
+				"y":50,
+				"spi":"eas_hud_diamond",
+				"name":"18D655"
 			}]
 		},
 		{
@@ -145,7 +142,7 @@
 			"spriteList":[]
 		}
 	],
-	"last_ob_flt":"guy",
-	"last_sp_flt":"gras",
-	"camx":-58.803069
+	"last_ob_flt":"ground",
+	"last_sp_flt":"",
+	"camx":-70.079746
 }

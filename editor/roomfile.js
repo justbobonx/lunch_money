@@ -28,10 +28,13 @@ const ED_DEFAULT_SPRITE_FILTER = "s";
 const ED_DEFAULT_OBJECT_FILTER = "o";
 // the grid a room without one has
 const ED_FILE_DEFAULT_GRID = 8;
+// marks a setup block written fresh by the editor, so the printer indents it to where it sits
+const ED_FRESH_BLOCK_MARK = "\u0001";
 
 const EdFile = {
 	// For every object read or built: its keys in order, the number text each key was written with,
-	// and the keys holding raw setup blocks.
+	// and the keys holding raw setup blocks. A built object can also note the blocks written fresh,
+	// laid out from no indent, which the printer moves in to their place.
 	meta: new WeakMap(),
 
 	// Reads a whole file. Objects and arrays come back as plain values, setup blocks as their raw text.
@@ -110,7 +113,8 @@ const EdFile = {
 	// original editor wrote: a value equal to what the file held keeps the file's own text; one at the
 	// default the original left out is left out, unless the file held it; an always written field the
 	// file never had stays out while it holds what the editor assumed for it. Keys the editor does not
-	// know are kept as read. New keys take their place from the original's order.
+	// know are kept as read. New keys take their place from the original's order. A fresh block is noted
+	// so the printer indents it.
 	shape(kind, base, fields) {
 		const bm = base ? this.meta.get(base) : undefined;
 		const out = {};
@@ -149,6 +153,7 @@ const EdFile = {
 			om.keys.splice(at, 0, k);
 			out[k] = f.v;
 			if (f.block) om.blocks.add(k);
+			if (f.fresh) (om.fresh = om.fresh || new Set()).add(k);
 		};
 		if (base) {
 			for (const k of bm ? bm.keys : Object.keys(base)) {
@@ -159,6 +164,7 @@ const EdFile = {
 					om.keys.push(k);
 					out[k] = fields[k].v;
 					if (fields[k].block) om.blocks.add(k);
+					if (fields[k].fresh) (om.fresh = om.fresh || new Set()).add(k);
 				}
 			}
 		}
@@ -192,7 +198,8 @@ const EdFile = {
 	},
 
 	// The whole file text for a value: the compact text the original's encoder made, then its pretty
-	// printer. Setup blocks go in raw, as their text already carries the indent they sit at.
+	// printer. Setup blocks go in raw, as their text already carries the indent they sit at, except
+	// fresh ones, whose every line the printer moves in to the depth of the key holding them.
 	write(tree) {
 		const meta = this.meta;
 		const enc = (v, m, key) => {
@@ -205,7 +212,10 @@ const EdFile = {
 				const raw = m ? m.raw.get(key) : undefined;
 				return raw !== undefined && Number(raw) === v ? raw : this.number(v);
 			}
-			if (typeof v === "string") return m && m.blocks.has(key) ? "»" + v + "«" : JSON.stringify(v);
+			if (typeof v === "string") {
+				if (!m || !m.blocks.has(key)) return JSON.stringify(v);
+				return "»" + (m.fresh && m.fresh.has(key) ? ED_FRESH_BLOCK_MARK : "") + v + "«";
+			}
 			const vm = meta.get(v);
 			if (Array.isArray(v)) return "[" + v.map((x, n) => enc(x, vm, n)).join(",") + "]";
 			const keys = vm && vm.keys ? vm.keys : Object.keys(v);
@@ -251,7 +261,7 @@ const EdFile = {
 				pos = n + 1;
 			} else if (c === "»") {
 				const n = src.indexOf("«", pos);
-				out += src.slice(pos - 1, n + 1);
+				out += src[pos] === ED_FRESH_BLOCK_MARK ? "»" + src.slice(pos + 1, n).split("\n").join(tabs()) + "«" : src.slice(pos - 1, n + 1);
 				pos = n + 1;
 			} else {
 				out += c;
@@ -282,7 +292,7 @@ const EdFile = {
 			spd: { v: rec.spd === 0 ? "0" : rec.spd, dflt: 1 },
 			ifr: { v: rec.start_ifr, dflt: 0 },
 			isobj: { v: rec.isobj },
-			objinit: { v: rec.objinit, block: true },
+			objinit: { v: rec.objinit, block: true, fresh: rec.initFresh },
 			groups: { v: rec.groups && rec.groups.length > 0 ? this.list(rec.groups.slice(), rec.saved ? rec.saved.groups : null) : undefined },
 			paths: { v: rec.paths }
 		});

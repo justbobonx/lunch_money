@@ -142,7 +142,8 @@ const Editor = {
 		}, { passive: false });
 		canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 		window.addEventListener("keydown", (e) => {
-			if (this.asking) return;
+			// a question, or typing in the settings panel, keeps every key from the editor
+			if (this.asking || EdPanel.el.contains(document.activeElement)) return;
 			mods(e);
 			// control letters are the editor's own, saving and reading again among them, and a field
 			// being edited takes every key
@@ -175,6 +176,7 @@ const Editor = {
 			e.returnValue = "";
 		});
 
+		EdPanel.install();
 		this.gate();
 		const tick = (now) => {
 			this.frame(now);
@@ -326,10 +328,13 @@ const Editor = {
 		EdGui.startEdit("header", null, "", false, false, false);
 	},
 
-	// Takes up a room just built, from its file or from an undo step, leaving the camera alone: its
-	// layers, folds and filters as it keeps them, and nothing under the mouse until found again.
+	// Takes up a room just built, from its file, an undo step or a panel change, leaving the camera
+	// alone: its layers, folds and filters as it keeps them, how its layers map onto the screen
+	// worked out at once, so its entries can be measured before the next frame draws, and nothing
+	// under the mouse until found again.
 	adoptRoom(room) {
 		this.room = room;
+		EdView.lenses();
 		EdGui.roomLoaded();
 		EdPicker.roomLoaded(room);
 		this.hovers = [];
@@ -467,6 +472,7 @@ const Editor = {
 		this.lastDevY = mouse.devy;
 		const wh = Math.sign(inp.wheel);
 
+		EdPanel.step();
 		if (EdGui.needLyrGuiReset) {
 			EdGui.needLyrGuiReset = false;
 			EdGui.page();

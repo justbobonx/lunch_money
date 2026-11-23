@@ -133,7 +133,8 @@ const ED_HELP_RIGHT = "CTRL wheel click - center on click\n"
 	+ "CTRL Z - undo   CTRL Y / CTRL shift Z - redo\n"
 	+ "wheel over picker - next / last page of items\n"
 	+ "drag picker item into room - place it\n"
-	+ "not yet: align, groups, find, bounds, settings panels\n";
+	+ "right click entry - settings panel, ESC closes\n"
+	+ "not yet: align, groups, find, bounds, layer and room panels\n";
 
 // sublayers that focusing on an area leaves hidden
 const ED_FOCUS_HIDDEN_SUBNAMES = ["w", "m"];

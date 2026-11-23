@@ -117,14 +117,19 @@ const EdEdit = {
 		};
 	},
 
-	// Steps back or forward: the room now goes on the other stack and the kept one is built again,
-	// with what was selected and hidden in the editor then.
+	// Steps back or forward: the room now goes on the other stack and the kept one is built again.
 	undo(back) {
 		const from = back ? this.undos : this.redos;
 		const to = back ? this.redos : this.undos;
 		if (from.length === 0) return;
 		to.push(this.snapshot());
 		const s = from.pop();
+		this.restore(s);
+		this.rev = s.rev;
+	},
+
+	// Builds the room again from a snapshot, with what was selected and hidden in the editor then.
+	restore(s) {
 		const ed = Editor;
 		ed.adoptRoom(EdRoom.build(ed.room.index, s.text));
 		this.selects = [];
@@ -139,7 +144,6 @@ const EdEdit = {
 				}
 			}
 		}
-		this.rev = s.rev;
 		this.updateBox();
 	},
 
@@ -850,15 +854,16 @@ const EdEdit = {
 			}
 		}
 
-		// Letting go of the right button over an entry selects it; its settings panel comes in a
-		// later phase. Over nothing it clears the selection.
-		if (inp.released.right) {
+		// Letting go of the right button over an entry selects it and opens the settings panel next
+		// to the mouse; over nothing it clears the selection. Let go over the panel it does neither.
+		if (inp.released.right && ed.mouseIn) {
 			if (hovers.length > 0) {
 				const rec = hovers[ed.curhoveri];
 				if (!rec.selected) {
 					this.clear();
 					this.select(rec, false);
 				}
+				EdPanel.open(rec, mouse.devx / ed.dpr, mouse.devy / ed.dpr);
 			} else {
 				this.clear();
 			}
