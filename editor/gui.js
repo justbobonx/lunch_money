@@ -87,6 +87,14 @@ const ED_HUD_BOTTOM_H = 30;
 const ED_HUD_TAG_DX = 20;
 // sublayers that focusing on an area leaves hidden
 const ED_FOCUS_HIDDEN_SUBNAMES = ["w", "m"];
+// The entry group fields at the bottom right, as the original's: the group being worked inside,
+// which renames it, over the hovered group's name. Their right ends sit this far from the overlay's
+// right side, and they sit this far up from its bottom.
+const ED_GROUP_RIGHT = 10;
+const ED_GROUP_IN_DY = 50;
+const ED_GROUP_HOVER_DY = 40;
+const ED_GROUP_IN_PRETEXT = "IN ";
+const ED_GROUP_COLOR = "#ffff99";
 
 const EdGui = {
 	// screen pixels per overlay pixel
@@ -360,14 +368,15 @@ const EdGui = {
 	},
 
 	// Ends editing. Committing a layer row renames it; the filter keeps its text either way, but
-	// cancelling puts back what it had. The header names a room not saved yet: cancelling keeps the
-	// name it has, and a refused name keeps the editing going.
+	// cancelling puts back what it had. The header names a room not saved yet and the group field
+	// renames the group being worked inside: cancelling keeps the name it has, and a refused name
+	// keeps the editing going.
 	endEdit(commit) {
 		const e = this.edit;
 		this.edit = null;
-		if (e.kind === "header") {
+		if (e.kind === "header" || e.kind === "group") {
 			if (!commit) return;
-			const why = this.renameRoom(e.text);
+			const why = e.kind === "header" ? this.renameRoom(e.text) : EdEdit.renameGroup(e.text);
 			Editor.debugtxt = why === "" ? "" : " " + why;
 			if (why !== "") this.edit = e;
 		} else if (e.kind === "filter") {
@@ -496,9 +505,10 @@ const EdGui = {
 		this.needLyrGuiReset = true;
 	},
 
-	// The overlay's fields as they show now: the room header, the rows on the page, and the add button,
-	// each with its text, colour, backing box, and whether the mouse is over it. A hovered field
-	// blinks arrows after its text, which widens its box as in the original.
+	// The overlay's fields as they show now: the room header, the rows on the page, the add button,
+	// the picker's fields and the entry group fields, each with its text, colour, backing box, and
+	// whether the mouse is over it. A hovered field blinks arrows after its text, which widens its
+	// box as in the original. The group fields line up on their right ends.
 	fields() {
 		const ed = Editor;
 		const room = ed.room;
@@ -533,7 +543,17 @@ const EdGui = {
 		});
 		add("add", null, ED_ADD_X, this.addY, this.addPretext, " +", ED_ADD_COLOR, 0);
 		if (EdLink.players.length > 0) add("players", null, ED_ROOM_X + ED_ROW_DX, this.playersY, "", ED_PLAYERS_TEXT, ED_PLAYERS_COLOR, 0);
-		for (const f of EdPicker.fields(ed.canvas.height / this.scale)) add(f.kind, null, f.x, f.y, f.pretext, f.text, f.color, f.minw);
+		const gh = ed.canvas.height / this.scale;
+		for (const f of EdPicker.fields(gh)) add(f.kind, null, f.x, f.y, f.pretext, f.text, f.color, f.minw);
+		const h = ed.hovers[ed.curhoveri];
+		const hovered = h !== undefined && !ed.inp.alt ? EdEdit.nextGroup(h) : null;
+		for (const g of [{ kind: "group", dy: ED_GROUP_IN_DY, pretext: ED_GROUP_IN_PRETEXT, text: EdEdit.inGroup },
+			{ kind: "hovgroup", dy: ED_GROUP_HOVER_DY, pretext: "", text: hovered }]) {
+			if (g.text === null) continue;
+			add(g.kind, null, 0, gh - g.dy, g.pretext, g.text, ED_GROUP_COLOR, 0);
+			const f = list[list.length - 1];
+			f.x = ed.canvas.width / this.scale - ED_GROUP_RIGHT - f.w;
+		}
 		return list;
 	},
 
@@ -604,7 +624,8 @@ const EdGui = {
 		}
 		// control and a left click copies a field's text, as the original's fields did
 		if (inp.pressed.left && inp.ctrl && hit.kind !== "add") {
-			navigator.clipboard.writeText(hit.kind === "row" ? hit.lyr.name : (hit.kind === "header" ? room.name : hit.text)).catch(() => {});
+			navigator.clipboard.writeText(hit.kind === "row" ? hit.lyr.name : (hit.kind === "header" ? room.name
+				: (hit.kind === "group" ? EdEdit.inGroup : hit.text))).catch(() => {});
 			return true;
 		}
 		// The filter switches pointing to sprites and starts editing at any press; the name field
@@ -627,7 +648,12 @@ const EdGui = {
 			}
 			return true;
 		}
-		if (hit.kind === "name") return true;
+		if (hit.kind === "name" || hit.kind === "hovgroup") return true;
+		// the group field renames the group being worked inside, from a click or enter
+		if (hit.kind === "group") {
+			if (inp.pressed.left || inp.keysPressed.has("Enter")) this.startEdit("group", null, EdEdit.inGroup, false, true, false);
+			return true;
+		}
 
 		const now = currentTime();
 		const pressed = inp.pressed.left || inp.pressed.right || inp.pressed.middle;

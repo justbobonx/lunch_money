@@ -38,6 +38,8 @@ const ED_GRID_FALL = 8;
 const ED_UID_DIGITS = 5;
 // the object marking the player start, which control F finds
 const ED_PLAYER_START_OBJECT = "oGuyPlacer";
+// the script actions that name an entry group, whose names follow a group renamed
+const ED_GROUP_SCRIPT_OPS = ["groupViz", "copyGroup"];
 
 const EdEdit = {
 	// the selected entries, in the order they were selected, and the box round them in view space
@@ -83,6 +85,9 @@ const EdEdit = {
 	// the undo step of the last lining up to one side by an alt arrow, so centring or spreading
 	// right after can take it back
 	alignStep: null,
+	// The entry group being worked inside, by name, or none. Only its entries hover, select and
+	// take new entries, and clicking picks the groups one level inside it. Not an undo step.
+	inGroup: null,
 
 	// A room just opened or read again: nothing selected, held or to undo.
 	reset() {
@@ -96,6 +101,7 @@ const EdEdit = {
 		this.grab = null;
 		this.lastPlaced = [];
 		this.alignStep = null;
+		this.inGroup = null;
 	},
 
 	dirty() {
@@ -193,8 +199,8 @@ const EdEdit = {
 	},
 
 	// Adds an entry to the selection as the original did: its offsets from the mouse kept for moving,
-	// its group unfolded and its layer made current, and with a group asked for, the rest of the last
-	// group it belongs to.
+	// its group unfolded and its layer made current, and with a group asked for, the rest of its
+	// next group.
 	select(rec, andgroup) {
 		const ed = Editor;
 		const room = ed.room;
@@ -209,9 +215,65 @@ const EdEdit = {
 		if (lg !== undefined && lg.folded) EdGui.fold(lg.col_head_lyr, false);
 		EdGui.selectLayer(room.layers.indexOf(rec.mylayer));
 		this.updateBox();
-		if (andgroup && rec.groups !== null && rec.groups.length > 0) {
-			for (const member of room.objGroups[rec.groups[rec.groups.length - 1]]) this.select(member, false);
+		const gname = andgroup ? this.nextGroup(rec) : null;
+		if (gname !== null) for (const member of room.objGroups[gname]) this.select(member, false);
+	},
+
+	// An entry's next group, the one clicking it picks: outside every group its outermost, inside
+	// one the group just inside that, or none. Groups nest strictly, an entry's list running from
+	// its innermost group out.
+	nextGroup(rec) {
+		if (rec.groups === null || rec.groups.length === 0) return null;
+		if (this.inGroup === null) return rec.groups[rec.groups.length - 1];
+		const i = rec.groups.indexOf(this.inGroup);
+		return i > 0 ? rec.groups[i - 1] : null;
+	},
+
+	// Whether an entry is in the group being worked inside, which every entry is when there is none.
+	inside(rec) {
+		return this.inGroup === null || (rec.groups !== null && rec.groups.includes(this.inGroup));
+	},
+
+	// The groups an entry placed or pasted now goes in: the group being worked inside and the groups
+	// round it, or none.
+	chain() {
+		if (this.inGroup === null) return null;
+		const g = Editor.room.objGroups[this.inGroup][0].groups;
+		return g.slice(g.indexOf(this.inGroup));
+	},
+
+	// Renames the group being worked inside, as one undo step: every entry's list of groups, and the
+	// room's scripts that show, hide or copy the group by name. A name left empty or already a
+	// group's is refused; tells why, or gives nothing.
+	renameGroup(text) {
+		const room = Editor.room;
+		const old = this.inGroup;
+		if (text === old) return "";
+		if (text === "") return "a group needs a name";
+		if (room.objGroups[text] !== undefined) return "a group is already named " + text;
+		const named = new RegExp("(\\[\\s*\"(?:" + ED_GROUP_SCRIPT_OPS.join("|") + ")\"\\s*,\\s*)\"" + old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"", "g");
+		const swap = (v) => (typeof v === "string" ? v.replace(named, (m, head) => head + JSON.stringify(text)) : v);
+		const members = room.objGroups[old];
+		this.push(members, ["groups"]);
+		for (const rec of members) rec.groups = rec.groups.map((g) => (g === old ? text : g));
+		let scripts = 0;
+		const blocks = [];
+		for (const lyr of room.layers) for (const rec of lyr.lsprites) blocks.push({ obj: rec, f: "objinit" });
+		for (const lg of Object.values(room.lgroups)) blocks.push({ obj: lg, f: "grp_init" });
+		blocks.push({ obj: room, f: "room_init" });
+		for (const b of blocks) {
+			const v = swap(b.obj[b.f]);
+			if (v === b.obj[b.f]) continue;
+			this.keep(b.obj, [b.f]);
+			b.obj[b.f] = v;
+			if (b.obj instanceof lpSprite) EdRoom.refresh(b.obj);
+			scripts++;
 		}
+		this.inGroup = text;
+		EdRoom.relink(room);
+		Editor.debugtxt = " renamed " + old + " to " + text + (scripts > 0 ? ", " + scripts + " scripts changed" : "");
+		Editor.rehover = true;
+		return "";
 	},
 
 	clear() {
@@ -334,13 +396,14 @@ const EdEdit = {
 		return taken;
 	},
 
-	// Copies the selection as it would be saved, with where its box sits; cutting also deletes it, as
-	// an undo step of its own. A cut has not been pasted yet.
+	// Copies the selection as it would be saved, with where its box sits and the group it was copied
+	// inside; cutting also deletes it, as an undo step of its own. A cut has not been pasted yet.
 	copy(cut) {
 		this.clip = {
 			items: this.selects.map((rec) => ({ map: EdFile.entryTree(rec), lyr: rec.mylayer })),
 			x: this.box.x1,
 			y: this.box.y1,
+			inGroup: this.inGroup,
 			cut: cut,
 			pasted: false
 		};
@@ -349,10 +412,11 @@ const EdEdit = {
 
 	// Pastes the copied entries moved by an offset in view space, at the end of the current layer or
 	// of the layers they came from, as the new selection, keeping the lists they go into in the undo
-	// step already started. The first paste of a cut is the cut entries moved: each keeps its name,
-	// unless this room already has it, and its groups. Any other paste is a copy: names are made
-	// unique, and every group the entries were in becomes a new group of their own, as the
-	// original's paste did.
+	// step already started. Each keeps only the groups inside the one it was copied inside, then
+	// goes in the group being worked inside and those round it. The first paste of a cut is the cut
+	// entries moved: each keeps its name, unless this room already has it, and its groups. Any other
+	// paste is a copy: names are made unique, and every group kept becomes a new group of its own,
+	// as the original's paste did.
 	paste(xo, yo, keepLayer) {
 		const ed = Editor;
 		const room = ed.room;
@@ -364,6 +428,7 @@ const EdEdit = {
 		const renamed = new Map();
 		const added = [];
 		const moving = this.clip.cut && !this.clip.pasted;
+		const chain = this.chain();
 		this.clip.pasted = true;
 		for (const item of this.clip.items) {
 			const lyr = keepLayer && room.layers.includes(item.lyr) ? item.lyr : cur;
@@ -374,16 +439,18 @@ const EdEdit = {
 			const k = lyr.lens.s / EdView.z;
 			rec.x += xo / k;
 			rec.y += yo / k;
-			if (rec.groups !== null && !moving) {
-				rec.groups = rec.groups.map((gname) => {
-					if (!renamed.has(gname)) {
-						const nn = this.unique(gname, groupsTaken);
-						groupsTaken.add(nn);
-						renamed.set(gname, nn);
-					}
-					return renamed.get(gname);
-				});
-			}
+			const from = rec.groups !== null ? rec.groups : [];
+			const upto = this.clip.inGroup !== null && from.includes(this.clip.inGroup) ? from.indexOf(this.clip.inGroup) : from.length;
+			const groups = from.slice(0, upto).map((gname) => {
+				if (moving) return gname;
+				if (!renamed.has(gname)) {
+					const nn = this.unique(gname, groupsTaken);
+					groupsTaken.add(nn);
+					renamed.set(gname, nn);
+				}
+				return renamed.get(gname);
+			}).concat(chain !== null ? chain : []);
+			rec.groups = groups.length > 0 ? groups : null;
 			EdRoom.refresh(rec);
 			lyr.lsprites.push(rec);
 			added.push(rec);
@@ -409,9 +476,9 @@ const EdEdit = {
 	},
 
 	// Places one of the picker's items in the current layer at a spot in that layer, named with the
-	// next number, keeping the layer's list in the undo step already started. Its animation starts in
-	// step with the editor's, or with control from its first frame at this moment, as the original
-	// placed them.
+	// next number, in the group being worked inside and those round it, keeping the layer's list in
+	// the undo step already started. Its animation starts in step with the editor's, or with
+	// control from its first frame at this moment, as the original placed them.
 	add(item, x, y, startoff) {
 		const ed = Editor;
 		const lyr = ed.room.layers[ed.curlayeri];
@@ -420,6 +487,7 @@ const EdEdit = {
 		if (item.isobj !== undefined) map.isobj = item.isobj;
 		const rec = EdRoom.record(map, lyr);
 		rec.saved = null;
+		rec.groups = this.chain();
 		const sr = Sprites.get(rec.spi);
 		const n = sr.frameCount;
 		const nowii = n > 0 ? (ed.frames * sr.imageSpeed) % n : 0;
@@ -490,13 +558,56 @@ const EdEdit = {
 		}
 		if (inp.ctrl && ((hit("KeyZ") && !inp.shift))) this.undo(true);
 		if (inp.ctrl && (hit("KeyY") || (hit("KeyZ") && inp.shift))) this.undo(false);
+		// control A selects the current layer, with shift every layer, and inside a group all of it
 		if (inp.ctrl && hit("KeyA")) {
 			this.clear();
 			room.layers.forEach((lyr, li) => {
-				if ((inp.shift || li === ed.curlayeri) && EdView.pickable(lyr, li, false)) {
-					for (const rec of lyr.lsprites) this.select(rec, false);
+				if ((inp.shift || li === ed.curlayeri || this.inGroup !== null) && EdView.pickable(lyr, li, false)) {
+					for (const rec of lyr.lsprites) if (this.inside(rec)) this.select(rec, false);
 				}
 			});
+		}
+		// Control G groups the selection under a new name, just inside the group being worked inside,
+		// keeping it selected. A group only part selected is refused, so groups always nest.
+		if (inp.ctrl && !inp.shift && hit("KeyG") && this.selects.length > 0) {
+			const sel = this.selects;
+			const part = sel.some((rec) => {
+				const gname = this.nextGroup(rec);
+				return !this.inside(rec) || (gname !== null && room.objGroups[gname].some((m) => !m.selected));
+			});
+			if (part) {
+				ed.debugtxt = " can't group part of a group, or what is outside the group worked in";
+			} else {
+				const name = this.unique(this.newUid(), new Set(Object.keys(room.objGroups)));
+				this.push(sel, ["groups"]);
+				for (const rec of sel) {
+					const g = rec.groups !== null ? rec.groups.slice() : [];
+					g.splice(this.inGroup !== null ? g.indexOf(this.inGroup) : g.length, 0, name);
+					rec.groups = g;
+				}
+				EdRoom.relink(room);
+				ed.debugtxt = " grouped as " + name;
+				ed.rehover = true;
+			}
+		}
+		// control shift G ungroups every next group of the selection, keeping it selected
+		if (inp.ctrl && inp.shift && hit("KeyG")) {
+			const gone = new Set();
+			for (const rec of this.selects) {
+				const gname = this.nextGroup(rec);
+				if (gname !== null) gone.add(gname);
+			}
+			if (gone.size > 0) {
+				const members = [...new Set([...gone].flatMap((gname) => room.objGroups[gname]))];
+				this.push(members, ["groups"]);
+				for (const rec of members) {
+					const g = rec.groups.filter((gname) => !gone.has(gname));
+					rec.groups = g.length > 0 ? g : null;
+				}
+				EdRoom.relink(room);
+				ed.debugtxt = " ungrouped " + [...gone].join(" ");
+				ed.rehover = true;
+			}
 		}
 		if (inp.ctrl && hit("KeyJ") && this.selects.length > 0) {
 			const amt = inp.shift ? ED_JITTER_SHIFT : ED_JITTER;
@@ -634,6 +745,9 @@ const EdEdit = {
 
 		const hovers = ed.hovers;
 		if (inp.pressed.left) {
+			// a G click on an entry, or a double click on the selection, goes inside its next group
+			const into = hovers.length === 0 ? null : (held("KeyG") ? this.nextGroup(hovers[ed.curhoveri])
+				: (this.dbl && !inp.shift && !this.hoverWheeled && hovers.some((h) => h.selected) ? this.nextGroup(hovers.find((h) => h.selected)) : null));
 			if (this.grab !== null) {
 				this.resizing = true;
 				this.resizePrimed = true;
@@ -641,6 +755,10 @@ const EdEdit = {
 				const s0 = this.selects[0];
 				const p = EdView.toView(s0.mylayer, s0.x - s0.exoffx + s0.loopdx, s0.y - s0.exoffy + s0.loopdy);
 				this.rotateStAng = (s0.ang - Math.round(pointDirection(p.x, p.y, mouse.wx, mouse.wy)) + 720) % 360;
+			} else if (into !== null) {
+				this.inGroup = into;
+				this.clear();
+				ed.rehover = true;
 			} else if (hovers.length > 0 && held("KeyF")) {
 				// F finds the type of the entry clicked; with control an object also of its sprite
 				const hover = hovers[ed.curhoveri];
@@ -659,14 +777,18 @@ const EdEdit = {
 						seldown.tiledy = t;
 						seldown.tile_loop = t && inp.shift ? 1 : 0;
 						EdRoom.refresh(seldown);
-					} else if (held("KeyG") || held("KeyP") || held("KeyB")) {
-						// groups, paths and area backdrops come in a later phase
+					} else if (held("KeyP") || held("KeyB")) {
+						// paths and area backdrops come in a later phase
 					} else if (held("KeyH")) {
 						seldown.hidden = 1;
 						this.clear();
 					} else if (inp.shift) {
-						seldown.selected = false;
-						this.selects.splice(this.selects.indexOf(seldown), 1);
+						// shift takes its whole next group out of the selection, with alt only it
+						const gname = inp.alt ? null : this.nextGroup(seldown);
+						for (const rec of gname !== null ? room.objGroups[gname] : [seldown]) {
+							rec.selected = false;
+							if (this.selects.includes(rec)) this.selects.splice(this.selects.indexOf(rec), 1);
+						}
 					}
 				} else if (held("KeyH")) {
 					hover.hidden = 1;
@@ -693,13 +815,22 @@ const EdEdit = {
 				this.movePrimed = true;
 				this.copyPrimed = inp.ctrl;
 			} else {
+				// On nothing a press clears the selection, unless with shift, and starts a box. The
+				// second press of a double one also steps out of the group being worked inside to the
+				// one round it, if any, or with control out of every group.
 				if (!inp.shift) this.clear();
 				this.boxSelect = true;
+				if (this.dbl && this.inGroup !== null) {
+					const g = room.objGroups[this.inGroup][0].groups;
+					const up = g.indexOf(this.inGroup) + 1;
+					this.inGroup = up < g.length && !inp.ctrl ? g[up] : null;
+					ed.rehover = true;
+				}
 			}
 		}
 
-		// Dragging out a box selects whatever it touches on the layers that can be picked from. With
-		// shift what it touched stays selected, as in the original.
+		// Dragging out a box selects whatever it touches on the layers that can be picked from, inside a
+		// group only its entries. With shift what it touched stays selected, as in the original.
 		if (this.boxSelect && inp.down.left && mmoved) {
 			if (!inp.shift) this.clear();
 			const x1 = Math.min(this.downX, mouse.wx);
@@ -712,7 +843,7 @@ const EdEdit = {
 				const b = EdView.toLayer(lyr, x2, y2);
 				const rect = { l: a.x, t: a.y, r: b.x, b: b.y };
 				for (const rec of lyr.lsprites) {
-					if (rec.hidden || rec.selected) continue;
+					if (rec.hidden || rec.selected || !this.inside(rec)) continue;
 					const p = EdView.spot(rec);
 					if (shapesOverlap(EdView.frameShape(rec, p.x, p.y), rect)) {
 						rec.selected = true;

@@ -262,7 +262,8 @@ const EdView = {
 	},
 
 	// Everything under the mouse: on every layer that can be picked from, bottom layer first, by each
-	// entry's whole picture frame at its spot. The original went by the collision shape.
+	// entry's whole picture frame at its spot, inside an entry group only its entries. The original
+	// went by the collision shape, and inside a group by its list, unshifted by parallax.
 	findHovers(alt) {
 		const ed = Editor;
 		const room = ed.room;
@@ -273,7 +274,7 @@ const EdView = {
 			const mx = Math.floor((ed.mouse.devx - ln.ox) / ln.s + ln.offx);
 			const my = Math.floor((ed.mouse.devy - ln.oy) / ln.s + ln.offy);
 			for (const rec of lyr.lsprites) {
-				if (rec.hidden) continue;
+				if (rec.hidden || !EdEdit.inside(rec)) continue;
 				this.loopShift(lyr, rec);
 				const p = this.spot(rec);
 				if (pointInShape(this.frameShape(rec, p.x, p.y), mx, my)) found.push(rec);

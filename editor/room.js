@@ -202,7 +202,8 @@ const EdRoom = {
 
 	// Ties the room together again after layers or entries come or go: which layer each entry and
 	// caret layer belongs to, the object groups, the masks and the layer groups with their headers,
-	// as the original's group update, and the group area bounds.
+	// as the original's group update, and the group area bounds. An entry group the editor is
+	// working inside is left once no entry is in it.
 	relink(room) {
 		room.objGroups = {};
 		room.count = 0;
@@ -231,6 +232,8 @@ const EdRoom = {
 				if (cls === oGroupBounds && init && init.group !== undefined) boundsOf[init.group] = rec;
 			}
 		}
+
+		if (EdEdit.inGroup !== null && room.objGroups[EdEdit.inGroup] === undefined) EdEdit.inGroup = null;
 
 		// Masks cut the layers they name, as in play. A starred name is skipped, as the player does.
 		for (const mrec of masks) {

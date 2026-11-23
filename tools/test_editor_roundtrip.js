@@ -6,7 +6,8 @@
 // editor's scripts run here as they are, with a bare page around them.
 // Then undo and redo are checked: in one room, each kind of change is made through the editor's own
 // code, as the keys, the mouse and the panel make it, undone, and the room's text compared with the
-// text before; then redone and compared with the text after.
+// text before; then redone and compared with the text after. Entry groups are checked the same way,
+// with the selecting, going inside and stepping out that come with them.
 //
 // usage: node tools/test_editor_roundtrip.js [<lunch_money dir>]
 
@@ -24,6 +25,8 @@ const EDITOR_SCRIPTS = ["editor/roomfile.js", "editor/room.js", "editor/view.js"
 const UNDO_ROOM = "TestDev";
 const UNDO_SCREEN_W = 1280;
 const UNDO_SCREEN_H = 720;
+// a press this long before a click keeps it from counting as the second of a double click, in ms
+const LONG_AGO_MS = 10000;
 
 // a drawing surface that accepts every call and draws nothing
 const surface = () => new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => surface()), set: (t, k, v) => { t[k] = v; return true; } });
@@ -50,8 +53,8 @@ const loadScript = async (rel) => { run(rel); };
 (async () => {
 	for (const f of PLAYER_SCRIPTS) run(f);
 	for (const f of EDITOR_SCRIPTS) run(f);
-	vm.runInContext("this.T = { game, Sprites, Draw, EdRoom, EdFile, EdGui, Editor, EdEdit, EdView, EdPicker, EdPanel, ED_PANEL_KINDS };", page);
-	const { game, Sprites, Draw, EdRoom, EdFile, EdGui, Editor, EdEdit, EdView, EdPicker, EdPanel, ED_PANEL_KINDS } = page.T;
+	vm.runInContext("this.T = { game, Sprites, Draw, EdRoom, EdFile, EdGui, Editor, EdEdit, EdView, EdPicker, EdPanel, ED_PANEL_KINDS, currentTime };", page);
+	const { game, Sprites, Draw, EdRoom, EdFile, EdGui, Editor, EdEdit, EdView, EdPicker, EdPanel, ED_PANEL_KINDS, currentTime } = page.T;
 	// a room as the editor holds it once opened, with its current layer saved as it was read
 	const opened = (rmi, text) => {
 		const room = EdRoom.build(rmi, text);
@@ -111,8 +114,9 @@ const loadScript = async (rel) => { run(rel); };
 	const inp = Editor.inp;
 	// the current layer is the editor's, not the room's, so it is left out of the comparing
 	const text = () => EdFile.roomText(room, Object.assign(Editor.fileState(), { curlyri: 0 }));
-	// one editor step of the mouse and keys: keys pressed this step, keys and buttons held, the mouse
-	// at a room spot, then everything let go
+	// one editor step of the mouse and keys: keys pressed this step, keys and buttons held, a left
+	// press or a right let go over what is set as under the mouse, the mouse at a room spot, then
+	// everything let go
 	const step = (o) => {
 		inp.keysPressed = new Set(o.press || []);
 		inp.keysDown = new Set((o.press || []).concat(o.hold || []));
@@ -120,6 +124,13 @@ const loadScript = async (rel) => { run(rel); };
 		inp.shift = !!o.shift;
 		inp.ctrl = !!o.ctrl;
 		inp.down.left = !!o.left;
+		inp.pressed.left = !!o.click;
+		inp.released.right = !!o.rclick;
+		Editor.mouseIn = true;
+		if (o.under) {
+			Editor.hovers = o.under;
+			Editor.curhoveri = o.under.length - 1;
+		}
 		if (o.at) {
 			Editor.mouse.wx = o.at.x;
 			Editor.mouse.wy = o.at.y;
@@ -128,7 +139,8 @@ const loadScript = async (rel) => { run(rel); };
 		if (EdEdit.keys()) EdEdit.mouse(!!o.at, o.wheel || 0);
 		inp.keysPressed = new Set();
 		inp.keysDown = new Set();
-		inp.alt = inp.shift = inp.ctrl = inp.down.left = false;
+		inp.alt = inp.shift = inp.ctrl = inp.down.left = inp.pressed.left = inp.released.right = false;
+		Editor.hovers = [];
 	};
 	// a plain layer with at least four upright entries of different sizes, and four of them
 	const plain = room.layers.find((l) => !l.name.startsWith("^") && l.plx_x === 1 && l.plx_y === 1 && l.wd === room.roomw
@@ -290,6 +302,157 @@ const loadScript = async (rel) => { run(rel); };
 		EdPanel.inputs = { roomw: { input: { dataset: { dirty: "1" }, value: String(room.roomw + 64) } } };
 		EdPanel.commitField(f);
 	});
+	// Entry groups: four loose entries grouped, entered, grouped again inside, ungrouped, renamed,
+	// placed and pasted into, and the selecting and stepping out that are not undo steps.
+	const say = (ok, what) => {
+		if (ok) return;
+		failed++;
+		console.log("group check: " + what);
+	};
+	const loose = plain.lsprites.filter((r) => r.groups === null && r.ang === 0).slice(0, 4);
+	EdEdit.inGroup = null;
+	let outer = null;
+	check("group", () => {
+		pick(loose);
+		step({ press: ["KeyG"], ctrl: true });
+		outer = loose[0].groups !== null ? loose[0].groups[0] : null;
+		say(outer !== null && loose.every((r) => r.groups.join() === outer), "four not grouped as one");
+		say(EdEdit.selects.length === 4, "grouping dropped the selection");
+	});
+	{
+		const before = text();
+		const steps = EdEdit.undos.length;
+		pick(loose.slice(0, 2));
+		step({ press: ["KeyG"], ctrl: true });
+		say(text() === before && EdEdit.undos.length === steps, "part of a group was grouped");
+		EdEdit.clear();
+		EdEdit.select(loose[1], true);
+		say(EdEdit.selects.length === 4, "a click did not select the whole group");
+		step({ click: true, shift: true, under: [loose[2]] });
+		say(EdEdit.selects.length === 0, "shift on the selection did not take its whole group out");
+		EdEdit.select(loose[1], true);
+		step({ click: true, shift: true, alt: true, under: [loose[2]] });
+		say(EdEdit.selects.length === 3 && !loose[2].selected, "shift alt did not take one entry out");
+		EdEdit.clear();
+		EdEdit.select(loose[0], true);
+		EdEdit.lastPress = currentTime();
+		step({ click: true, under: [loose[0]] });
+		say(EdEdit.inGroup === outer && EdEdit.selects.length === 0, "a double click on the selection did not go inside");
+		EdEdit.inGroup = null;
+		step({ click: true, hold: ["KeyG"], under: [loose[0]] });
+		say(EdEdit.inGroup === outer && EdEdit.selects.length === 0, "G click did not go inside with nothing selected");
+		// the test layer is locked, which control A respects
+		const wasLocked = plain.locked;
+		plain.locked = 0;
+		step({ press: ["KeyA"], ctrl: true });
+		say(EdEdit.selects.length === 4 && loose.every((r) => r.selected), "control A inside took more than the group");
+		plain.locked = wasLocked;
+	}
+	let inner = null;
+	check("group inside a group", () => {
+		pick(loose.slice(0, 2));
+		step({ press: ["KeyG"], ctrl: true });
+		inner = loose[0].groups[0];
+		say(inner !== outer && loose[1].groups.join() === inner + "," + outer && loose[2].groups.join() === outer, "inner group not inside");
+	});
+	{
+		EdEdit.clear();
+		EdEdit.select(loose[0], true);
+		say(EdEdit.selects.length === 2, "inside a group a click did not pick the inner group");
+		// the page clock stands still here, so a press long ago is set by hand before a first click;
+		// a click on nothing, then a second soon after it
+		const twice = (ctrl) => {
+			EdEdit.lastPress = -LONG_AGO_MS;
+			step({ click: true, ctrl: ctrl, under: [] });
+			step({ click: true, ctrl: ctrl, under: [] });
+			EdEdit.boxSelect = false;
+		};
+		const into = () => {
+			EdEdit.lastPress = -LONG_AGO_MS;
+			step({ click: true, hold: ["KeyG"], under: [loose[0]] });
+		};
+		into();
+		into();
+		say(EdEdit.inGroup === inner, "two G clicks did not reach the inner group");
+		EdEdit.select(loose[0], false);
+		step({ rclick: true, under: [] });
+		step({ rclick: true, ctrl: true, under: [] });
+		say(EdEdit.inGroup === inner && EdEdit.selects.length === 0, "right click on nothing changed the group or kept the selection");
+		EdEdit.select(loose[0], false);
+		EdEdit.lastPress = -LONG_AGO_MS;
+		step({ click: true, under: [] });
+		say(EdEdit.inGroup === inner && EdEdit.selects.length === 0 && EdEdit.boxSelect, "one click on nothing did more than clear and start a box");
+		EdEdit.boxSelect = false;
+		twice(false);
+		say(EdEdit.inGroup === outer, "double click on nothing did not step out one level");
+		twice(false);
+		say(EdEdit.inGroup === null, "double click on nothing did not step out of the last group");
+		into();
+		into();
+		twice(true);
+		say(EdEdit.inGroup === null, "control double click on nothing did not leave every group");
+		into();
+	}
+	check("ungroup", () => {
+		pick(loose.slice(0, 1));
+		step({ press: ["KeyG"], ctrl: true, shift: true });
+		say(loose[0].groups.join() === outer && loose[1].groups.join() === outer, "inner group not ungrouped");
+		say(EdEdit.selects.length === 1, "ungrouping dropped the selection");
+	});
+	check("place in a group", () => {
+		Editor.curlayeri = room.layers.indexOf(plain);
+		EdEdit.push();
+		const rec = EdEdit.add({ spi: loose[0].spi }, 30, 40, false);
+		say(rec.groups !== null && rec.groups.join() === outer, "placed entry not in the group");
+	});
+	check("paste in a group", () => {
+		EdEdit.inGroup = null;
+		pick(four.slice(0, 1).filter((r) => r.groups === null).concat(plain.lsprites.filter((r) => r.groups === null).slice(0, 1)).slice(0, 1));
+		EdEdit.copy(false);
+		EdEdit.inGroup = outer;
+		step({ press: ["KeyV"], ctrl: true, at: { x: 50, y: 60 } });
+		say(EdEdit.selects.length === 1 && EdEdit.selects[0].groups.join() === outer, "pasted entry not in the group");
+	});
+	check("copy paste of a group", () => {
+		EdEdit.inGroup = null;
+		pick(loose);
+		EdEdit.copy(false);
+		step({ press: ["KeyV"], ctrl: true, at: { x: 90, y: 60 } });
+		const g = EdEdit.selects[0].groups;
+		say(g !== null && g.length === 1 && g[0] !== outer && EdEdit.selects.every((r) => r.groups.join() === g[0]), "pasted group not given a new name");
+	});
+	{
+		// the room's scripts show and hide a group by this name; earlier checks may have left one
+		const scripted = "arcade_fr";
+		EdEdit.inGroup = outer;
+		say(EdEdit.renameGroup(Object.keys(room.objGroups).find((g) => g !== outer)) !== "", "a taken group name was taken");
+		check("group rename", () => {
+			say(EdEdit.renameGroup("undo_group") === "" && room.objGroups.undo_group !== undefined && room.objGroups[outer] === undefined
+				&& EdEdit.inGroup === "undo_group", "group not renamed");
+		});
+		outer = "undo_group";
+		if (room.objGroups[scripted] === undefined) {
+			EdEdit.inGroup = "arcade_fr_1";
+			EdEdit.renameGroup(scripted);
+		}
+		check("group rename and its scripts", () => {
+			EdEdit.inGroup = scripted;
+			EdEdit.renameGroup("arcade_fr_9");
+			const t = text();
+			say(t.includes("\"groupViz\", \"arcade_fr_9\"") && !t.includes("\"groupViz\", \"arcade_fr\""), "scripts did not follow the rename");
+		});
+		EdEdit.undo(true);
+		say(EdEdit.inGroup === null, "undoing a rename did not leave the group gone");
+		EdEdit.undo(false);
+	}
+	{
+		EdEdit.inGroup = outer;
+		pick(room.objGroups[outer].slice());
+		step({ press: ["Delete"] });
+		say(EdEdit.inGroup === null, "the group stayed worked in once empty");
+		EdEdit.undo(true);
+		EdEdit.inGroup = null;
+	}
 	check("layer settings", () => {
 		Editor.curlayeri = room.layers.indexOf(plain);
 		EdEdit.push(plain, ["zsort"]);

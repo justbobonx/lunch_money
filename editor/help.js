@@ -21,8 +21,7 @@ const ED_HELP_HOVER_BACK_COLOR = "#2a2a3c";
 const ED_HELP_COLUMNS = [
 	[
 		["room and selection", [
-			["click", "select, with its group"],
-			["ALT click", "select without its group"],
+			["click", "select"],
 			["SHIFT click", "add to or take from the selection"],
 			["drag on nothing", "box select, SHIFT keeps what it had"],
 			["ALT", "hovers from any visible layer, no grabber corners"],
@@ -103,6 +102,20 @@ const ED_HELP_COLUMNS = [
 			["click filter", "edit the filter"],
 			["double right click filter", "clear it"],
 			["right click editing", "cancel"]
+		]],
+		["groups", [
+			["hover", "lights its group, its name at the bottom right"],
+			["click", "select with its group, inside a group the one a level in"],
+			["ALT click", "just the entry, not its group"],
+			["SHIFT click", "add its group, on the selection take its group out"],
+			["SHIFT ALT click selected", "take just it from the selection"],
+			["G click, double click selected", "go inside its group, nothing selected"],
+			["double click nothing", "step out to the group round it"],
+			["CTRL double click nothing", "leave every group"],
+			["CTRL A inside", "select all of the group"],
+			["CTRL G", "group the selection, never part of a group"],
+			["CTRL SHIFT G", "ungroup the selection's groups"],
+			["click or ENTER on IN field", "rename the group, its scripts follow"]
 		]]
 	],
 	[
@@ -150,7 +163,7 @@ const ED_HELP_COLUMNS = [
 		]]
 	]
 ];
-const ED_HELP_LATER = "not yet: groups, bounds";
+const ED_HELP_LATER = "not yet: bounds, area focus";
 
 const EdHelp = {
 	el: null,

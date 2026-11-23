@@ -625,7 +625,7 @@ const Editor = {
 		}
 	},
 
-	// Marks the picked hover, and without alt, the rest of the last group it belongs to.
+	// Marks the picked hover, and without alt, the rest of its next group.
 	markHover() {
 		for (const lyr of this.room.layers) {
 			for (const rec of lyr.lsprites) rec.hover = false;
@@ -633,7 +633,7 @@ const Editor = {
 		const rec = this.hovers[this.curhoveri];
 		if (rec === undefined) return;
 		rec.hover = true;
-		if (this.inp.alt || rec.groups === null || rec.groups.length === 0) return;
-		for (const member of this.room.objGroups[rec.groups[rec.groups.length - 1]]) member.hover = true;
+		const gname = this.inp.alt ? null : EdEdit.nextGroup(rec);
+		if (gname !== null) for (const member of this.room.objGroups[gname]) member.hover = true;
 	}
 };
