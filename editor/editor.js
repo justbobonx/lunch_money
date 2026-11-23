@@ -142,8 +142,9 @@ const Editor = {
 		}, { passive: false });
 		canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 		window.addEventListener("keydown", (e) => {
-			// the browser's print never comes up, even while a question or the settings panel has the keys
-			if ((e.ctrlKey || e.metaKey) && e.code === "KeyP") e.preventDefault();
+			// the browser's print, and its back and forward on alt and the side arrows, never come up,
+			// even while a question or the settings panel has the keys
+			if (((e.ctrlKey || e.metaKey) && e.code === "KeyP") || (e.altKey && (e.code === "ArrowLeft" || e.code === "ArrowRight"))) e.preventDefault();
 			// a question, or typing in the settings panel, keeps every key from the editor
 			if (this.asking || EdPanel.el.contains(document.activeElement)) return;
 			mods(e);

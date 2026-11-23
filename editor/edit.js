@@ -1,11 +1,15 @@
 // Changing the room, a port of the original editor's selecting and editing: clicking, shift clicking
 // and dragging a box to select; moving, duplicating, resizing by the corners and turning by dragging;
 // the key and wheel commands on the selection; cutting, copying and pasting; placing what the picker
-// holds and wiping it out again with the right button; and undoing and redoing all of it. Every
-// change first keeps the whole room as it would be saved, so undoing puts back exactly that.
+// holds and wiping it out again with the right button; and undoing and redoing all of it.
+// Undoing works as the original's did, never building the room again: every change first keeps the
+// fields it is about to change on the very things it changes, entries, layers, their entry lists,
+// the room's layer list and its groups, and undoing puts those values back on the same things, after
+// keeping the values they had then for redoing. Entries deleted and layers taken out stay whole in
+// those kept lists, so they come back as the same entries at the same places in the same order.
 
 // how many changes can be undone
-const ED_UNDO_MAX = 100;
+const ED_UNDO_MAX = 500;
 // two presses this close are a double press, in ms
 const ED_EDIT_DOUBLE_MS = 300;
 // the selection's box, the box being dragged out, and the corner grabbers, as the original drew them
@@ -39,8 +43,9 @@ const EdEdit = {
 	// the selected entries, in the order they were selected, and the box round them in view space
 	selects: [],
 	box: { x1: 0, y1: 0, x2: 0, y2: 0 },
-	// Room snapshots to step back and forward through, and which change the room is at. The change
-	// last saved tells whether there is anything unsaved.
+	// The steps to go back and forward through, and which change the room is at. Each step holds the
+	// values to put back, each with the thing they go on, the selection to bring back, and which
+	// change the room was at. The change last saved tells whether there is anything unsaved.
 	undos: [],
 	redos: [],
 	rev: 0,
@@ -75,6 +80,9 @@ const EdEdit = {
 	// which selected entry finding last centred on
 	foundi: 0,
 	lastPress: 0,
+	// the undo step of the last lining up to one side by an alt arrow, so centring or spreading
+	// right after can take it back
+	alignStep: null,
 
 	// A room just opened or read again: nothing selected, held or to undo.
 	reset() {
@@ -87,18 +95,44 @@ const EdEdit = {
 		this.movePrimed = this.copyPrimed = this.resizePrimed = false;
 		this.grab = null;
 		this.lastPlaced = [];
+		this.alignStep = null;
 	},
 
 	dirty() {
 		return this.rev !== this.savedRev;
 	},
 
-	// Keeps the room as it is now so the change about to happen can be undone.
-	push() {
-		this.undos.push(this.snapshot());
+	// Starts an undo step for the change about to happen, keeping the selection as it is now, and
+	// when given, the fields named on the things given, as the next call does.
+	push(things, fields) {
+		this.undos.push({ keeps: [], sel: this.selects.slice(), rev: this.rev });
 		if (this.undos.length > ED_UNDO_MAX) this.undos.shift();
 		this.redos.length = 0;
 		this.rev = ++this.revCount;
+		if (things !== undefined) this.keep(things, fields);
+	},
+
+	// Keeps in the step just started the fields named on each thing given, as they are now, so undoing
+	// puts them back; a field already kept on a thing in this step keeps its first value.
+	keep(things, fields) {
+		const step = this.undos[this.undos.length - 1];
+		for (const obj of Array.isArray(things) ? things : [things]) {
+			const vals = {};
+			let any = false;
+			for (const f of fields) {
+				if (step.keeps.some((k) => k.obj === obj && f in k.vals)) continue;
+				vals[f] = this.kept(f, obj[f]);
+				any = true;
+			}
+			if (any) step.keeps.push({ obj: obj, vals: vals });
+		}
+	},
+
+	// A field's value as kept and as put back. Lists, and the room's table of groups by name, are
+	// copied, since they change in place; anything else is taken as it is, since every change gives a
+	// field a new value rather than changing the old one.
+	kept(f, v) {
+		return Array.isArray(v) ? v.slice() : (f === "lgroups" ? Object.assign({}, v) : v);
 	},
 
 	// Marks a change that is saved with the room but not worth an undo step of its own.
@@ -106,49 +140,56 @@ const EdEdit = {
 		this.rev = ++this.revCount;
 	},
 
-	snapshot() {
-		const room = Editor.room;
-		const names = (pick) => {
-			const out = [];
-			for (const lyr of room.layers) for (const rec of lyr.lsprites) if (pick(rec)) out.push(rec.name);
-			return out;
-		};
-		return {
-			text: EdFile.roomText(room, Editor.fileState()),
-			rev: this.rev,
-			selected: names((rec) => rec.selected),
-			hidden: names((rec) => rec.hidden)
-		};
-	},
-
-	// Steps back or forward: the room now goes on the other stack and the kept one is built again.
+	// Steps back or forward. The step's kept values go back on their things, the latest kept first,
+	// each first kept again as it is now for the step the other way, which also keeps the selection
+	// as it is now. Then everything the values feed is worked out again: each entry changed, the room
+	// tied together, the layer list's rows, the current layer, the selection that was, and the box.
 	undo(back) {
+		const ed = Editor;
+		const room = ed.room;
 		const from = back ? this.undos : this.redos;
 		const to = back ? this.redos : this.undos;
 		if (from.length === 0) return;
-		to.push(this.snapshot());
-		const s = from.pop();
-		this.restore(s);
-		this.rev = s.rev;
-	},
-
-	// Builds the room again from a snapshot, with what was selected and hidden in the editor then.
-	restore(s) {
-		const ed = Editor;
-		ed.adoptRoom(EdRoom.build(ed.room.index, s.text));
-		this.selects = [];
-		const sel = new Set(s.selected);
-		const hid = new Set(s.hidden);
-		for (const lyr of ed.room.layers) {
-			for (const rec of lyr.lsprites) {
-				if (hid.has(rec.name)) rec.hidden = 1;
-				if (sel.has(rec.name)) {
-					rec.selected = true;
-					this.selects.push(rec);
-				}
+		const step = from.pop();
+		const other = { keeps: [], sel: this.selects.slice(), rev: this.rev };
+		for (let i = step.keeps.length - 1; i >= 0; i--) {
+			const k = step.keeps[i];
+			const now = {};
+			for (const f of Object.keys(k.vals)) {
+				now[f] = this.kept(f, k.obj[f]);
+				k.obj[f] = this.kept(f, k.vals[f]);
 			}
+			other.keeps.push({ obj: k.obj, vals: now });
+			if (k.obj instanceof lpSprite) EdRoom.refresh(k.obj);
+		}
+		to.push(other);
+		this.rev = step.rev;
+
+		EdRoom.relink(room);
+		for (const lyr of room.layers) {
+			const lg = lyr.group !== undefined ? room.lgroups[lyr.group] : undefined;
+			if (lg !== undefined && lg.folded && lg.col_head_lyr === lyr) {
+				lyr.txt.text = lyr.group;
+				lyr.txt.pretext = "-[";
+			} else {
+				lyr.txt.text = lyr.name;
+				EdGui.pretext(lyr);
+			}
+			lyr.txt.disabled = !lyr.visible;
+		}
+		ed.curlayeri = clamp(ed.curlayeri, 0, room.layers.length - 1);
+		EdGui.needLyrGuiReset = true;
+		EdView.lenses();
+		this.clear();
+		for (const rec of step.sel) {
+			if (!room.layers.includes(rec.mylayer) || !rec.mylayer.lsprites.includes(rec)) continue;
+			rec.selected = true;
+			this.selects.push(rec);
 		}
 		this.updateBox();
+		ed.hovers = [];
+		ed.curhoveri = 0;
+		ed.rehover = true;
 	},
 
 	// Adds an entry to the selection as the original did: its offsets from the mouse kept for moving,
@@ -293,20 +334,25 @@ const EdEdit = {
 		return taken;
 	},
 
-	// Copies the selection as it would be saved, with where its box sits; cutting also deletes it.
+	// Copies the selection as it would be saved, with where its box sits; cutting also deletes it, as
+	// an undo step of its own. A cut has not been pasted yet.
 	copy(cut) {
 		this.clip = {
 			items: this.selects.map((rec) => ({ map: EdFile.entryTree(rec), lyr: rec.mylayer })),
 			x: this.box.x1,
 			y: this.box.y1,
-			cut: cut
+			cut: cut,
+			pasted: false
 		};
 		if (cut) this.remove();
 	},
 
-	// Pastes the copied entries moved by an offset in view space, into the current layer or back into
-	// the layers they came from, as the new selection. Names are made unique, and every group the
-	// entries were in becomes a new group of their own, as the original's paste did.
+	// Pastes the copied entries moved by an offset in view space, at the end of the current layer or
+	// of the layers they came from, as the new selection, keeping the lists they go into in the undo
+	// step already started. The first paste of a cut is the cut entries moved: each keeps its name,
+	// unless this room already has it, and its groups. Any other paste is a copy: names are made
+	// unique, and every group the entries were in becomes a new group of their own, as the
+	// original's paste did.
 	paste(xo, yo, keepLayer) {
 		const ed = Editor;
 		const room = ed.room;
@@ -317,15 +363,18 @@ const EdEdit = {
 		const groupsTaken = new Set(Object.keys(room.objGroups));
 		const renamed = new Map();
 		const added = [];
+		const moving = this.clip.cut && !this.clip.pasted;
+		this.clip.pasted = true;
 		for (const item of this.clip.items) {
 			const lyr = keepLayer && room.layers.includes(item.lyr) ? item.lyr : cur;
+			this.keep(lyr, ["lsprites"]);
 			const rec = EdRoom.record(item.map, lyr);
 			rec.name = this.unique(rec.name, taken);
 			taken.add(rec.name);
 			const k = lyr.lens.s / EdView.z;
 			rec.x += xo / k;
 			rec.y += yo / k;
-			if (rec.groups !== null) {
+			if (rec.groups !== null && !moving) {
 				rec.groups = rec.groups.map((gname) => {
 					if (!renamed.has(gname)) {
 						const nn = this.unique(gname, groupsTaken);
@@ -343,9 +392,11 @@ const EdEdit = {
 		for (const rec of added) this.select(rec, false);
 	},
 
-	// Deletes the selection.
+	// Deletes the selection as an undo step, keeping the lists it leaves, so undoing puts the very
+	// same entries back where they were.
 	remove() {
 		const ed = Editor;
+		this.push([...new Set(this.selects.map((rec) => rec.mylayer))], ["lsprites"]);
 		for (const rec of this.selects) {
 			const list = rec.mylayer.lsprites;
 			list.splice(list.indexOf(rec), 1);
@@ -358,11 +409,13 @@ const EdEdit = {
 	},
 
 	// Places one of the picker's items in the current layer at a spot in that layer, named with the
-	// next number. Its animation starts in step with the editor's, or with control from its first
-	// frame at this moment, as the original placed them.
+	// next number, keeping the layer's list in the undo step already started. Its animation starts in
+	// step with the editor's, or with control from its first frame at this moment, as the original
+	// placed them.
 	add(item, x, y, startoff) {
 		const ed = Editor;
 		const lyr = ed.room.layers[ed.curlayeri];
+		this.keep(lyr, ["lsprites"]);
 		const map = { name: this.unique(this.newUid(), this.names()), spi: item.spi, x: x, y: y };
 		if (item.isobj !== undefined) map.isobj = item.isobj;
 		const rec = EdRoom.record(map, lyr);
@@ -382,14 +435,16 @@ const EdEdit = {
 	},
 
 	// Takes the selection out of its layers in drawing order and puts it back together at the spot
-	// the pick gives once they are out, as the original's restacking did.
+	// the pick gives once they are out, as the original's restacking did, as an undo step keeping
+	// every list it changes.
 	restack(pick) {
 		const room = Editor.room;
-		this.push();
+		this.push([...new Set(this.selects.map((rec) => rec.mylayer))], ["lsprites"]);
 		const order = (rec) => room.layers.indexOf(rec.mylayer) * 1e6 + rec.mylayer.lsprites.indexOf(rec);
 		const sorted = this.selects.slice().sort((a, b) => order(a) - order(b));
 		for (const rec of sorted) rec.mylayer.lsprites.splice(rec.mylayer.lsprites.indexOf(rec), 1);
 		const spot = pick(sorted);
+		this.keep(spot.lyr, ["lsprites"]);
 		spot.lyr.lsprites.splice(spot.at, 0, ...sorted);
 		for (const rec of sorted) rec.mylayer = spot.lyr;
 		this.selects = sorted;
@@ -415,10 +470,7 @@ const EdEdit = {
 			this.touch();
 		}
 		if (inp.ctrl && hit("KeyC") && this.selects.length > 0) this.copy(false);
-		if (inp.ctrl && hit("KeyX") && this.selects.length > 0) {
-			this.push();
-			this.copy(true);
-		}
+		if (inp.ctrl && hit("KeyX") && this.selects.length > 0) this.copy(true);
 		if (inp.ctrl && hit("KeyV") && this.clip !== null) {
 			// a cut with nothing selected pastes back where it was, otherwise at the mouse
 			const pastelast = this.selects.length === 0 && this.clip.cut && !inp.down.left;
@@ -448,7 +500,7 @@ const EdEdit = {
 		}
 		if (inp.ctrl && hit("KeyJ") && this.selects.length > 0) {
 			const amt = inp.shift ? ED_JITTER_SHIFT : ED_JITTER;
-			this.push();
+			this.push(this.selects, ["x", "y"]);
 			for (const rec of this.selects) {
 				rec.x += Math.floor(Math.random() * (amt * 2 + 1)) - amt;
 				rec.y += Math.floor(Math.random() * (amt * 2 + 1)) - amt;
@@ -459,10 +511,7 @@ const EdEdit = {
 		// control F with nothing under the mouse finds the player start
 		if (inp.ctrl && hit("KeyF") && ed.hovers.length === 0) this.find({ isobj: ED_PLAYER_START_OBJECT }, inp.alt);
 		if (hit("Escape")) this.clear();
-		if (hit("Delete") && !held("KeyO") && this.selects.length > 0) {
-			this.push();
-			this.remove();
-		}
+		if (hit("Delete") && !held("KeyO") && this.selects.length > 0) this.remove();
 		return true;
 	},
 
@@ -569,6 +618,7 @@ const EdEdit = {
 				if (gone.length > 0) {
 					if (!this.erasing) this.push();
 					this.erasing = true;
+					this.keep(lyr, ["lsprites"]);
 					for (const rec of gone) {
 						lyr.lsprites.splice(lyr.lsprites.indexOf(rec), 1);
 						rec.selected = false;
@@ -600,10 +650,10 @@ const EdEdit = {
 				const seldown = this.hoverWheeled ? undefined : hovers.find((h) => h.selected);
 				if (seldown !== undefined) {
 					if (held("KeyA")) {
-						this.push();
+						this.push(seldown, ["spd"]);
 						seldown.spd = seldown.spd > 0 ? 0 : 1;
 					} else if (held("KeyT")) {
-						this.push();
+						this.push(seldown, ["tiledx", "tiledy", "tile_loop"]);
 						const t = seldown.tiledx ? 0 : 1;
 						seldown.tiledx = t;
 						seldown.tiledy = t;
@@ -621,13 +671,13 @@ const EdEdit = {
 				} else if (held("KeyH")) {
 					hover.hidden = 1;
 				} else if (this.selects.length > 0 && held("KeyS")) {
-					this.push();
+					this.push(this.selects, ["spi"]);
 					for (const rec of this.selects) {
 						rec.spi = hover.spi;
 						EdRoom.refresh(rec);
 					}
 				} else if (this.selects.length > 0 && held("KeyO") && hover.isobj !== undefined) {
-					this.push();
+					this.push(this.selects, ["isobj"]);
 					for (const rec of this.selects) {
 						rec.isobj = hover.isobj;
 						EdRoom.refresh(rec);
@@ -685,6 +735,7 @@ const EdEdit = {
 				this.copy(false);
 				this.paste(0, 0, true);
 			}
+			this.keep(this.selects, ["x", "y", "exoffx", "exoffy"]);
 			const xdif = Math.abs(mouse.wx - this.downX);
 			const ydif = Math.abs(mouse.wy - this.downY);
 			const movex = !inp.shift || xdif >= ydif;
@@ -716,7 +767,7 @@ const EdEdit = {
 				this.resizePrimed = false;
 				this.grabX = this.grab.xo < 0 ? this.box.x1 : this.box.x2;
 				this.grabY = this.grab.yo < 0 ? this.box.y1 : this.box.y2;
-				this.push();
+				this.push(this.selects, ["x", "y", "x_sc", "y_sc", "ang"]);
 			}
 			if (!this.rotating) {
 				const b = this.box;
@@ -791,7 +842,7 @@ const EdEdit = {
 		const sel = this.selects;
 		// A and the wheel steps the frame the selection starts on
 		if (sel.length > 0 && held("KeyA") && wh !== 0) {
-			this.push();
+			this.push(sel, ["start_ifr", "ifr"]);
 			for (const rec of sel) {
 				const n = Sprites.get(rec.spi).frameCount;
 				rec.start_ifr = ((rec.start_ifr - wh) % n + n) % n;
@@ -800,7 +851,7 @@ const EdEdit = {
 		}
 		// O and delete makes objects plain sprites again
 		if (sel.length > 0 && held("KeyO") && hit("Delete")) {
-			this.push();
+			this.push(sel, ["isobj"]);
 			for (const rec of sel) {
 				rec.isobj = undefined;
 				EdRoom.refresh(rec);
@@ -810,7 +861,7 @@ const EdEdit = {
 		// Numpad minus flips, sideways or with shift upright; alt also mirrors the spots within the
 		// selection's box. Numpad plus turns a quarter, clockwise or with shift the other way.
 		if (sel.length > 0 && hit("NumpadSubtract")) {
-			this.push();
+			this.push(sel, ["x", "y", "x_sc", "y_sc"]);
 			for (const rec of sel) {
 				const p = EdView.toView(rec.mylayer, rec.x - rec.exoffx + rec.loopdx, rec.y - rec.exoffy + rec.loopdy);
 				if (inp.shift) {
@@ -828,16 +879,16 @@ const EdEdit = {
 			this.updateBox();
 		}
 		if (sel.length > 0 && hit("NumpadAdd")) {
-			this.push();
+			this.push(sel, ["ang"]);
 			for (const rec of sel) {
 				rec.ang = (rec.ang + (inp.shift ? 90 : 270)) % 360;
 				EdRoom.refresh(rec);
 			}
 		}
 		// The arrows nudge by a pixel, with shift by the grid, landing on whole pixels. With alt they
-		// would align, which comes in a later phase.
+		// align instead, below.
 		if (sel.length > 0 && arrows && !this.resizing && !inp.alt) {
-			this.push();
+			this.push(sel, ["x", "y"]);
 			const xsh = (hit("ArrowLeft") ? -1 : 0) + (hit("ArrowRight") ? 1 : 0);
 			const ysh = (hit("ArrowUp") ? -1 : 0) + (hit("ArrowDown") ? 1 : 0);
 			const d = inp.shift ? room.grid_size : 1;
@@ -847,6 +898,76 @@ const EdEdit = {
 				EdRoom.refresh(rec);
 			}
 			this.updateBox();
+		}
+
+		// With alt the arrows align, as the original's did, by each entry's whole picture frame,
+		// turned ones by the upright box round them, against the box round all of them, positions
+		// taken as each layer keeps them whatever its parallax. An arrow alone lines every entry's
+		// matching side up with that side of the box. With left or right held, up or down centres them
+		// across the box's middle; with up or down held, left or right centres them down it. With left
+		// held, right spreads them from the box's left side to its right in order from the left with
+		// equal gaps between, and the same for up and down. The held arrow's own press already lined
+		// them up, so centring and spreading first undo that while it is still the last step, leaving
+		// one step to undo. Lining up and centring need two entries, spreading three. Entries on layers
+		// drawn one to one land on whole pixels, the others where the sums put them.
+		if (sel.length > 1 && arrows && !this.resizing && inp.alt) {
+			const lf = hit("ArrowLeft");
+			const rt = hit("ArrowRight");
+			const up = hit("ArrowUp");
+			const dn = hit("ArrowDown");
+			const centerx = (held("ArrowLeft") || held("ArrowRight")) && (up || dn);
+			const centery = !centerx && (held("ArrowUp") || held("ArrowDown")) && (lf || rt);
+			const spreadx = !centerx && !centery && ((lf && held("ArrowRight")) || (rt && held("ArrowLeft")));
+			const spready = !centerx && !centery && !spreadx && ((up && held("ArrowDown")) || (dn && held("ArrowUp")));
+			const side = !centerx && !centery && !spreadx && !spready;
+			if (!((spreadx || spready) && sel.length < 3)) {
+				if (!side && this.alignStep !== null && this.undos[this.undos.length - 1] === this.alignStep) this.undo(true);
+				const recs = this.selects;
+				this.push(recs, ["x", "y"]);
+				this.alignStep = side ? this.undos[this.undos.length - 1] : null;
+				const items = recs.map((rec) => {
+					const px = rec.x - rec.exoffx;
+					const py = rec.y - rec.exoffy;
+					const f = EdView.frameShape(rec, px, py);
+					return { rec: rec, px: px, py: py, l: f.l, t: f.t, r: f.r + 1, b: f.b + 1 };
+				});
+				const box = {
+					l: Math.min(...items.map((it) => it.l)), t: Math.min(...items.map((it) => it.t)),
+					r: Math.max(...items.map((it) => it.r)), b: Math.max(...items.map((it) => it.b))
+				};
+				// where each entry's frame's left or top side goes
+				const tox = new Map();
+				const toy = new Map();
+				if (spreadx || spready) {
+					const lo = spreadx ? (it) => it.l : (it) => it.t;
+					const size = spreadx ? (it) => it.r - it.l : (it) => it.b - it.t;
+					const sorted = items.slice().sort((a, b) => lo(a) - lo(b));
+					const span = spreadx ? box.r - box.l : box.b - box.t;
+					const gap = (span - sorted.reduce((sum, it) => sum + size(it), 0)) / (sorted.length - 1);
+					let at = spreadx ? box.l : box.t;
+					for (const it of sorted) {
+						(spreadx ? tox : toy).set(it, at);
+						at += size(it) + gap;
+					}
+				} else {
+					for (const it of items) {
+						if (centerx) tox.set(it, (box.l + box.r) / 2 - (it.r - it.l) / 2);
+						else if (centery) toy.set(it, (box.t + box.b) / 2 - (it.b - it.t) / 2);
+						else if (lf) tox.set(it, box.l);
+						else if (rt) tox.set(it, box.r - (it.r - it.l));
+						else if (up) toy.set(it, box.t);
+						else toy.set(it, box.b - (it.b - it.t));
+					}
+				}
+				for (const it of items) {
+					const rec = it.rec;
+					const whole = !rec.mylayer.lens.parax && rec.mylayer.host.wd === room.roomw ? Math.round : (v) => v;
+					if (tox.has(it)) rec.x = whole(it.px + tox.get(it) - it.l) + rec.exoffx;
+					if (toy.has(it)) rec.y = whole(it.py + toy.get(it) - it.t) + rec.exoffy;
+					EdRoom.refresh(rec);
+				}
+				this.updateBox();
+			}
 		}
 
 		// Shift and the wheel moves the selection past the entries of its layer it overlaps, up with

@@ -34,7 +34,7 @@ const ED_HELP_COLUMNS = [
 			["CTRL H", "hide the selection"],
 			["CTRL SHIFT H, H right click", "show every hidden entry"],
 			["CTRL C / CTRL X", "copy / cut the selection"],
-			["CTRL V", "paste at the mouse; a cut with nothing selected goes back"],
+			["CTRL V", "paste at the mouse; a cut with nothing selected goes back; the first paste of a cut keeps its names"],
 			["CTRL ALT V", "paste off the grid"],
 			["DEL", "delete the selection"],
 			["Q", "grid lock on / off"],
@@ -46,6 +46,10 @@ const ED_HELP_COLUMNS = [
 			["drag corner", "resize, CTRL keeps the shape"],
 			["ALT drag corner", "turn"],
 			["arrows", "nudge a pixel, SHIFT by the grid"],
+			["ALT arrow", "align the selection's sides to that side of its box"],
+			["ALT hold left or right, up or down", "center across"],
+			["ALT hold up or down, left or right", "center down"],
+			["ALT hold left, right / up, down", "spread with even gaps, 3 or more"],
 			["arrows while resizing", "nudge the corner"],
 			["numpad -", "flip sideways, SHIFT upright, ALT also mirrors spots"],
 			["numpad +", "quarter turn, SHIFT the other way"],
@@ -146,7 +150,7 @@ const ED_HELP_COLUMNS = [
 		]]
 	]
 ];
-const ED_HELP_LATER = "not yet: align, groups, bounds";
+const ED_HELP_LATER = "not yet: groups, bounds";
 
 const EdHelp = {
 	el: null,

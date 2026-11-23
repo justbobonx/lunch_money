@@ -253,7 +253,7 @@ const EdGui = {
 		}
 		if (Math.sign(movei - curi) !== wh) return;
 		if (Math.abs(movei - curi) > 1) movei -= wh;
-		EdEdit.push();
+		EdEdit.push(room, ["layers"]);
 		const lyr = layers.splice(curi, 1)[0];
 		layers.splice(movei, 0, lyr);
 		EdRoom.relink(room);
@@ -266,7 +266,7 @@ const EdGui = {
 	addLayer() {
 		const ed = Editor;
 		const room = ed.room;
-		EdEdit.push();
+		EdEdit.push(room, ["layers", "lgroups"]);
 		const lyr = EdRoom.layer(null, "");
 		lyr.wd = room.roomw;
 		lyr.ht = room.roomh;
@@ -290,21 +290,23 @@ const EdGui = {
 				EdEdit.redos.length = 0;
 				return;
 			} else if (lyr.lsprites.length === 0) {
-				EdEdit.push();
 				this.deleteLayer(lyr);
 				return;
 			} else {
 				ed.ask("Delete layer \"" + lyr.name + "\" and its " + lyr.lsprites.length + " entries? Undo brings them back.",
 					["Delete", "Cancel"]).then((answer) => {
 					if (answer !== "Delete" || !room.layers.includes(lyr) || ed.room !== room) return;
-					EdEdit.push();
 					this.deleteLayer(lyr);
 				});
 				return;
 			}
 		}
 		if (text === lyr.name) return;
-		if (!fresh) EdEdit.push();
+		// a fresh layer's naming is part of adding it, whose undo step takes the layer away
+		if (!fresh) {
+			EdEdit.push(lyr, ["name", "group", "subname"]);
+			EdEdit.keep(room, ["lgroups"]);
+		}
 		const oldgroup = lyr.group;
 		lyr.set_name(text);
 		lyr.txt.text = text;
@@ -316,10 +318,12 @@ const EdGui = {
 		this.needLyrGuiReset = true;
 	},
 
-	// Takes a layer and its entries out of the room, the current layer moving to its neighbour first.
+	// Takes a layer and its entries out of the room as an undo step, the current layer moving to its
+	// neighbour first. Undoing puts the very same layer back.
 	deleteLayer(lyr) {
 		const ed = Editor;
 		const room = ed.room;
+		EdEdit.push(room, ["layers", "lgroups"]);
 		const li = room.layers.indexOf(lyr);
 		if (li === ed.curlayeri) ed.curlayeri = li < room.layers.length - 1 ? li + 1 : li - 1;
 		EdEdit.selects = EdEdit.selects.filter((rec) => rec.mylayer !== lyr);
@@ -681,8 +685,8 @@ const EdGui = {
 		// again, with alt on every layer of the layer's group; a plain click makes the layer current.
 		if (inp.pressed.left && !inp.ctrl) {
 			if (inp.keysDown.has("KeyZ") || inp.keysDown.has("KeyD")) {
-				EdEdit.push();
 				const field = inp.keysDown.has("KeyZ") ? "zsort" : "disabled";
+				EdEdit.push(lyr, [field]);
 				lyr[field] = lyr[field] ? 0 : 1;
 				this.pretext(lyr);
 			} else if (inp.shift) {
@@ -697,7 +701,7 @@ const EdGui = {
 		// undone.
 		if (inp.pressed.right) {
 			const field = inp.ctrl ? "locked" : "visible";
-			if (inp.ctrl) EdEdit.push();
+			if (inp.ctrl) EdEdit.push(inp.shift || inp.alt ? room.layers : lyr, [field]);
 			else EdEdit.touch();
 			lyr[field] = lyr[field] ? 0 : 1;
 			if (!inp.ctrl) lyr.txt.disabled = !lyr.visible;

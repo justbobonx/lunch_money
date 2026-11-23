@@ -181,7 +181,7 @@ const EdPicker = {
 				// an object cell finds entries of that object type, a sprite cell plain sprites of it
 				EdEdit.find(it.isobj !== undefined ? { isobj: it.isobj } : { spi: it.spi }, inp.alt);
 			} else if (EdEdit.selects.length > 0 && inp.keysDown.has("KeyS")) {
-				EdEdit.push();
+				EdEdit.push(EdEdit.selects, ["isobj", "spi"]);
 				for (const rec of EdEdit.selects) {
 					// an object cell gives only its object type, the picture staying as it was; a sprite
 					// cell gives only its picture, as the original did

@@ -63,14 +63,16 @@ const ED_PANEL_INTERNAL_KEYS = ["mask", "dmi", "persistent", "active", "timers",
 	"rz", "moving", "inFallWall", "jumped", "cur_stayin", "facingy"];
 
 // The kinds of thing the panel opens on. Each gives its title; its fields; what holds its setup
-// block, how that block is read and written and what its rows are called; the lists of keys its
-// suggestions come from, the classes whose starting fields are offered too and the keys marked
-// special; how each thing is named so it is found again once the room is built anew; whether the
-// things are still there; and what is worked out again after a field changes.
+// block, how that block is read and written, the fields an undo step keeps for it, and what its
+// rows are called; the lists of keys its suggestions come from, the classes whose starting fields
+// are offered too and the keys marked special; whether the things are still there; and what is
+// worked out again after a field changes.
 // A field has a label and a type: read only, text, number (one above zero when it must be),
 // box, colour (may be left empty when allowed), sprite name or a choice. It reads and writes each
-// thing open, or with the holder mark the things holding the block, as a layer's group. A field
-// with its own put does its own checking and undo step, and tells why it refused, if it did.
+// thing open, or with the holder mark the things holding the block, as a layer's group. Its undo
+// step keeps the field of its key on each thing, or the fields it lists when it sets more than that
+// one. A field with its own put does its own checking and undo step, and tells why it refused, if it
+// did.
 const ED_PANEL_KINDS = {
 	entry: {
 		title: (ts) => (ts.length > 1 ? ts.length + " entries" : "entry " + ts[0].name),
@@ -84,7 +86,7 @@ const ED_PANEL_KINDS = {
 				if (ts.length > 1) return "several entries can't share one name";
 				if (taken.has(v)) return "the name " + v + " is taken in this room";
 				if (v === ts[0].name) return "";
-				EdEdit.push();
+				EdEdit.push(ts[0], ["name"]);
 				ts[0].name = v;
 				return "";
 			} },
@@ -102,11 +104,12 @@ const ED_PANEL_KINDS = {
 			{ key: "col", label: "blend", type: "color", get: (r) => r.col.replace("#", "").toUpperCase(), set: (r, v) => { r.col = "#" + v; } },
 			{ key: "alpha", label: "alpha", type: "num", get: (r) => r.alpha, set: (r, v) => { r.alpha = v; } },
 			{ key: "ang", label: "angle", type: "num", get: (r) => r.ang, set: (r, v) => { r.ang = v; } },
-			{ key: "start_ifr", label: "start frame", type: "num", get: (r) => r.start_ifr, set: (r, v) => { r.start_ifr = v; r.ifr = v; } },
+			{ key: "start_ifr", label: "start frame", type: "num", keeps: ["start_ifr", "ifr"], get: (r) => r.start_ifr, set: (r, v) => { r.start_ifr = v; r.ifr = v; } },
 			{ key: "spd", label: "image speed", type: "num", get: (r) => r.spd, set: (r, v) => { r.spd = v; } }
 		],
 		holders: (ts, primary) => [primary].concat(ts.filter((r) => r !== primary)),
 		getBlock: (r) => r.objinit,
+		blockKeeps: ["objinit", "initFresh"],
 		setBlock: (r, text) => {
 			r.objinit = text;
 			r.initFresh = text !== undefined;
@@ -114,14 +117,6 @@ const ED_PANEL_KINDS = {
 		lists: (ts) => ts.map((r) => "entry " + (r.isobj !== undefined ? r.isobj : "")),
 		classes: (ts) => ts.filter((r) => r.isobj !== undefined).map((r) => objectType(r.isobj)),
 		special: ED_PANEL_SPECIAL_KEYS,
-		keyOf: (r) => r.name,
-		find: (room, name) => {
-			for (const lyr of room.layers) {
-				const r = lyr.lsprites.find((e) => e.name === name);
-				if (r !== undefined) return r;
-			}
-			return undefined;
-		},
 		alive: (ts) => EdEdit.selects.length === ts.length && ts.every((r) => EdEdit.selects.includes(r)),
 		after: (ts, room) => {
 			for (const r of ts) EdRoom.refresh(r);
@@ -142,7 +137,7 @@ const ED_PANEL_KINDS = {
 			{ key: "plx_y", label: "parallax y", type: "num", get: (l) => l.plx_y, set: (l, v) => { l.plx_y = v; } },
 			{ key: "loop_x", label: "loop x", type: "num", get: (l) => l.loop_x, set: (l, v) => { l.loop_x = v; } },
 			{ key: "loop_y", label: "loop y", type: "num", get: (l) => l.loop_y, set: (l, v) => { l.loop_y = v; } },
-			{ key: "wd", label: "width", type: "num", positive: true, get: (l) => l.wd, set: (l, v) => {
+			{ key: "wd", label: "width", type: "num", positive: true, keeps: ["wd", "ht"], get: (l) => l.wd, set: (l, v) => {
 				l.wd = v;
 				l.ht = v * 9 / 16;
 			} },
@@ -157,7 +152,7 @@ const ED_PANEL_KINDS = {
 				get: (g) => g.type, set: (g, v) => { g.type = v; } },
 			{ key: "bgcolor", label: "group colour", type: "color", empty: true, holder: true,
 				get: (g) => String(g.bgcolor).toUpperCase(), set: (g, v) => { g.bgcolor = v; } },
-			{ key: "bd_sprite", label: "backdrop", type: "sprite", holder: true,
+			{ key: "bd_sprite", label: "backdrop", type: "sprite", holder: true, keeps: ["bdName", "bd_sprite"],
 				get: (g) => (g.bdName !== undefined ? g.bdName : ""), set: (g, v) => {
 					g.bdName = v === "" ? undefined : v;
 					g.bd_sprite = v !== "" && Sprites.exists(v) ? v : null;
@@ -170,6 +165,7 @@ const ED_PANEL_KINDS = {
 			return [...new Set(ts.map((l) => room.lgroups[l.group]))];
 		},
 		getBlock: (g) => g.grp_init,
+		blockKeeps: ["grp_init", "initFresh"],
 		setBlock: (g, text) => {
 			g.grp_init = text;
 			g.initFresh = text !== undefined;
@@ -177,8 +173,6 @@ const ED_PANEL_KINDS = {
 		lists: () => ["group"],
 		classes: () => [],
 		special: {},
-		keyOf: (l) => Editor.room.layers.indexOf(l),
-		find: (room, i) => room.layers[i],
 		alive: (ts) => ts.every((l) => Editor.room.layers.includes(l)),
 		// a folded group's header row keeps the fold's own look
 		after: (ts, room) => {
@@ -202,7 +196,8 @@ const ED_PANEL_KINDS = {
 			{ key: "roomw", label: "width", type: "num", positive: true, get: (r) => r.roomw, put: (ts, v) => {
 				const room = ts[0];
 				if (v === room.roomw) return "";
-				EdEdit.push();
+				EdEdit.push(room, ["roomw", "roomh"]);
+				EdEdit.keep(room.layers, ["wd", "ht"]);
 				const k = v / room.roomw;
 				for (const l of room.layers) {
 					l.wd *= k;
@@ -222,6 +217,7 @@ const ED_PANEL_KINDS = {
 		],
 		holders: (ts) => ts,
 		getBlock: (r) => r.room_init,
+		blockKeeps: ["room_init", "initFresh"],
 		setBlock: (r, text) => {
 			r.room_init = text;
 			r.initFresh = text !== undefined;
@@ -229,8 +225,6 @@ const ED_PANEL_KINDS = {
 		lists: () => ["room"],
 		classes: () => [],
 		special: {},
-		keyOf: () => 0,
-		find: (room) => room,
 		alive: (ts) => Editor.room === ts[0],
 		after: (ts, room) => {
 			EdRoom.relink(room);
@@ -586,7 +580,7 @@ const EdPanel = {
 			if (why !== "") return refuse(why);
 		} else {
 			if (things.every((x) => String(f.get(x)) === String(v))) return refuse("");
-			EdEdit.push();
+			EdEdit.push(things, f.keeps !== undefined ? f.keeps : [f.key]);
 			for (const x of things) f.set(x, v);
 		}
 		const room = Editor.room;
@@ -879,9 +873,8 @@ const EdPanel = {
 	// Puts block changes on every holder, key by key, or with no changes given removes every block.
 	// The first holder can take a whole text instead. Holders whose block can't be read, and those
 	// the changes leave as they were, are left alone. Changed blocks are written anew from no
-	// indent, then the room is built again from its own text so they sit at their depth, as one
-	// undo step, and the panel finds what it is open on again. The field to give the focus back to
-	// is named.
+	// indent, laid out at their depth when the room is saved, as one undo step. The field to give
+	// the focus back to is named.
 	applyBlock(changes, firstText, slot) {
 		const kind = ED_PANEL_KINDS[this.kind];
 		// a value laid out as the room files lay blocks out: maps a key a line, lists of plain values
@@ -932,15 +925,12 @@ const EdPanel = {
 			this.table(slot);
 			return;
 		}
-		EdEdit.push();
+		EdEdit.push(plan.map((p) => p.holder), kind.blockKeeps);
 		for (const p of plan) kind.setBlock(p.holder, p.text);
-		const keys = this.targets.map(kind.keyOf);
-		const primaryKey = kind.keyOf(this.primary);
-		EdEdit.restore(EdEdit.snapshot());
-		const room = Editor.room;
-		this.room = room;
-		this.targets = keys.map((k) => kind.find(room, k)).filter((t) => t !== undefined);
-		this.primary = kind.find(room, primaryKey) || this.targets[0];
+		kind.after(this.targets, Editor.room);
+		EdView.lenses();
+		EdEdit.updateBox();
+		Editor.rehover = true;
 		this.fill();
 		this.table(slot);
 	}
