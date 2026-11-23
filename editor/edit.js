@@ -151,7 +151,7 @@ const EdEdit = {
 		const room = ed.room;
 		if (!this.selects.includes(rec)) this.selects.push(rec);
 		rec.selected = true;
-		const ml = EdView.toLayer(rec.mylayer, ed.mouse.wx, ed.mouse.wy);
+		const ml = EdView.mouseOn(rec.mylayer);
 		rec.mox = ml.x - (rec.x - rec.exoffx);
 		rec.moy = ml.y - (rec.y - rec.exoffy);
 		rec.ofx = ml.x - rec.exoffx;
@@ -451,7 +451,7 @@ const EdEdit = {
 			const item = EdPicker.current();
 			if (wh !== 0 && !inp.shift && !inp.ctrl && !inp.alt) EdPicker.cycle(wh);
 			const lyr = room.layers[ed.curlayeri];
-			const ml = EdView.toLayer(lyr, mouse.wx, mouse.wy);
+			const ml = EdView.mouseOn(lyr);
 			const gx = snap(ml.x);
 			const gy = snap(ml.y);
 			if (item !== null && inp.pressed.left) {
@@ -479,11 +479,12 @@ const EdEdit = {
 					const s = maskShape(rec, rec.x - rec.exoffx, rec.y - rec.exoffy);
 					return s && pointInShape(s, gx, gy);
 				})) {
-					// filling: copies laid on a grid the first copy's size, starting from the first
+					// Filling: copies laid on a grid the first copy's size in whole pixels, never less
+					// than one, starting from the first, so each butts right against the one before.
 					const lp = this.lastPlaced[0];
 					const lr = Sprites.get(lp.spi);
-					const w = lr.w * lp.x_sc;
-					const h = lr.h * lp.y_sc;
+					const w = (Math.sign(lp.x_sc) || 1) * Math.max(1, Math.round(Math.abs(lr.w * lp.x_sc)));
+					const h = (Math.sign(lp.y_sc) || 1) * Math.max(1, Math.round(Math.abs(lr.h * lp.y_sc)));
 					const rec = this.add(item, this.placeX + Math.floor((gx - this.placeX + lr.ox) / w) * w,
 						this.placeY + Math.floor((gy - this.placeY + lr.oy) / h) * h, inp.ctrl);
 					this.lastPlaced.push(rec);
@@ -631,7 +632,7 @@ const EdEdit = {
 			const movex = !inp.shift || xdif >= ydif;
 			const movey = !inp.shift || ydif > xdif;
 			for (const rec of this.selects) {
-				const ml = EdView.toLayer(rec.mylayer, mouse.wx, mouse.wy);
+				const ml = EdView.mouseOn(rec.mylayer);
 				const px = rec.x - rec.exoffx;
 				const py = rec.y - rec.exoffy;
 				if (held("KeyO")) {

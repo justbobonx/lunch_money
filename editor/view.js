@@ -134,6 +134,16 @@ const EdView = {
 		return { x: (ln.s * (x - ln.offx) + ln.ox) / this.z + cam.x, y: (ln.s * (y - ln.offy) + ln.oy) / this.z + cam.y };
 	},
 
+	// The mouse's spot in a layer for pointing, picking, dragging and placing. On a layer that maps
+	// one to one onto the room, with no parallax and the room's width, it is the whole room pixel
+	// under the mouse, so whatever the mouse moves or places stays on whole pixels; on any other
+	// layer it is the exact spot.
+	mouseOn(lyr) {
+		const m = Editor.mouse;
+		if (!lyr.lens.parax && lyr.host.wd === Editor.room.roomw) return { x: Math.floor(m.wx), y: Math.floor(m.wy) };
+		return this.toLayer(lyr, m.wx, m.wy);
+	},
+
 	toLayer(lyr, wx, wy) {
 		const ln = lyr.lens;
 		const cam = Editor.cam;
@@ -505,7 +515,7 @@ const EdView = {
 		if (item !== null && !ed.ingui && room.layers[ed.curlayeri] !== undefined) {
 			const lyr = room.layers[ed.curlayeri];
 			const ln = lyr.lens;
-			const ml = this.toLayer(lyr, ed.mouse.wx, ed.mouse.wy);
+			const ml = this.mouseOn(lyr);
 			const pv = this.preview;
 			if (pv.spi !== item.spi) {
 				Draw.setSprite(pv, item.spi);
@@ -592,7 +602,7 @@ const EdView = {
 			if (lyr !== undefined && lyr.lens !== undefined) {
 				const ln = lyr.lens;
 				k = this.markScale(ln.s);
-				const ml = this.toLayer(lyr, m.wx, m.wy);
+				const ml = this.mouseOn(lyr);
 				x = Math.floor(ln.s * (Math.floor(ml.x) + 0.5 - ln.offx) + ln.ox);
 				y = Math.floor(ln.s * (Math.floor(ml.y) + 0.5 - ln.offy) + ln.oy);
 			} else {
