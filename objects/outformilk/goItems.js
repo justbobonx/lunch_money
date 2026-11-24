@@ -1,5 +1,9 @@
 // Things to pick up, carry and use, what they shoot, and chests that hold them.
 
+// The watering can at rest and pouring.
+const WATERING_CAN_SPRITE = "s_watering_can";
+const WATERING_CAN_USE_SPRITE = "s_watering_can_use";
+
 // Something to pick up and carry in hand, which does nothing when used.
 class oPickupObj extends oIaBgObject {
 	constructor() {
@@ -43,6 +47,34 @@ class oHoneycomb extends oIaBgObject {
 }
 mixin(oHoneycomb, Pickupable);
 oHoneycomb.defaultSprite = "s_honeycomb";
+
+// A watering can. Used it pours, and keeps pouring while the use is held, the pouring picture
+// only started when it is not already showing so it runs through. Letting go puts it back.
+class oWateringCan extends oHoldObject {
+	use(who) {
+		if (this.spi === WATERING_CAN_USE_SPRITE) return;
+		Draw.setSprite(this, WATERING_CAN_USE_SPRITE);
+		this.ifr = 0;
+	}
+
+	use_c(who) {
+		this.use(who);
+	}
+
+	use_r(who) {
+		Draw.setSprite(this, WATERING_CAN_SPRITE);
+		this.ifr = 0;
+	}
+}
+oWateringCan.defaultSprite = WATERING_CAN_SPRITE;
+
+// A flower to hold, given by someone.
+class oFlower extends oHoldObject {}
+oFlower.defaultSprite = "s_flower_rose_itm";
+
+// A hidden spot marking a garden, which characters look for when deciding to tend it.
+class oGarden extends oEmptyObject {}
+oGarden.defaultSprite = "sBlankGn";
 
 // Unlocks the thing it names, by name or the thing itself, or anything with a lock when it names
 // nothing. Used on something with a lock it tries to open it, and a key that fits is used up.

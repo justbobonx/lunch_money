@@ -95,6 +95,11 @@ const ED_GROUP_IN_DY = 50;
 const ED_GROUP_HOVER_DY = 40;
 const ED_GROUP_IN_PRETEXT = "IN ";
 const ED_GROUP_COLOR = "#ffff99";
+// The path field over them: the path of the point under the mouse, else the selected entry's
+// current path, which it renames.
+const ED_PATH_DY = 60;
+const ED_PATH_PRETEXT = "PATH ";
+const ED_PATH_FIELD_COLOR = "#ffffaa";
 
 const EdGui = {
 	// screen pixels per overlay pixel
@@ -368,15 +373,16 @@ const EdGui = {
 	},
 
 	// Ends editing. Committing a layer row renames it; the filter keeps its text either way, but
-	// cancelling puts back what it had. The header names a room not saved yet and the group field
-	// renames the group being worked inside: cancelling keeps the name it has, and a refused name
-	// keeps the editing going.
+	// cancelling puts back what it had. The header names a room not saved yet, the group field
+	// renames the group being worked inside and the path field the selected entry's current path:
+	// cancelling keeps the name it has, and a refused name keeps the editing going.
 	endEdit(commit) {
 		const e = this.edit;
 		this.edit = null;
-		if (e.kind === "header" || e.kind === "group") {
+		if (e.kind === "header" || e.kind === "group" || e.kind === "path") {
 			if (!commit) return;
-			const why = e.kind === "header" ? this.renameRoom(e.text) : EdEdit.renameGroup(e.text);
+			const why = e.kind === "header" ? this.renameRoom(e.text)
+				: (e.kind === "group" ? EdEdit.renameGroup(e.text) : EdEdit.renamePath(e.text));
 			Editor.debugtxt = why === "" ? "" : " " + why;
 			if (why !== "") this.edit = e;
 		} else if (e.kind === "filter") {
@@ -506,9 +512,9 @@ const EdGui = {
 	},
 
 	// The overlay's fields as they show now: the room header, the rows on the page, the add button,
-	// the picker's fields and the entry group fields, each with its text, colour, backing box, and
-	// whether the mouse is over it. A hovered field blinks arrows after its text, which widens its
-	// box as in the original. The group fields line up on their right ends.
+	// the picker's fields and the path and entry group fields, each with its text, colour, backing
+	// box, and whether the mouse is over it. A hovered field blinks arrows after its text, which
+	// widens its box as in the original. The path and group fields line up on their right ends.
 	fields() {
 		const ed = Editor;
 		const room = ed.room;
@@ -547,10 +553,14 @@ const EdGui = {
 		for (const f of EdPicker.fields(gh)) add(f.kind, null, f.x, f.y, f.pretext, f.text, f.color, f.minw);
 		const h = ed.hovers[ed.curhoveri];
 		const hovered = h !== undefined && !ed.inp.alt ? EdEdit.nextGroup(h) : null;
-		for (const g of [{ kind: "group", dy: ED_GROUP_IN_DY, pretext: ED_GROUP_IN_PRETEXT, text: EdEdit.inGroup },
-			{ kind: "hovgroup", dy: ED_GROUP_HOVER_DY, pretext: "", text: hovered }]) {
+		const hp = EdEdit.pathHot;
+		const s0 = EdEdit.selects[0];
+		const path = hp !== null ? hp.name : (s0 !== undefined ? EdEdit.curPath(s0) : null);
+		for (const g of [{ kind: "path", dy: ED_PATH_DY, pretext: ED_PATH_PRETEXT, text: path, color: ED_PATH_FIELD_COLOR },
+			{ kind: "group", dy: ED_GROUP_IN_DY, pretext: ED_GROUP_IN_PRETEXT, text: EdEdit.inGroup, color: ED_GROUP_COLOR },
+			{ kind: "hovgroup", dy: ED_GROUP_HOVER_DY, pretext: "", text: hovered, color: ED_GROUP_COLOR }]) {
 			if (g.text === null) continue;
-			add(g.kind, null, 0, gh - g.dy, g.pretext, g.text, ED_GROUP_COLOR, 0);
+			add(g.kind, null, 0, gh - g.dy, g.pretext, g.text, g.color, 0);
 			const f = list[list.length - 1];
 			f.x = ed.canvas.width / this.scale - ED_GROUP_RIGHT - f.w;
 		}
@@ -622,10 +632,13 @@ const EdGui = {
 			}
 			return true;
 		}
+		// the name the group or path field renames, the path one only with an entry selected
+		const named = hit.kind === "group" ? EdEdit.inGroup
+			: (hit.kind === "path" && EdEdit.selects.length > 0 ? EdEdit.curPath(EdEdit.selects[0]) : null);
 		// control and a left click copies a field's text, as the original's fields did
 		if (inp.pressed.left && inp.ctrl && hit.kind !== "add") {
 			navigator.clipboard.writeText(hit.kind === "row" ? hit.lyr.name : (hit.kind === "header" ? room.name
-				: (hit.kind === "group" ? EdEdit.inGroup : hit.text))).catch(() => {});
+				: (named !== null ? named : hit.text))).catch(() => {});
 			return true;
 		}
 		// The filter switches pointing to sprites and starts editing at any press; the name field
@@ -649,9 +662,10 @@ const EdGui = {
 			return true;
 		}
 		if (hit.kind === "name" || hit.kind === "hovgroup") return true;
-		// the group field renames the group being worked inside, from a click or enter
-		if (hit.kind === "group") {
-			if (inp.pressed.left || inp.keysPressed.has("Enter")) this.startEdit("group", null, EdEdit.inGroup, false, true, false);
+		// the group field renames the group being worked inside, and the path field the selected
+		// entry's current path, from a click or enter
+		if (hit.kind === "group" || hit.kind === "path") {
+			if (named !== null && (inp.pressed.left || inp.keysPressed.has("Enter"))) this.startEdit(hit.kind, null, named, false, true, false);
 			return true;
 		}
 

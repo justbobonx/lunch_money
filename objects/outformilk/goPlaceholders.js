@@ -10,6 +10,3 @@ oBouncer.ported = false;
 
 class oGameBoxV extends oIaBgObject {}
 oGameBoxV.ported = false;
-
-class oNpcChar extends oActor {}
-oNpcChar.ported = false;

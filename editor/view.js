@@ -76,6 +76,21 @@ const ED_MARK_MIN_PX = 2;
 // how far the cross at the view's middle reaches, in room pixels, and at least in line widths
 const ED_CENTER_REACH = 1;
 const ED_CENTER_MIN_REACH = 2;
+// Paths, as the original drew them: lines through the points, the entry's current path in its own
+// colour, faint when the entry is only hovered; the points drawn with the node sprite, tinted for
+// the first, the middle ones and the last, the one under the mouse and the one being dragged.
+const ED_PATH_CUR_COLOR = "#ffffaa";
+const ED_PATH_COLOR = "#66aaaa";
+const ED_PATH_HOVER_ALPHA = 0.3;
+const ED_PATH_SELECT_ALPHA = 0.7;
+const ED_PATH_SPRITE = "sle_path_node";
+const ED_PATH_FIRST_TINT = "#88cc88";
+const ED_PATH_MID_TINT = "#8888ff";
+const ED_PATH_LAST_TINT = "#ff8888";
+const ED_PATH_HOT_TINT = "#ffcc88";
+const ED_PATH_HELD_TINT = "#ffffff";
+const ED_PATH_POINT_HOVER_ALPHA = 0.4;
+const ED_PATH_POINT_SELECT_ALPHA = 1;
 
 const EdView = {
 	// screen pixels per room pixel
@@ -280,6 +295,40 @@ const EdView = {
 				if (pointInShape(this.frameShape(rec, p.x, p.y), mx, my)) found.push(rec);
 			}
 		});
+		return found;
+	},
+
+	// The entries whose paths show: the selected ones, then the one hovered, in the order their
+	// paths draw. None while showing as the player.
+	pathEntries() {
+		const ed = Editor;
+		if (ed.showAsPlayer) return [];
+		const h = ed.hovers[ed.curhoveri];
+		const shown = h !== undefined && !h.selected ? EdEdit.selects.concat([h]) : EdEdit.selects;
+		return shown.filter((rec) => rec.paths !== undefined && rec.paths !== null);
+	},
+
+	// The path point under the mouse, the last drawn when points overlap, as its entry, its path's
+	// name and its number along the path, or none. Points are hit by the node sprite's square at the
+	// scale they draw at, and only while pointing.
+	findPathPoint() {
+		if (EdPicker.mode !== 0) return null;
+		const m = Editor.mouse;
+		const cam = Editor.cam;
+		const gs = this.markScale(this.z);
+		const node = Sprites.get(ED_PATH_SPRITE);
+		let found = null;
+		for (const rec of this.pathEntries()) {
+			for (const name of Object.keys(rec.paths)) {
+				const a = rec.paths[name];
+				for (let i = 0; i < Math.floor((a.length - 1) / 2); i++) {
+					const v = this.toView(rec.mylayer, a[i * 2], a[i * 2 + 1]);
+					const lx = ((m.wx - cam.x) * this.z - Math.round((v.x - cam.x) * this.z)) / gs;
+					const ly = ((m.wy - cam.y) * this.z - Math.round((v.y - cam.y) * this.z)) / gs;
+					if (lx >= -node.ox && lx < node.w - node.ox && ly >= -node.oy && ly < node.h - node.oy) found = { rec: rec, name: name, i: i };
+				}
+			}
+		}
 		return found;
 	},
 
@@ -522,6 +571,48 @@ const EdView = {
 		// grabbers at its corners, the one under the mouse brighter and still shown while it drags.
 		const vx = (x) => (x - cam.x) * z;
 		const vy = (y) => (y - cam.y) * z;
+
+		// The paths shown, each a line through its points and back to the first when it loops, then
+		// every entry's points over its lines.
+		const pathRecs = this.pathEntries();
+		if (pathRecs.length > 0) {
+			const gs = this.markScale(z);
+			const hp = edit.pathHot;
+			const pd = edit.pathDrag;
+			for (const rec of pathRecs) {
+				const cur = edit.curPath(rec);
+				const dots = [];
+				for (const name of Object.keys(rec.paths)) {
+					const a = rec.paths[name];
+					const n = Math.max(0, Math.floor((a.length - 1) / 2));
+					const pts = [];
+					for (let i = 0; i < n; i++) {
+						const v = this.toView(rec.mylayer, a[i * 2], a[i * 2 + 1]);
+						pts.push({ x: Math.round(vx(v.x)), y: Math.round(vy(v.y)) });
+						const on = (p) => p !== null && p.rec === rec && p.name === name && p.i === i;
+						dots.push({ x: pts[i].x, y: pts[i].y, tint: on(pd) ? ED_PATH_HELD_TINT : (on(hp) ? ED_PATH_HOT_TINT
+							: (i === 0 ? ED_PATH_FIRST_TINT : (i === n - 1 ? ED_PATH_LAST_TINT : ED_PATH_MID_TINT))) });
+					}
+					if (n < 2) continue;
+					ctx.globalAlpha = rec.selected ? ED_PATH_SELECT_ALPHA : ED_PATH_HOVER_ALPHA;
+					ctx.strokeStyle = name === cur ? ED_PATH_CUR_COLOR : ED_PATH_COLOR;
+					ctx.lineWidth = thick(rec.mylayer.lens.s);
+					ctx.beginPath();
+					pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+					if (a[a.length - 1]) ctx.closePath();
+					ctx.stroke();
+				}
+				Draw.base = { sx: 1, sy: 1, ox: 0, oy: 0 };
+				Draw.curdrawoffx = 0;
+				Draw.curdrawoffy = 0;
+				ctx.imageSmoothingEnabled = false;
+				for (const d of dots) {
+					Draw.spriteRaw(ED_PATH_SPRITE, 0, d.x, d.y, gs, gs, 0, d.tint, rec.selected ? ED_PATH_POINT_SELECT_ALPHA : ED_PATH_POINT_HOVER_ALPHA);
+				}
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+			}
+		}
+
 		const sel = edit.selects;
 		const b = edit.box;
 		const showgrab = !ed.showAsPlayer && !edit.moving && !edit.resizing && sel.length > 0;

@@ -33,7 +33,7 @@ const ED_HELP_COLUMNS = [
 			["CTRL H", "hide the selection"],
 			["CTRL SHIFT H, H right click", "show every hidden entry"],
 			["CTRL C / CTRL X", "copy / cut the selection"],
-			["CTRL V", "paste at the mouse; a cut with nothing selected goes back; the first paste of a cut keeps its names"],
+			["CTRL V", "paste at the mouse; a cut with nothing selected goes back in its own room; the first paste of a cut keeps its names"],
 			["CTRL ALT V", "paste off the grid"],
 			["DEL", "delete the selection"],
 			["Q", "grid lock on / off"],
@@ -116,6 +116,17 @@ const ED_HELP_COLUMNS = [
 			["CTRL G", "group the selection, never part of a group"],
 			["CTRL SHIFT G", "ungroup the selection's groups"],
 			["click or ENTER on IN field", "rename the group, its scripts follow"]
+		]],
+		["paths", [
+			["shown", "the selected entries' paths, the hovered one's faintly"],
+			["P click", "add a point at the mouse to the one selected entry's current path, the first making p1"],
+			["SHIFT P click", "start a new path there"],
+			["click / drag point", "make its path current / move it, on the grid"],
+			["CTRL click point", "put a point halfway to the next, or below the last"],
+			["L click point", "loop on / off"],
+			["right click point", "delete it, with the path once it has no points"],
+			["SHIFT right click point", "delete its whole path"],
+			["click or ENTER on PATH field", "rename the current path"]
 		]]
 	],
 	[

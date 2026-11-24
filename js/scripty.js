@@ -16,6 +16,10 @@ const SAY_SCREEN_BG_COLOR = "#000000";
 const SAY_SCREEN_FONT = "ftScreenTitle";
 // How long the player shows off an item they were just given, in updates.
 const PRESENT_HELD_UPDATES = 150;
+// What an actor's method gives back when it is not done yet and will call back once it is.
+const SCRIPT_WAIT = "wait";
+// How many updates a walk may go without getting closer before it gives up, unless the step says.
+const SCRIPT_WALK_TO_TIMEOUT = 300;
 
 // The engine calls a script may make by name, given the action's remaining values.
 const SCRIPT_CALLS = {
@@ -28,10 +32,8 @@ const SCRIPT_CALLS = {
 };
 
 // Actions the data uses whose systems are later stages: the spotlight, one time effects, sound,
-// copying groups, and the other characters, whose giving and taking go with them. Each logs once
-// and is passed over.
-const SCRIPT_OPS_NOT_YET = ["setSpotlight", "add_onefx", "playBgSound", "copyGroup",
-	"give", "take", "walkTo", "saveCurLoc", "use", "face"];
+// copying groups, and the other characters' giving and taking. Each logs once and is passed over.
+const SCRIPT_OPS_NOT_YET = ["setSpotlight", "add_onefx", "playBgSound", "copyGroup", "give", "take"];
 
 // A value against another by a comparison's name. On and off count as one and zero.
 function scriptValIs(a, comp, b) {
@@ -46,6 +48,77 @@ function scriptValIs(a, comp, b) {
 	return false;
 }
 
+// A name in an action: the player, the script's actor, its caller, or any object by name.
+function scriptLookup(v, actor, caller) {
+	if (v === "main") return game.guy;
+	if (v === "actor") return actor;
+	if (v === "self") return caller;
+	return game.lookupInst(v, caller);
+}
+
+// Whether a check holds for whoever checks: the spot distances are measured from, the actor and
+// the caller names in it stand for. A bare number is the odds it does. The others check values of
+// objects, their state or the game's, chance, distance, or the time since something, or combine
+// checks. Script runners and characters choosing what to do both ask.
+function scriptCheck(check, x, y, actor, caller) {
+	if (typeof check === "number" || typeof check === "boolean") return rng.random(1) < check;
+	if (!Array.isArray(check)) return false;
+
+	const type = check[0];
+	if (type === "true") return true;
+	if (type === "and" || type === "or") {
+		if (!Array.isArray(check[1])) return false;
+		for (const c of check[1]) {
+			if (scriptCheck(c, x, y, actor, caller) !== (type === "and")) return type === "or";
+		}
+		return type === "and";
+	}
+	if (type === "rando") return rng.random(check[2]) <= check[1];
+	if (type === "instVarIs") {
+		const obj = scriptLookup(check[1], actor, caller);
+		const v = obj ? obj[check[2]] : undefined;
+		return scriptValIs(v !== undefined ? v : false, check[3], check[4]);
+	}
+	if (type === "instStateIs") {
+		const v = game.objStateOf(check[1])[check[2]];
+		return scriptValIs(v !== undefined ? v : 0, check[3], check[4]);
+	}
+	if (type === "gameStateIs") {
+		const v = game.gameState[String(check[1])];
+		return scriptValIs(v !== undefined ? v : false, check[2], check[3]);
+	}
+	if (type === "instExists") {
+		const obj = scriptLookup(check[1], actor, caller);
+		return (!!obj && !obj.destroyed) === !!check[2];
+	}
+	// how far from here to the nearest of a kind of object, or to a named one, edge to edge
+	if (type === "objDist") {
+		const cls = objectType(check[1]);
+		const named = cls === undefined ? scriptLookup(check[1], actor, caller) : undefined;
+		let dist = Infinity;
+		for (const o of cls !== undefined ? game.instances : [named]) {
+			if (!o || (cls !== undefined && (!(o instanceof cls) || !o.active))) continue;
+			const dx = Math.max(o.bbox_left - x, 0, x - o.bbox_right);
+			const dy = Math.max(o.bbox_top - y, 0, y - o.bbox_bottom);
+			dist = Math.min(dist, Math.sqrt(dx * dx + dy * dy));
+		}
+		return scriptValIs(dist, check[2], check[3]);
+	}
+	// Whether the item being given is of a kind. The giver is whoever last acted on the actor,
+	// as a character being given something remembers, else the actor.
+	if (type === "isGive") {
+		const giver = (actor && actor.actwho) || actor;
+		return !!giver && !!giver.carrying && giver.carrying.constructor === objectType(check[1]);
+	}
+	// The original read the time from the runner itself, where nothing writes it. Here it is
+	// the actor's, where remembering the last time puts it.
+	if (type === "timeSince") {
+		const last = actor ? actor[check[1]] : undefined;
+		return scriptValIs(game.frames - (last !== undefined ? last : 0), check[2], check[3]);
+	}
+	return false;
+}
+
 // One function per action name, run with the runner as this and the action as its value.
 // An action that is done sets nexta so the next one runs in the same update, one that holds
 // leaves it off and is run again next update.
@@ -53,7 +126,7 @@ const ScriptOps = {
 	// ------------------------------------------------------------ flow
 
 	if(ca) {
-		if (this.doCheck(ca[1])) this.enter_subscript(ca[2]);
+		if (scriptCheck(ca[1], this.x, this.y, this.actor, this.trigger)) this.enter_subscript(ca[2]);
 		else if (ca.length > 3) this.enter_subscript(ca[3]);
 		this.nexta = true;
 	},
@@ -61,7 +134,7 @@ const ScriptOps = {
 	// checks in order, the first that holds runs its actions and the rest are passed over
 	choose(ca) {
 		for (let i = 1; i < ca.length; i++) {
-			if (this.doCheck(ca[i][0])) {
+			if (scriptCheck(ca[i][0], this.x, this.y, this.actor, this.trigger)) {
 				this.enter_subscript(ca[i][1]);
 				break;
 			}
@@ -90,7 +163,7 @@ const ScriptOps = {
 
 	// another script started alongside this one
 	runScript(ca) {
-		Hooks.runScript(ca[1], this.lookup(ca[2]), undefined, undefined, undefined, this.trigger);
+		Hooks.runScript(ca[1], scriptLookup(ca[2], this.actor, this.trigger), undefined, undefined, undefined, this.trigger);
 		this.nexta = true;
 	},
 
@@ -102,7 +175,7 @@ const ScriptOps = {
 
 	// a method of a named object, given the action's remaining values
 	exec_obj(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) {
 			if (typeof obj[ca[2]] === "function") obj[ca[2]](...ca.slice(3));
 			else Hooks.todo("script call " + ca[2] + " on " + obj.constructor.name);
@@ -150,7 +223,7 @@ const ScriptOps = {
 	// Shown above the sayer, the actor when none is named, for a while and fading, not waited on.
 	// Kept from the original: a sayer that cannot be found means nothing is said.
 	say(ca) {
-		Hooks.popMessage(this.lookup(ca.length > 2 ? ca[2] : this.actor), ca[1], ca[3], ca[4], {
+		Hooks.popMessage(scriptLookup(ca.length > 2 ? ca[2] : this.actor, this.actor, this.trigger), ca[1], ca[3], ca[4], {
 			fadestart: ca.length > 5 ? ca[5] : SAY_FADE_START, fadetime: SAY_FADE_TIME,
 			floatspdx: 0, floatspdy: ca.length > 6 ? ca[6] : 0, drawbg: true
 		});
@@ -161,7 +234,7 @@ const ScriptOps = {
 	// Picked choices run as part of this script. Kept from the original: the offsets it is given
 	// are not used, it always sits at the usual spot above the sayer.
 	sayWfB(ca) {
-		const msg = Hooks.popMessage(this.lookup(ca.length > 2 ? ca[2] : this.actor), ca[1], undefined, undefined,
+		const msg = Hooks.popMessage(scriptLookup(ca.length > 2 ? ca[2] : this.actor, this.actor, this.trigger), ca[1], undefined, undefined,
 			{ fadetime: 0, drawbg: true });
 		if (msg === undefined) {
 			this.nexta = true;
@@ -177,7 +250,7 @@ const ScriptOps = {
 
 	// with no backing, so a little lower, and drifting when given speeds
 	sayNB(ca) {
-		const msg = Hooks.popMessage(this.lookup(ca.length > 2 ? ca[2] : this.actor), ca[1]);
+		const msg = Hooks.popMessage(scriptLookup(ca.length > 2 ? ca[2] : this.actor, this.actor, this.trigger), ca[1]);
 		if (msg !== undefined) {
 			msg.y += 2;
 			if (ca.length > 3) msg.floatspdx = ca[3];
@@ -233,14 +306,14 @@ const ScriptOps = {
 	// ------------------------------------------------------------ objects
 
 	setInstVar(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) obj[ca[2]] = ca[3];
 		this.nexta = true;
 	},
 
 	// Added to. The original fails on a value the object lacks, here that counts as nothing.
 	adjInstVar(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) obj[ca[2]] = (obj[ca[2]] !== undefined ? obj[ca[2]] : 0) + ca[3];
 		this.nexta = true;
 	},
@@ -253,21 +326,21 @@ const ScriptOps = {
 
 	// shown, hidden, or the other way round
 	setVis(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) obj.visible = ca[2] === "toggle" ? !obj.visible : ca[2];
 		this.nexta = true;
 	},
 
 	// switched on or off, or the other way round, which neither runs nor collides while off
 	setActive(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) game.setObjEnabled(obj, ca[2] === "toggle" ? !obj.active : ca[2]);
 		this.nexta = true;
 	},
 
 	// one update for an object, even one switched off
 	objStep(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) {
 			obj.update();
 			if (obj.afterUpdate !== undefined) obj.afterUpdate();
@@ -276,7 +349,7 @@ const ScriptOps = {
 	},
 
 	obj_set_sprite(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) {
 			Draw.setSprite(obj, ca[2]);
 			obj.ifr = 0;
@@ -303,7 +376,7 @@ const ScriptOps = {
 	},
 
 	destroy(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj instanceof oBaseObject) obj.destroy();
 		else if (obj) game.forgetObject(obj);
 		this.nexta = true;
@@ -320,7 +393,7 @@ const ScriptOps = {
 	// The script ends here unless the object's being there is as asked.
 	// The original asked about the name itself, here the name is looked up.
 	checkExists(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if ((!!obj && !obj.destroyed) !== !!ca[2]) this.scrExit = true;
 		else this.nexta = true;
 	},
@@ -333,7 +406,7 @@ const ScriptOps = {
 
 	// a value of an object eased to a new one over a number of updates
 	obj_fade(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj) {
 			game.createObject(oFader, { obj: obj, obj_var: ca[2], final_val: ca[3], time: ca[4] },
 				obj.mylayer ? obj.mylayer : undefined);
@@ -345,7 +418,7 @@ const ScriptOps = {
 
 	// a knock from the middle of whoever hits
 	hit(ca) {
-		const by = this.lookup(ca[1]);
+		const by = scriptLookup(ca[1], this.actor, this.trigger);
 		if (by) game.guy.takeHit((by.bbox_left + by.bbox_right) / 2, (by.bbox_top + by.bbox_bottom) / 2, ca[2]);
 		this.nexta = true;
 	},
@@ -384,7 +457,7 @@ const ScriptOps = {
 
 	// follows someone over a time, pans to a spot over a time, or stays where it is
 	lockCamTo(ca) {
-		if (ca.length > 1 && typeof ca[1] === "string") game.cam.pan(this.lookup(ca[1]), ca[2]);
+		if (ca.length > 1 && typeof ca[1] === "string") game.cam.pan(scriptLookup(ca[1], this.actor, this.trigger), ca[2]);
 		else if (ca.length > 2) game.cam.lockToStatic(ca[1], ca[2], ca[3]);
 		else game.cam.lockToCurrent(ca[1]);
 		this.nexta = true;
@@ -404,7 +477,7 @@ const ScriptOps = {
 
 	// The actor picks up a named thing, and with one more value the player shows it off.
 	pickup(ca) {
-		const obj = this.lookup(ca[1]);
+		const obj = scriptLookup(ca[1], this.actor, this.trigger);
 		if (obj && this.actor && this.actor.inv) this.actor.inv.pickup(obj);
 		if (ca.length > 2) game.guy.presenting = PRESENT_HELD_UPDATES;
 		this.nexta = true;
@@ -413,7 +486,7 @@ const ScriptOps = {
 	// A new object of a kind put straight into someone's hands, gone again if they cannot take it,
 	// and with one more value the player shows it off.
 	giveNew(ca) {
-		const towho = this.lookup(ca[2]);
+		const towho = scriptLookup(ca[2], this.actor, this.trigger);
 		if (objectType(ca[1]) === undefined) {
 			Hooks.todo("script giving an unknown object " + ca[1]);
 		} else if (towho && towho.inv) {
@@ -434,6 +507,76 @@ const ScriptOps = {
 			if (obj) obj.destroy();
 		}
 		this.nexta = true;
+	},
+
+	// ------------------------------------------------------------ the actor's own doings
+
+	// Each of these calls one of the actor's own methods by name, with the places it names worked
+	// out first.
+
+	// The actor walks to a spot, to an object by name, or back to the spot it last remembered.
+	// A map at the end can say how many updates it may go without getting closer before it gives
+	// up, and whether giving up carries on with the next action or ends the script.
+	walkTo(ca) {
+		const last = ca[ca.length - 1];
+		const opts = (ca.length > 1 && last !== null && typeof last === "object" && !Array.isArray(last)) ? last : {};
+		let x = ca[1];
+		let y = ca[2];
+		if (x === "saveLoc") {
+			x = this.actor ? this.actor.savedLocX : undefined;
+			y = this.actor ? this.actor.savedLocY : undefined;
+		} else if (typeof x === "string") {
+			const obj = scriptLookup(x, this.actor, this.trigger);
+			x = obj ? obj.x : undefined;
+			y = obj ? obj.y : undefined;
+		}
+		if (typeof x !== "number" || typeof y !== "number") {
+			console.log("scripty: " + JSON.stringify(ca) + " has nowhere to walk to.");
+			this.nexta = true;
+			return;
+		}
+		this.actorDo(ca, "walkTo", [x, y, opts.timeout !== undefined ? opts.timeout : SCRIPT_WALK_TO_TIMEOUT],
+			opts.fail === "stop");
+	},
+
+	// The actor remembers where it stands, for walking back later.
+	saveCurLoc(ca) {
+		this.actorDo(ca, "saveCurLoc", [], false);
+	},
+
+	// The actor faces the nearest object of a kind, or one by name, or faces the ways given.
+	face(ca) {
+		let fx = ca[1];
+		let fy = ca[2];
+		if (typeof fx === "string") {
+			const cls = objectType(fx);
+			let obj = cls === undefined ? scriptLookup(fx, this.actor, this.trigger) : null;
+			if (cls !== undefined && this.actor) {
+				let best = Infinity;
+				for (const o of game.instances) {
+					if (!(o instanceof cls) || !o.active || o === this.actor) continue;
+					const d = pointDistance(this.actor.x, this.actor.y, o.x, o.y);
+					if (d < best) {
+						best = d;
+						obj = o;
+					}
+				}
+			}
+			if (!obj || !this.actor) {
+				console.log("scripty: " + JSON.stringify(ca) + " has nothing to face.");
+				this.nexta = true;
+				return;
+			}
+			fx = sign(obj.sprite_cx() - this.actor.x);
+			fy = this.actor.facingy;
+		}
+		this.actorDo(ca, "faceTo", [fx, fy], false);
+	},
+
+	// The actor uses what it carries: held down with one, let go with nothing, or a single press
+	// and release without a value. The second value names what is used and is only read as that.
+	use(ca) {
+		this.actorDo(ca, "useCarried", [ca.length > 2 ? (ca[2] ? "hold" : "release") : "tap"], false);
 	},
 
 	// ------------------------------------------------------------ rooms, layers and areas
@@ -569,73 +712,26 @@ class oScripty extends oBaseObject {
 		this.step = 0;
 	}
 
-	// A name in an action: the player, the actor, the caller, or any object by name.
-	lookup(v) {
-		if (v === "main") return game.guy;
-		if (v === "actor") return this.actor;
-		if (v === "self") return this.trigger;
-		return game.lookupInst(v, this.trigger);
-	}
-
-	// Whether a check holds. A bare number is the odds it does. The others check values of objects,
-	// their state or the game's, chance, distance, or the time since something, or combine checks.
-	doCheck(check) {
-		if (typeof check === "number" || typeof check === "boolean") return rng.random(1) < check;
-		if (!Array.isArray(check)) return false;
-
-		const type = check[0];
-		if (type === "true") return true;
-		if (type === "and" || type === "or") {
-			if (!Array.isArray(check[1])) return false;
-			for (const c of check[1]) {
-				if (this.doCheck(c) !== (type === "and")) return type === "or";
-			}
-			return type === "and";
+	// Calls the actor's method by name with the values given and a callback last. Without the
+	// method it says so and the action is passed over. A method that is not done at once says so
+	// and calls back when it is, true if it managed. The script holds until then, and when it did
+	// not manage and should stop there, the script ends instead, still calling its own callback.
+	actorDo(ca, method, vals, stopOnFail) {
+		const actor = this.actor;
+		if (!actor || typeof actor[method] !== "function") {
+			const from = this.trigger && this.trigger.name !== undefined ? this.trigger.name : "a script";
+			console.log("scripty: " + from + " step " + JSON.stringify(ca) + " passed over, "
+				+ (actor ? actor.constructor.name : "no actor") + " has no " + method + ".");
+			this.nexta = true;
+			return;
 		}
-		if (type === "rando") return rng.random(check[2]) <= check[1];
-		if (type === "instVarIs") {
-			const obj = this.lookup(check[1]);
-			const v = obj ? obj[check[2]] : undefined;
-			return scriptValIs(v !== undefined ? v : false, check[3], check[4]);
-		}
-		if (type === "instStateIs") {
-			const v = game.objStateOf(check[1])[check[2]];
-			return scriptValIs(v !== undefined ? v : 0, check[3], check[4]);
-		}
-		if (type === "gameStateIs") {
-			const v = game.gameState[String(check[1])];
-			return scriptValIs(v !== undefined ? v : false, check[2], check[3]);
-		}
-		if (type === "instExists") {
-			const obj = this.lookup(check[1]);
-			return (!!obj && !obj.destroyed) === !!check[2];
-		}
-		// how far from here to the nearest of a kind of object, or to a named one, edge to edge
-		if (type === "objDist") {
-			const cls = objectType(check[1]);
-			const named = cls === undefined ? this.lookup(check[1]) : undefined;
-			let dist = Infinity;
-			for (const o of cls !== undefined ? game.instances : [named]) {
-				if (!o || (cls !== undefined && (!(o instanceof cls) || !o.active))) continue;
-				const dx = Math.max(o.bbox_left - this.x, 0, this.x - o.bbox_right);
-				const dy = Math.max(o.bbox_top - this.y, 0, this.y - o.bbox_bottom);
-				dist = Math.min(dist, Math.sqrt(dx * dx + dy * dy));
-			}
-			return scriptValIs(dist, check[2], check[3]);
-		}
-		// Whether the item being given is of a kind. The giver is whoever last acted on the actor,
-		// as a character being given something remembers, else the actor.
-		if (type === "isGive") {
-			const giver = (this.actor && this.actor.actwho) || this.actor;
-			return !!giver && !!giver.carrying && giver.carrying.constructor === objectType(check[1]);
-		}
-		// The original read the time from the runner itself, where nothing writes it. Here it is
-		// the actor's, where remembering the last time puts it.
-		if (type === "timeSince") {
-			const last = this.actor ? this.actor[check[1]] : undefined;
-			return scriptValIs(game.frames - (last !== undefined ? last : 0), check[2], check[3]);
-		}
-		return false;
+		const done = (ok) => {
+			if (this.destroyed) return;
+			if (!ok && stopOnFail) this.scrExit = true;
+			this.unpause();
+		};
+		if (actor[method](...vals, done) === SCRIPT_WAIT) this.pause();
+		else this.nexta = true;
 	}
 
 	update() {
@@ -649,8 +745,9 @@ class oScripty extends oBaseObject {
 			this.curAction = undefined;
 		}
 
+		// ended early by an action, the rest is passed over
 		this.nexta = true;
-		while (this.nexta) {
+		while (this.nexta && !this.scrExit) {
 			this.nexta = false;
 
 			if (this.curAction === undefined) {

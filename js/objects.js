@@ -45,6 +45,18 @@ const WANDER_WALK_SPEED_MAX = 0.4;
 const WANDER_WALK_MIN = 20;
 const WANDER_WALK_MAX = 60;
 
+// Characters that act on their own: updates between looks for something to do when idle, the
+// shadow at their feet, how high above their feet they carry things, a scripted walk's speed, how
+// near counts as there, and the least it must close in by for the walk to count as getting closer,
+// and the debug line's colour to where they are heading.
+const NPC_IDLE_CHECK_EVERY = 10;
+const NPC_SHADOW = "tem_shadow";
+const NPC_CARRY_RAISE = 2;
+const NPC_WALK_TO_SPEED = 0.6;
+const NPC_WALK_TO_REACH = 2;
+const NPC_WALK_TO_MIN_PROGRESS = 0.5;
+const NPC_HEADING_COLOR = "#ffffaa";
+
 // The debug revive leaves these alone: where it is, its name, its layer, and whether it is gone or
 // switched off.
 const REVIVE_KEEP_FIELDS = ["x", "y", "name", "mylayer", "destroyed", "pdis"];
@@ -918,10 +930,26 @@ class oActor extends oBaseObject {
 		this.bored = 0;
 		this.idleTime = 0;
 		this.walkTime = 0;
+		// a spot remembered by a script to come back to
+		this.savedLocX = null;
+		this.savedLocY = null;
 	}
 
 	// override for behavior
 	acton(action, who) {}
+
+	// Turns to face the ways given, left or right and up or down. Facing neither way across keeps
+	// the way it faced, and no way up or down given keeps that too.
+	faceTo(fx, fy) {
+		if (fx !== 0) this.facing = fx;
+		if (fy !== undefined) this.facingy = fy;
+	}
+
+	// remembers where it stands, for a script to send it back to
+	saveCurLoc() {
+		this.savedLocX = this.x;
+		this.savedLocY = this.y;
+	}
 
 	// Wandering setup once the room settings are in: the start path if it names one, the idle
 	// range, and a random start into the first idle so a group does not set off together.
@@ -1066,6 +1094,221 @@ class oActor extends oBaseObject {
 	}
 }
 mixin(oActor, Interactive);
+
+// A character that lives its own life: it wanders its paths or area, now and then does one of its
+// idle actions when its check holds, and answers the player with the first of its interactions
+// whose action and check match. Each of those runs as a script with it as actor and caller, and
+// while one runs it does nothing else. An interaction can cut into an idle action, never into
+// another interaction. It can carry something it was set up holding, which it draws itself.
+class oNpcChar extends oActor {
+	constructor() {
+		super();
+		this.initMoveable();
+		// set by room and object files: what it starts holding by kind, its interactions as
+		// action, check and script, and its idle actions as check and script
+		this.holding = null;
+		this.interacts = [];
+		this.idleacts = [];
+		// the script running for it and whether it is an idle one, while it is busy
+		this.scripted = null;
+		// a scripted walk: its spot, the updates it may go without closing in, the nearest it got,
+		// updates since, and who to tell how it went
+		this.walk = null;
+		// using what it carries: held down, or a single press let go next update
+		this.useHeld = false;
+		this.useTap = false;
+		// so characters do not all look for something to do on the same update
+		this.idleCheckOff = 0;
+	}
+
+	init() {
+		super.init();
+		this.wanderInit();
+		this.idleCheckOff = rng.irandom(NPC_IDLE_CHECK_EVERY - 1);
+		if (this.holding !== null && this.carrying === null) {
+			if (objectType(this.holding[0]) === undefined) {
+				Hooks.todo("character holding an unknown object " + this.holding[0]);
+			} else {
+				// hidden and without a mask, so it is only drawn by us and cannot be looked at
+				const item = game.createObject(this.holding[0], { x: this.x, y: this.y - NPC_CARRY_RAISE }, this.mylayer);
+				item.carriedBy = this;
+				item.visible = false;
+				item.mask = "sNoMask";
+				this.carrying = item;
+			}
+		}
+	}
+
+	// The first interaction for the action whose check holds starts, unless an interaction is
+	// already running. Says whether one started.
+	acton(action, who, pars) {
+		if (this.scripted !== null && !this.scripted.idle) return false;
+		this.actwho = who;
+		this.actpars = pars;
+		for (const iact of this.interacts) {
+			if (iact[0] !== action || !scriptCheck(iact[1], this.x, this.y, this, this)) continue;
+			this.runScripted(iact[2], false);
+			return true;
+		}
+		return false;
+	}
+
+	// Starts a script with us as actor and caller, standing still, busy until it finishes. An idle
+	// action still running is ended first, letting go of any use it held down. The original left
+	// it running alongside the interaction.
+	runScripted(script, idle) {
+		if (this.scripted !== null) {
+			const old = this.scripted.runner;
+			this.scripted = null;
+			if (old !== null && !old.destroyed) old.destroy();
+			if (this.useHeld) this.useCarried("release");
+		}
+		this.stop();
+		const run = { idle: idle, runner: null };
+		this.scripted = run;
+		const runner = Hooks.runScript(script, this, undefined, undefined, () => {
+			if (this.scripted === run) this.scripted = null;
+		}, this);
+		// it may have finished at once, or never started
+		if (this.scripted === run) {
+			if (runner === undefined) this.scripted = null;
+			else run.runner = runner;
+		}
+	}
+
+	stop() {
+		this.xspd = 0;
+		this.yspd = 0;
+		this.walk = null;
+	}
+
+	// Walks straight to a spot for a script, calling back true on getting there. Going the given
+	// number of updates without closing in it gives up and calls back false.
+	walkTo(x, y, timeout, done) {
+		this.walk = {
+			x: x, y: y, timeout: timeout, done: done,
+			best: pointDistance(this.x, this.y, x, y), since: 0
+		};
+		return SCRIPT_WAIT;
+	}
+
+	// Uses what it carries the way given: a single press, held down, or let go. Something that
+	// drops itself on use is let go of where it is.
+	useCarried(how) {
+		const item = this.carrying;
+		if (item === null) return;
+		if (how === "release") {
+			this.useHeld = false;
+			item.use_r(this);
+			return;
+		}
+		if (item.use(this) === "drop") {
+			item.carriedBy = null;
+			item.visible = true;
+			item.mask = item.dmi;
+			this.carrying = null;
+			this.useHeld = false;
+			this.useTap = false;
+			return;
+		}
+		if (how === "hold") this.useHeld = true;
+		else this.useTap = true;
+	}
+
+	update() {
+		// a script taken away without finishing, as by clearing the world, frees it too
+		if (this.scripted !== null && this.scripted.runner !== null && this.scripted.runner.destroyed) {
+			this.scripted = null;
+			this.walk = null;
+		}
+		if (this.scripted !== null) {
+			const w = this.walk;
+			if (w !== null) {
+				const d = pointDistance(this.x, this.y, w.x, w.y);
+				if (d < NPC_WALK_TO_REACH) {
+					this.stop();
+					w.done(true);
+				} else {
+					// only real closing in counts, so pushing against something runs the count out
+					if (d <= w.best - NPC_WALK_TO_MIN_PROGRESS) {
+						w.best = d;
+						w.since = 0;
+					} else {
+						w.since++;
+					}
+					if (w.since >= w.timeout) {
+						this.stop();
+						w.done(false);
+					} else {
+						const dir = pointDirection(this.x, this.y, w.x, w.y);
+						this.xspd = lengthdirX(NPC_WALK_TO_SPEED, dir);
+						this.yspd = lengthdirY(NPC_WALK_TO_SPEED, dir);
+					}
+				}
+			}
+		} else {
+			// it stands still for the player bumping into it
+			if (game.guy && this.placeMeeting(this.x, this.y, game.guy)) {
+				this.xspd = 0;
+				this.yspd = 0;
+			} else {
+				this.wanderUpdate();
+			}
+			if ((game.frames + this.idleCheckOff) % NPC_IDLE_CHECK_EVERY === 0) {
+				for (const iact of this.idleacts) {
+					if (!scriptCheck(iact[0], this.x, this.y, this, this)) continue;
+					this.runScripted(iact[1], true);
+					break;
+				}
+			}
+		}
+
+		const item = this.carrying;
+		if (item !== null) {
+			if (this.useHeld) item.use_c(this);
+			if (this.useTap) {
+				this.useTap = false;
+				item.use_r(this);
+			}
+		}
+
+		this.moveThroughObjectsTopd(this.xspd, this.yspd, this.zspd);
+		// kept in its area only while wandering it
+		if (this.scripted === null && this.wanderPath === null) this.checkStayinObjs(objectType("oStayinBox"));
+
+		if (this.xspd !== 0) this.facing = sign(this.xspd);
+
+		if (item !== null && this.carrying === item) {
+			item.x = this.x;
+			item.y = this.y - NPC_CARRY_RAISE;
+			item.x_sc = this.facing * Math.abs(item.x_sc);
+			// hidden things do not animate by themselves
+			Draw.animate(item, 1);
+		}
+
+		if (game.drawStats) {
+			if (this.walk !== null) {
+				Hooks.debugLine(this.x, this.y, this.walk.x, this.walk.y, NPC_HEADING_COLOR);
+			} else if (this.scripted === null && this.wanderPath !== null) {
+				Hooks.debugLine(this.x, this.y, this.wanderPath[this.pathIndex], this.wanderPath[this.pathIndex + 1],
+					NPC_HEADING_COLOR);
+			}
+		}
+	}
+
+	// the shadow at its feet, itself lifted by its height, then what it carries lifted with it
+	draw() {
+		Draw.spriteExt(NPC_SHADOW, 0, this.x, this.y, 1, 1, 0, NO_TINT, 1);
+		this.y -= this.z;
+		super.draw();
+		this.y += this.z;
+		if (this.carrying !== null) {
+			this.carrying.y -= this.z;
+			this.carrying.draw();
+			this.carrying.y += this.z;
+		}
+	}
+}
 
 // Shared by the player characters only.
 class oChar extends oActor {

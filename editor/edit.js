@@ -40,6 +40,9 @@ const ED_UID_DIGITS = 5;
 const ED_PLAYER_START_OBJECT = "oGuyPlacer";
 // the script actions that name an entry group, whose names follow a group renamed
 const ED_GROUP_SCRIPT_OPS = ["groupViz", "copyGroup"];
+// a new path's name is this and a number, and a point put after a path's last goes this far below it
+const ED_PATH_PREFIX = "p";
+const ED_PATH_DROP = 10;
 
 const EdEdit = {
 	// the selected entries, in the order they were selected, and the box round them in view space
@@ -88,6 +91,11 @@ const EdEdit = {
 	// The entry group being worked inside, by name, or none. Only its entries hover, select and
 	// take new entries, and clicking picks the groups one level inside it. Not an undo step.
 	inGroup: null,
+	// The path point under the mouse, among the paths shown, as its entry, its path's name and its
+	// number along the path, or none; and the point being dragged, with where the mouse holds it
+	// from and whether its undo step is still to start.
+	pathHot: null,
+	pathDrag: null,
 
 	// A room just opened or read again: nothing selected, held or to undo.
 	reset() {
@@ -102,6 +110,8 @@ const EdEdit = {
 		this.lastPlaced = [];
 		this.alignStep = null;
 		this.inGroup = null;
+		this.pathHot = null;
+		this.pathDrag = null;
 	},
 
 	dirty() {
@@ -196,6 +206,8 @@ const EdEdit = {
 		ed.hovers = [];
 		ed.curhoveri = 0;
 		ed.rehover = true;
+		this.pathHot = null;
+		this.pathDrag = null;
 	},
 
 	// Adds an entry to the selection as the original did: its offsets from the mouse kept for moving,
@@ -273,6 +285,52 @@ const EdEdit = {
 		EdRoom.relink(room);
 		Editor.debugtxt = " renamed " + old + " to " + text + (scripts > 0 ? ", " + scripts + " scripts changed" : "");
 		Editor.rehover = true;
+		return "";
+	},
+
+	// An entry's current path, the one its points were last clicked on or added to, while it still
+	// has it, else its last, or none.
+	curPath(rec) {
+		if (rec.paths === undefined || rec.paths === null) return null;
+		if (rec.curPath !== undefined && Object.prototype.hasOwnProperty.call(rec.paths, rec.curPath)) return rec.curPath;
+		const names = Object.keys(rec.paths);
+		return names.length > 0 ? names[names.length - 1] : null;
+	},
+
+	// An entry's paths after a change, as a new map, the old one left whole for undoing. The change
+	// gets the paths in order, each its name, its points as a flat list of spots and whether it loops,
+	// and may change, add, rename or drop them. A path left as it was keeps its saved list, a changed
+	// one the number text of its unchanged spots, so the file changes only where the paths did. With
+	// no paths left the entry has none.
+	pathsWith(paths, change) {
+		const list = paths === undefined || paths === null ? [] : Object.keys(paths).map((name) => {
+			const a = paths[name];
+			return { name: name, pts: a.slice(0, Math.max(0, a.length - 1)), loop: a.length > 0 ? a[a.length - 1] : 0, was: a };
+		});
+		change(list);
+		if (list.length === 0) return undefined;
+		const out = {};
+		EdFile.meta.set(out, { keys: list.map((p) => p.name), raw: new Map(), blocks: new Set() });
+		for (const p of list) {
+			const a = p.pts.concat([p.loop]);
+			out[p.name] = p.was !== undefined && JSON.stringify(a) === JSON.stringify(p.was) ? p.was : EdFile.list(a, p.was);
+		}
+		return out;
+	},
+
+	// Renames the selected entry's current path, as one undo step, keeping its place among the
+	// entry's paths. A name left empty or already one of the entry's paths is refused; tells why, or
+	// gives nothing.
+	renamePath(text) {
+		const rec = this.selects[0];
+		const old = this.curPath(rec);
+		if (text === old) return "";
+		if (text === "") return "a path needs a name";
+		if (Object.prototype.hasOwnProperty.call(rec.paths, text)) return "this entry already has a path named " + text;
+		this.push(rec, ["paths"]);
+		rec.paths = this.pathsWith(rec.paths, (list) => { list.find((p) => p.name === old).name = text; });
+		rec.curPath = text;
+		Editor.debugtxt = " renamed path " + old + " to " + text;
 		return "";
 	},
 
@@ -405,7 +463,9 @@ const EdEdit = {
 			y: this.box.y1,
 			inGroup: this.inGroup,
 			cut: cut,
-			pasted: false
+			pasted: false,
+			// a cut only pastes back where it was in the room it came from
+			room: Editor.room
 		};
 		if (cut) this.remove();
 	},
@@ -437,8 +497,18 @@ const EdEdit = {
 			rec.name = this.unique(rec.name, taken);
 			taken.add(rec.name);
 			const k = lyr.lens.s / EdView.z;
+			const wasx = rec.x;
+			const wasy = rec.y;
 			rec.x += xo / k;
 			rec.y += yo / k;
+			// its paths come along, moved as far as it went, into whatever room
+			const dx = rec.x - wasx;
+			const dy = rec.y - wasy;
+			if (rec.paths !== undefined && (dx !== 0 || dy !== 0)) {
+				rec.paths = this.pathsWith(rec.paths, (list) => {
+					for (const p of list) p.pts = p.pts.map((v, n) => v + (n % 2 === 0 ? dx : dy));
+				});
+			}
 			const from = rec.groups !== null ? rec.groups : [];
 			const upto = this.clip.inGroup !== null && from.includes(this.clip.inGroup) ? from.indexOf(this.clip.inGroup) : from.length;
 			const groups = from.slice(0, upto).map((gname) => {
@@ -540,8 +610,8 @@ const EdEdit = {
 		if (inp.ctrl && hit("KeyC") && this.selects.length > 0) this.copy(false);
 		if (inp.ctrl && hit("KeyX") && this.selects.length > 0) this.copy(true);
 		if (inp.ctrl && hit("KeyV") && this.clip !== null) {
-			// a cut with nothing selected pastes back where it was, otherwise at the mouse
-			const pastelast = this.selects.length === 0 && this.clip.cut && !inp.down.left;
+			// a cut with nothing selected pastes back where it was in its own room, otherwise at the mouse
+			const pastelast = this.selects.length === 0 && this.clip.cut && this.clip.room === room && !inp.down.left;
 			const g = room.grid_lock && !inp.alt ? room.grid_size : 0;
 			const gx = g ? ed.mouse.wx - Math.sign(ed.mouse.wx) * (Math.abs(ed.mouse.wx) % g) : ed.mouse.wx;
 			const gy = g ? ed.mouse.wy - Math.sign(ed.mouse.wy) * (Math.abs(ed.mouse.wy) % g) : ed.mouse.wy;
@@ -755,6 +825,50 @@ const EdEdit = {
 				const s0 = this.selects[0];
 				const p = EdView.toView(s0.mylayer, s0.x - s0.exoffx + s0.loopdx, s0.y - s0.exoffy + s0.loopdy);
 				this.rotateStAng = (s0.ang - Math.round(pointDirection(p.x, p.y, mouse.wx, mouse.wy)) + 720) % 360;
+			} else if (this.pathHot !== null) {
+				// A press on a path point makes its path the entry's current one, then with L turns its
+				// looping on or off, with control puts a new point halfway to the next one, or below the
+				// last, and otherwise starts dragging it.
+				const hp = this.pathHot;
+				const rec = hp.rec;
+				rec.curPath = hp.name;
+				if (held("KeyL") || inp.ctrl) {
+					this.push(rec, ["paths"]);
+					rec.paths = this.pathsWith(rec.paths, (list) => {
+						const p = list.find((q) => q.name === hp.name);
+						const i = hp.i * 2;
+						if (held("KeyL")) p.loop = p.loop ? 0 : 1;
+						else if (i + 2 < p.pts.length) p.pts.splice(i + 2, 0, Math.floor((p.pts[i] + p.pts[i + 2]) / 2), Math.floor((p.pts[i + 1] + p.pts[i + 3]) / 2));
+						else p.pts.push(p.pts[i], p.pts[i + 1] + ED_PATH_DROP);
+					});
+					ed.rehover = true;
+				} else {
+					const ml = EdView.mouseOn(rec.mylayer);
+					const a = rec.paths[hp.name];
+					this.pathDrag = { rec: rec, name: hp.name, i: hp.i, mox: ml.x - a[hp.i * 2], moy: ml.y - a[hp.i * 2 + 1], primed: true };
+				}
+			} else if (held("KeyP")) {
+				// P adds a point at the mouse, on the grid, to the one selected entry's current path,
+				// starting a path when it has none; with shift it starts a new path first
+				if (this.selects.length !== 1) {
+					ed.debugtxt = " a P click needs exactly one entry selected";
+				} else {
+					const rec = this.selects[0];
+					const ml = EdView.mouseOn(rec.mylayer);
+					let name = this.curPath(rec);
+					this.push(rec, ["paths"]);
+					rec.paths = this.pathsWith(rec.paths, (list) => {
+						if (name === null || inp.shift) {
+							let n = list.length + 1;
+							while (list.some((p) => p.name === ED_PATH_PREFIX + n)) n++;
+							name = ED_PATH_PREFIX + n;
+							list.push({ name: name, pts: [], loop: 0, was: undefined });
+						}
+						list.find((p) => p.name === name).pts.push(snap(ml.x), snap(ml.y));
+					});
+					rec.curPath = name;
+					ed.rehover = true;
+				}
 			} else if (into !== null) {
 				this.inGroup = into;
 				this.clear();
@@ -777,8 +891,8 @@ const EdEdit = {
 						seldown.tiledy = t;
 						seldown.tile_loop = t && inp.shift ? 1 : 0;
 						EdRoom.refresh(seldown);
-					} else if (held("KeyP") || held("KeyB")) {
-						// paths and area backdrops come in a later phase
+					} else if (held("KeyB")) {
+						// area backdrops come in a later phase
 					} else if (held("KeyH")) {
 						seldown.hidden = 1;
 						this.clear();
@@ -888,6 +1002,22 @@ const EdEdit = {
 			}
 		}
 
+		// Dragging a path point, on the grid, as one undo step. The entry's paths stay put when the
+		// entry itself moves, as in the original.
+		if (this.pathDrag !== null && inp.down.left && mmoved) {
+			const pd = this.pathDrag;
+			if (pd.primed) {
+				pd.primed = false;
+				this.push(pd.rec, ["paths"]);
+			}
+			const ml = EdView.mouseOn(pd.rec.mylayer);
+			pd.rec.paths = this.pathsWith(pd.rec.paths, (list) => {
+				const pts = list.find((p) => p.name === pd.name).pts;
+				pts[pd.i * 2] = snap(ml.x - pd.mox);
+				pts[pd.i * 2 + 1] = snap(ml.y - pd.moy);
+			});
+		}
+
 		// Resizing by a grabber, or turning with alt. The box's grabbed corner follows the mouse,
 		// snapped to the grid, or the arrows nudge it; every entry scales from the box's far corner,
 		// tiled ones counting their tiles instead. Control keeps the shape. Turning points each
@@ -967,6 +1097,7 @@ const EdEdit = {
 		if (inp.released.left) {
 			this.updateBox();
 			this.moving = this.resizing = this.rotating = this.boxSelect = this.copyPrimed = false;
+			this.pathDrag = null;
 			ed.rehover = true;
 		}
 
@@ -1160,10 +1291,22 @@ const EdEdit = {
 			}
 		}
 
-		// Letting go of the right button over an entry selects it and opens the settings panel next
-		// to the mouse; over nothing it clears the selection. Let go over the panel it does neither.
+		// Letting go of the right button over a path point deletes the point, with shift its whole
+		// path, and a path left with no points goes too. Over an entry it selects it and opens the
+		// settings panel next to the mouse; over nothing it clears the selection. Let go over the
+		// panel it does none of these.
 		if (inp.released.right && ed.mouseIn) {
-			if (hovers.length > 0) {
+			if (this.pathHot !== null) {
+				const hp = this.pathHot;
+				this.push(hp.rec, ["paths"]);
+				hp.rec.paths = this.pathsWith(hp.rec.paths, (list) => {
+					const at = list.findIndex((p) => p.name === hp.name);
+					list[at].pts.splice(hp.i * 2, 2);
+					if (inp.shift || list[at].pts.length === 0) list.splice(at, 1);
+				});
+				this.pathHot = null;
+				ed.rehover = true;
+			} else if (hovers.length > 0) {
 				const rec = hovers[ed.curhoveri];
 				if (!rec.selected) {
 					this.clear();

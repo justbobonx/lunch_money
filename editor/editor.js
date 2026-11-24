@@ -546,7 +546,7 @@ const Editor = {
 		if (inp.released.left) EdPicker.dragging = false;
 
 		// What is under the mouse, when it or the view moved or entries went: the top one marked
-		// unless the stack is the same.
+		// unless the stack is the same, then the path point, which a dragged one stays.
 		if ((mmoved || wh !== 0 || this.rehover) && !this.pan) {
 			this.rehover = false;
 			EdView.lenses();
@@ -557,6 +557,7 @@ const Editor = {
 				this.curhoveri = found.length - 1;
 				this.markHover();
 			}
+			if (EdEdit.pathDrag === null) EdEdit.pathHot = this.ingui ? null : EdView.findPathPoint();
 		}
 
 		if (EdGui.focuson !== null) {
