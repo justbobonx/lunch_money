@@ -22,7 +22,7 @@ const ED_NEW_ROOM_TEXT = '{ "curlyri": "2", "layers": [ { "name": "a.bd", "sprit
 	+ '{ "name": "a.", "spriteList": [] }, { "name": "a.fg", "spriteList": [] } ] }';
 const ED_NEW_ROOM_NAME = "room";
 // keys whose browser meaning would get in the way, always, and while a field is being edited
-const ED_KEPT_KEYS = ["Space", "Tab", "PageUp", "PageDown", "AltLeft", "AltRight", "Escape", "F12",
+const ED_KEPT_KEYS = ["Space", "Tab", "PageUp", "PageDown", "AltLeft", "AltRight", "Escape", "F11", "F12",
 	"Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Delete", "Backspace", "Quote", "Slash"];
 
 const Editor = {
@@ -70,6 +70,8 @@ const Editor = {
 	spaceAt: 0,
 	// Ctrl F12 hides the area backdrops as the original's did
 	drawBdSprites: true,
+	// Ctrl F11 outlines the area bounds and stay in boxes
+	drawBounds: false,
 	// what is under the mouse, the one the wheel picked out of a stack, and how many
 	hovers: [],
 	curhoveri: 0,
@@ -363,13 +365,16 @@ const Editor = {
 		};
 	},
 
-	// Saves the room, and the world when new names were handed out or the room list changed, each
+	// Saves the room, its area bounds made again first while auto bounds is on, and the world when
+	// new names were handed out or the room list changed, each
 	// with a backup of the file before, then tells the player tabs switched on, with control shift P's
 	// drop for the tab this editor opened when given one. Tells whether it all went.
 	async save(drop) {
 		const room = this.room;
 		if (room === null || this.saving) return false;
 		this.saving = true;
+		// with auto bounds on the area bounds are made again first, as their own undo step
+		if (room.autogen) EdEdit.rebuildBounds();
 		const rev = EdEdit.rev;
 		try {
 			await EdFolder.save(ROOM_DIR + "room_" + room.name + ".dat", EdFile.roomText(room, this.fileState()));
@@ -568,12 +573,13 @@ const Editor = {
 		EdPanel.step();
 	},
 
-	// The keys that work wherever the mouse is: the backdrops, folding every group, paging the layer
+	// The keys that work wherever the mouse is: the backdrops, the bounds overlay, folding every group, paging the layer
 	// list, showing as the player, and saving or reading the room again.
 	alwaysKeys() {
 		const inp = this.inp;
 		const room = this.room;
 		if (inp.ctrl && inp.keysPressed.has("F12")) this.drawBdSprites = !this.drawBdSprites;
+		if (inp.ctrl && inp.keysPressed.has("F11")) this.drawBounds = !this.drawBounds;
 		// fold or unfold every group at once
 		if (inp.ctrl && inp.shift && (inp.keysPressed.has("ArrowLeft") || inp.keysPressed.has("ArrowRight"))) {
 			const folding = inp.keysPressed.has("ArrowLeft");

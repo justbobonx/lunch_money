@@ -33,6 +33,7 @@ const ED_PANEL_BORDER_COLOR = "#5a5a78";
 const ED_PANEL_TEXT_COLOR = "#ccccdd";
 const ED_PANEL_TITLE_COLOR = "#ffff33";
 const ED_PANEL_LABEL_COLOR = "#8888a0";
+const ED_PANEL_SECTION_COLOR = "#33ffff";
 const ED_PANEL_READ_COLOR = "#aaaabb";
 const ED_PANEL_LINE_COLOR = "#2e2e42";
 const ED_PANEL_FOCUS_COLOR = "#ffff33";
@@ -213,7 +214,11 @@ const ED_PANEL_KINDS = {
 				get: (r) => (r.bd_color !== undefined ? String(r.bd_color).toUpperCase() : ""), set: (r, v) => { r.bd_color = v === "" ? undefined : v; } },
 			{ key: "grid_size", label: "grid size", type: "num", positive: true, get: (r) => r.grid_size, set: (r, v) => { r.grid_size = v; } },
 			{ key: "grid_lock", label: "grid lock", type: "check", get: (r) => (r.grid_lock ? 1 : 0), set: (r, v) => { r.grid_lock = v; } },
-			{ key: "autogen", label: "auto bounds", type: "read", get: (r) => (r.data.autogen_boundry_layers ? "on" : "off") }
+			// saving makes the area bounds again while on; turned off it goes back to how the file
+			// left it off, so a room never saved with it on keeps its file as it was
+			{ key: "autogen", label: "auto bounds", type: "check", get: (r) => (r.autogen ? 1 : 0), set: (r, v) => {
+				r.autogen = v || r.data.autogen_boundry_layers ? v : r.data.autogen_boundry_layers;
+			} }
 		],
 		holders: (ts) => ts,
 		getBlock: (r) => r.room_init,
@@ -282,7 +287,7 @@ const EdPanel = {
 			+ "#ed_panel .special { color: " + ED_PANEL_SPECIAL_COLOR + "; }\n"
 			+ "#ed_panel .msg { color: " + ED_PANEL_ERROR_COLOR + "; white-space: pre-line; }\n"
 			+ "#ed_panel .note { color: " + ED_PANEL_LABEL_COLOR + "; white-space: pre-line; }\n"
-			+ "#ed_panel .section { grid-column: 1 / -1; color: " + ED_PANEL_LABEL_COLOR + "; margin-top: " + px(ED_PANEL_GAP) + ";"
+			+ "#ed_panel .section { grid-column: 1 / -1; color: " + ED_PANEL_SECTION_COLOR + "; margin-top: " + px(ED_PANEL_GAP) + ";"
 			+ " padding-top: " + px(ED_PANEL_GAP / 2) + "; border-top: " + p + " solid " + ED_PANEL_LINE_COLOR + "; }\n"
 			+ "#ed_panel .head { display: flex; justify-content: space-between; margin-top: " + px(ED_PANEL_GAP) + ";"
 			+ " padding-top: " + px(ED_PANEL_GAP / 2) + "; border-top: " + p + " solid " + ED_PANEL_LINE_COLOR + "; }\n"

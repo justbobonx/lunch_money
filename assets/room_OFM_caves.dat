@@ -242,11 +242,11 @@
 						"triggerScript": [ [ "layerViz", "cur", "enter.*", 1 ] ],
 						"trigOffScript": [ [ "layerViz", "cur", "enter.*", 0 ] ]
 					}«,
-					"x":-551,
-					"y_sc":354,
-					"x_sc":435.5,
+					"x":-554,
+					"y_sc":372,
+					"x_sc":442,
 					"isobj":"oTrigScript",
-					"y":-344,
+					"y":-356,
 					"spi":"sBlankOr",
 					"name":"lyr_vbounds_enter"
 				}
@@ -260,11 +260,11 @@
 			"visible":0,
 			"spriteList":[{
 				"objinit":»{"group": "enter"}«,
-				"x":-381,
-				"y_sc":254,
-				"x_sc":265.5,
+				"x":-384,
+				"y_sc":272,
+				"x_sc":272,
 				"isobj":"oGroupBounds",
-				"y":-244,
+				"y":-256,
 				"spi":"sBlankOr",
 				"name":"lyr_pbounds_enter"
 			}],

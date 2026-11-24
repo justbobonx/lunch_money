@@ -42,6 +42,8 @@ const EdRoom = {
 			// the backdrop colour as hex digits, and the room's setup block as its raw text, with
 			// whether the panel wrote that block and it waits to be laid out in its place
 			bd_color: smap.bd_color,
+			// whether saving makes the area bounds again, as the file holds it
+			autogen: smap.autogen_boundry_layers,
 			room_init: smap.room_init,
 			initFresh: false,
 			layers: [],
@@ -229,7 +231,7 @@ const EdRoom = {
 				const init = rec.init;
 				if (cls !== undefined && (cls === oLayerMask || cls.prototype instanceof oLayerMask)
 					&& init && Array.isArray(init.layer_list)) masks.push(rec);
-				if (cls === oGroupBounds && init && init.group !== undefined) boundsOf[init.group] = rec;
+				if ((cls === oGroupBounds || cls === oEdgeGroup) && init && init.group !== undefined) boundsOf[init.group] = rec;
 			}
 		}
 

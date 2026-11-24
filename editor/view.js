@@ -91,6 +91,12 @@ const ED_PATH_HOT_TINT = "#ffcc88";
 const ED_PATH_HELD_TINT = "#ffffff";
 const ED_PATH_POINT_HOVER_ALPHA = 0.4;
 const ED_PATH_POINT_SELECT_ALPHA = 1;
+// The bounds overlay, control F11: play bounds, view bounds and stay in boxes outlined on every
+// layer, hidden ones too.
+const ED_PLAY_BOUNDS_COLOR = "#ff8800";
+const ED_VIEW_BOUNDS_COLOR = "#ffff00";
+const ED_STAYIN_COLOR = "#00ff00";
+const ED_BOUNDS_OUTLINE_ALPHA = 0.8;
 
 const EdView = {
 	// screen pixels per room pixel
@@ -566,6 +572,19 @@ const EdView = {
 				}
 			}
 		});
+
+		// The bounds overlay: each entry's kind gives its colour, and view bounds by name count too,
+		// as some rooms made them from other kinds.
+		if (ed.drawBounds && !ed.showAsPlayer) {
+			for (const lyr of room.layers) {
+				for (const rec of lyr.lsprites) {
+					const color = rec.isobj === "oGroupBounds" || rec.isobj === "oEdgeGroup" ? ED_PLAY_BOUNDS_COLOR
+						: (rec.isobj === "oVisBounds" || rec.name.startsWith(ED_BOUNDS_VIEW_PREFIX) ? ED_VIEW_BOUNDS_COLOR
+							: (rec.isobj === "oStayinBox" ? ED_STAYIN_COLOR : null));
+					if (color !== null) outline(corners(lyr.lens, rec), color, ED_BOUNDS_OUTLINE_ALPHA, thick(lyr.lens.s));
+				}
+			}
+		}
 
 		// The selection's box while nothing is held, a single turned entry's turned with it, and the
 		// grabbers at its corners, the one under the mouse brighter and still shown while it drags.

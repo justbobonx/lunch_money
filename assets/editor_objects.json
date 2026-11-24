@@ -104,6 +104,7 @@
 		"oDoggie": "sDoggie_stand",
 		"oDoor": "sDoor",
 		"oDoorway": "sDoorway",
+		"oEdgeGroup": "sBlankGn",
 		"oEegg": "s_eegg",
 		"oEmptyObject": null,
 		"oExplode1": null,

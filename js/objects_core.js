@@ -155,6 +155,10 @@ class oBlankGr extends oGround {
 	}
 }
 
+// The bounds of an edge area, which is only for looks: the area's box, hidden ground as in the original.
+class oEdgeGroup extends oBlankGr {}
+oEdgeGroup.defaultSprite = "sBlankGn";
+
 class oGrWall extends oGround {
 	constructor() {
 		super();

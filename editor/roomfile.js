@@ -357,6 +357,7 @@ const EdFile = {
 			grid_lock: { v: room.grid_lock ? 1 : 0, assumed: 0 },
 			grid_size: { v: room.grid_size, assumed: ED_FILE_DEFAULT_GRID },
 			bd_color: { v: room.bd_color },
+			autogen_boundry_layers: { v: room.autogen },
 			room_init: { v: room.room_init !== undefined ? room.room_init : ED_EMPTY_BLOCK, block: true, assumed: ED_EMPTY_BLOCK, fresh: room.initFresh }
 		});
 		return this.write(tree);

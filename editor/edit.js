@@ -43,6 +43,22 @@ const ED_GROUP_SCRIPT_OPS = ["groupViz", "copyGroup"];
 // a new path's name is this and a number, and a point put after a path's last goes this far below it
 const ED_PATH_PREFIX = "p";
 const ED_PATH_DROP = 10;
+// Area bounds, as the original's bounds layer made them: the group and its two layers, the play
+// bounds and the view bounds, what each bounds entry's name starts with, the grid each area's box is
+// widened out to, how far the view bounds reach past it across and down, and the sprite for each kind
+// of area's play bounds and for view bounds.
+const ED_BOUNDS_GROUP = "_lyr_bs";
+const ED_BOUNDS_PLAY_LAYER = "_lyr_bs.boundsp";
+const ED_BOUNDS_VIEW_LAYER = "_lyr_bs.boundsv";
+const ED_BOUNDS_PLAY_PREFIX = "lyr_pbounds_";
+const ED_BOUNDS_VIEW_PREFIX = "lyr_vbounds_";
+const ED_BOUNDS_GRID = 32;
+const ED_BOUNDS_PAD_X = 170;
+const ED_BOUNDS_PAD_Y = 100;
+const ED_BOUNDS_SPRITE = "sBlankOr";
+const ED_BOUNDS_POPUP_SPRITE = "sBlankPr";
+const ED_BOUNDS_EDGE_SPRITE = "sBlankGn";
+const ED_BOUNDS_VIEW_SPRITE = "sBlankYl";
 
 const EdEdit = {
 	// the selected entries, in the order they were selected, and the box round them in view space
@@ -590,6 +606,124 @@ const EdEdit = {
 		this.updateBox();
 	},
 
+	// Makes the area bounds again as the original's bounds layer did, as one undo step, telling
+	// whether anything changed. Every area but plain groups gets a box round the pictures on its
+	// layers that neither scroll apart nor loop, widened out to the bounds grid, or an empty box at
+	// the room's corner when there are none. That box is its play bounds, the kind and sprite its
+	// type takes, and unless it is a popup the box padded is its view bounds, so the area shows
+	// before it is reached. They go in the two bounds layers, added hidden and locked at the end when
+	// missing. Bounds already there are only moved and stretched, so a room whose areas have not
+	// changed saves back as it was; bounds of areas that are gone go.
+	rebuildBounds() {
+		const ed = Editor;
+		const room = ed.room;
+		const grid = ED_BOUNDS_GRID;
+		const boxes = new Map();
+		for (const key of Object.keys(room.lgroups)) {
+			const area = room.lgroups[key];
+			if (area.type === LGT_NON || area.name === ED_BOUNDS_GROUP) continue;
+			let l = Infinity;
+			let t = Infinity;
+			let r = -Infinity;
+			let b = -Infinity;
+			for (const lyr of area.layers) {
+				if (lyr.plx_x !== 1 || lyr.plx_y !== 1 || lyr.loop_x > 0 || lyr.loop_y > 0) continue;
+				for (const rec of lyr.lsprites) {
+					const px = rec.x - rec.exoffx;
+					const py = rec.y - rec.exoffy;
+					l = Math.min(l, px + rec.bbox.l);
+					t = Math.min(t, py + rec.bbox.t);
+					// the right and bottom are the last pixel in, as the original measured them
+					r = Math.max(r, px + rec.bbox.r - 1);
+					b = Math.max(b, py + rec.bbox.b - 1);
+				}
+			}
+			const box = l === Infinity ? { l: 0, t: 0, r: 0, b: 0 } : {
+				l: l - (((l % grid) + grid) % grid),
+				t: t - (((t % grid) + grid) % grid),
+				r: r + grid - (((r % grid) + grid) % grid),
+				b: b + grid - (((b % grid) + grid) % grid)
+			};
+			boxes.set(area.name, { area: area, box: box });
+		}
+
+		// what has to change, done only once the undo step is started
+		const changes = [];
+		const blyrs = [];
+		for (const view of [true, false]) {
+			const lname = view ? ED_BOUNDS_VIEW_LAYER : ED_BOUNDS_PLAY_LAYER;
+			const prefix = view ? ED_BOUNDS_VIEW_PREFIX : ED_BOUNDS_PLAY_PREFIX;
+			let lyr = room.layers.find((x) => x.name === lname);
+			if (lyr === undefined) {
+				lyr = EdRoom.layer(null, lname);
+				lyr.wd = room.roomw;
+				lyr.ht = room.roomh;
+				lyr.visible = 0;
+				lyr.locked = 1;
+				lyr.txt.disabled = true;
+				const made = lyr;
+				changes.push(() => room.layers.push(made));
+			}
+			blyrs.push(lyr);
+			const wanted = new Set();
+			for (const { area, box } of boxes.values()) {
+				if (view && area.type === LGT_POPUP) continue;
+				const name = prefix + area.name;
+				wanted.add(name);
+				const sprite = view ? ED_BOUNDS_VIEW_SPRITE
+					: (area.type === LGT_EDGE ? ED_BOUNDS_EDGE_SPRITE : (area.type === LGT_POPUP ? ED_BOUNDS_POPUP_SPRITE : ED_BOUNDS_SPRITE));
+				const sr = Sprites.get(sprite);
+				const x = view ? box.l - ED_BOUNDS_PAD_X : box.l;
+				const y = view ? box.t - ED_BOUNDS_PAD_Y : box.t;
+				const xs = (box.r - box.l + (view ? ED_BOUNDS_PAD_X * 2 : 0)) / sr.w;
+				const ys = (box.b - box.t + (view ? ED_BOUNDS_PAD_Y * 2 : 0)) / sr.h;
+				const rec = lyr.lsprites.find((x2) => x2.name === name);
+				if (rec === undefined) {
+					const into = lyr;
+					changes.push(() => {
+						const made = EdRoom.record({
+							name: name, spi: sprite, x: x, y: y, x_sc: xs, y_sc: ys,
+							isobj: view ? "oVisBounds" : (area.type === LGT_EDGE ? "oEdgeGroup" : "oGroupBounds"),
+							objinit: "{\"group\": \"" + area.name + "\"}"
+						}, into);
+						made.saved = null;
+						into.lsprites.push(made);
+					});
+				} else if (rec.x - rec.exoffx !== x || rec.y - rec.exoffy !== y || rec.x_sc !== xs || rec.y_sc !== ys) {
+					changes.push(() => {
+						this.keep(rec, ["x", "y", "x_sc", "y_sc"]);
+						rec.x = x + rec.exoffx;
+						rec.y = y + rec.exoffy;
+						rec.x_sc = xs;
+						rec.y_sc = ys;
+						EdRoom.refresh(rec);
+					});
+				}
+			}
+			for (const rec of lyr.lsprites) {
+				if (rec.name.startsWith(prefix) && !wanted.has(rec.name)) {
+					const from = lyr;
+					changes.push(() => from.lsprites.splice(from.lsprites.indexOf(rec), 1));
+				}
+			}
+		}
+		if (changes.length === 0) return false;
+
+		this.push(room, ["layers", "lgroups"]);
+		this.keep(blyrs, ["lsprites"]);
+		for (const change of changes) change();
+		EdRoom.relink(room);
+		// a bounds group made here is a plain group, as the original set it
+		const bgrp = room.lgroups[ED_BOUNDS_GROUP];
+		if (bgrp.saved === null) bgrp.type = LGT_NON;
+		for (const lyr of blyrs) EdGui.pretext(lyr);
+		EdGui.needLyrGuiReset = true;
+		EdView.lenses();
+		ed.rehover = true;
+		ed.debugtxt = " area bounds made again";
+		return true;
+	},
+
 	// The keys that work over the room in any mode, in the original's order.
 	keys() {
 		const ed = Editor;
@@ -607,6 +741,7 @@ const EdEdit = {
 			}
 			this.touch();
 		}
+		if (inp.ctrl && inp.alt && hit("KeyB") && !this.rebuildBounds()) ed.debugtxt = " area bounds already up to date";
 		if (inp.ctrl && hit("KeyC") && this.selects.length > 0) this.copy(false);
 		if (inp.ctrl && hit("KeyX") && this.selects.length > 0) this.copy(true);
 		if (inp.ctrl && hit("KeyV") && this.clip !== null) {
@@ -892,7 +1027,16 @@ const EdEdit = {
 						seldown.tile_loop = t && inp.shift ? 1 : 0;
 						EdRoom.refresh(seldown);
 					} else if (held("KeyB")) {
-						// area backdrops come in a later phase
+						// its area takes its sprite as the backdrop, as the original's did
+						const lg = seldown.mylayer.group !== undefined ? room.lgroups[seldown.mylayer.group] : undefined;
+						if (lg === undefined) {
+							ed.debugtxt = " a B click needs an entry in an area";
+						} else {
+							this.push(lg, ["bdName", "bd_sprite"]);
+							lg.bdName = seldown.spi;
+							lg.bd_sprite = Sprites.exists(seldown.spi) ? seldown.spi : null;
+							ed.debugtxt = " " + lg.name + " backdrop " + seldown.spi;
+						}
 					} else if (held("KeyH")) {
 						seldown.hidden = 1;
 						this.clear();

@@ -9,15 +9,45 @@
 			"type":1,
 			"name":"a",
 			"colheaderi":0
+		},
+		"b":{
+			"bgcolor":"",
+			"folded":0,
+			"size":2,
+			"visible":0,
+			"pre_grp_vis":1,
+			"type":1,
+			"name":"b",
+			"colheaderi":4
+		},
+		"_lyr_bs":{
+			"bgcolor":"",
+			"folded":0,
+			"size":2,
+			"visible":0,
+			"pre_grp_vis":0,
+			"type":0,
+			"name":"_lyr_bs",
+			"colheaderi":8
+		},
+		"c":{
+			"bgcolor":"",
+			"folded":0,
+			"size":2,
+			"visible":0,
+			"pre_grp_vis":1,
+			"type":1,
+			"name":"c",
+			"colheaderi":6
 		}
 	},
-	"camy":101.819053,
-	"camw":416,
+	"camy":-171.662713,
+	"camw":992,
 	"roomw":320,
 	"bd_color":"457C18",
 	"roomh":180,
-	"camh":260,
-	"curlyri":"2",
+	"camh":620,
+	"curlyri":"4",
 	"layers":[
 		{
 			"group":"a",
@@ -221,9 +251,179 @@
 			"visible":1,
 			"name":"a.fg",
 			"spriteList":[]
+		},
+		{
+			"group":"b",
+			"wd":320,
+			"visible":1,
+			"spriteList":[{
+				"x":62.001133,
+				"col":"CAB258",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":125.210111,
+				"spi":"sSolidWh",
+				"name":"18D683"
+			},{
+				"x":28.001133,
+				"col":"CAB258",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":200.210111,
+				"spi":"sSolidWh",
+				"name":"18D684"
+			},{
+				"x":85.001133,
+				"col":"CAB258",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":274.210111,
+				"spi":"sSolidWh",
+				"name":"18D685"
+			}],
+			"name":"b.bg"
+		},
+		{
+			"group":"b",
+			"wd":320,
+			"visible":1,
+			"spriteList":[],
+			"name":"b."
+		},
+		{
+			"group":"c",
+			"wd":320,
+			"visible":1,
+			"spriteList":[{
+				"x":-176.916333,
+				"col":"CA58C7",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":79.569151,
+				"spi":"sSolidWh",
+				"name":"18D686"
+			},{
+				"x":-80.916333,
+				"col":"CA58C7",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":87.569151,
+				"spi":"sSolidWh",
+				"name":"18D687"
+			},{
+				"x":-146.916333,
+				"col":"CA58C7",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":179.569151,
+				"spi":"sSolidWh",
+				"name":"18D688"
+			},{
+				"x":-274.916333,
+				"col":"CA58C7",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":114.569151,
+				"spi":"sSolidWh",
+				"name":"18D689"
+			},{
+				"x":-250.916333,
+				"col":"CA58C7",
+				"y_sc":30.77865,
+				"x_sc":31.350165,
+				"isobj":"oSolidGr",
+				"y":209.569151,
+				"spi":"sSolidWh",
+				"name":"18D68A"
+			}],
+			"name":"c.bg"
+		},
+		{
+			"group":"c",
+			"wd":320,
+			"visible":1,
+			"spriteList":[],
+			"name":"c."
+		},
+		{
+			"group":"_lyr_bs",
+			"locked":1,
+			"wd":320,
+			"visible":0,
+			"spriteList":[{
+				"objinit":»{"group": "a"}«,
+				"x":-10,
+				"y_sc":244,
+				"x_sc":330,
+				"isobj":"oVisBounds",
+				"y":-4,
+				"spi":"sBlankYl",
+				"name":"lyr_vbounds_a"
+			},{
+				"objinit":»{"group": "b"}«,
+				"x":-170,
+				"y_sc":228,
+				"x_sc":250,
+				"isobj":"oVisBounds",
+				"y":-4,
+				"spi":"sBlankYl",
+				"name":"lyr_vbounds_b"
+			},{
+				"objinit":»{"group": "c"}«,
+				"x":-426,
+				"y_sc":212,
+				"x_sc":314,
+				"isobj":"oVisBounds",
+				"y":-36,
+				"spi":"sBlankYl",
+				"name":"lyr_vbounds_c"
+			}],
+			"name":"_lyr_bs.boundsv"
+		},
+		{
+			"group":"_lyr_bs",
+			"locked":1,
+			"wd":320,
+			"visible":0,
+			"spriteList":[{
+				"objinit":»{"group": "a"}«,
+				"x":160,
+				"y_sc":144,
+				"x_sc":160,
+				"isobj":"oGroupBounds",
+				"y":96,
+				"spi":"sBlankOr",
+				"name":"lyr_pbounds_a"
+			},{
+				"objinit":»{"group": "b"}«,
+				"x":0,
+				"y_sc":128,
+				"x_sc":80,
+				"isobj":"oGroupBounds",
+				"y":96,
+				"spi":"sBlankOr",
+				"name":"lyr_pbounds_b"
+			},{
+				"objinit":»{"group": "c"}«,
+				"x":-256,
+				"y_sc":112,
+				"x_sc":144,
+				"isobj":"oGroupBounds",
+				"y":64,
+				"spi":"sBlankOr",
+				"name":"lyr_pbounds_c"
+			}],
+			"name":"_lyr_bs.boundsp"
 		}
 	],
 	"last_ob_flt":"rob",
 	"last_sp_flt":"solid",
-	"camx":86.848369
+	"camx":-323.777351
 }

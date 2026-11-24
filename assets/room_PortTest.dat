@@ -18,7 +18,7 @@
 	"roomh":180,
 	"camh":160,
 	"grid_lock":0,
-	"curlyri":"2",
+	"curlyri":"1",
 	"layers":[
 		{
 			"group":"a",
@@ -264,6 +264,27 @@
 				"y":0.150896,
 				"spi":"eas_bush_sm",
 				"name":"18D66C"
+			},{
+				"spd":"0",
+				"x":62.762148,
+				"isobj":"oGround",
+				"y":-2.849104,
+				"spi":"eas_tree",
+				"name":"18D66D"
+			},{
+				"spd":"0",
+				"x":89.762148,
+				"isobj":"oGround",
+				"y":8.150896,
+				"spi":"eas_tree",
+				"name":"18D66E"
+			},{
+				"spd":"0",
+				"x":81.762148,
+				"isobj":"oGround",
+				"y":31.150896,
+				"spi":"eas_tree",
+				"name":"18D66F"
 			}]
 		},
 		{

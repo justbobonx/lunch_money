@@ -53,6 +53,7 @@ const ED_HELP_COLUMNS = [
 			["numpad -", "flip sideways, SHIFT upright, ALT also mirrors spots"],
 			["numpad +", "quarter turn, SHIFT the other way"],
 			["T click", "tiling on / off, SHIFT T also loops"],
+			["B click selected", "its area takes its sprite as the backdrop"],
 			["A click", "animation stop / start"],
 			["A wheel", "animation start frame"],
 			["S click", "the selection takes the sprite under the mouse"],
@@ -141,6 +142,7 @@ const ED_HELP_COLUMNS = [
 			["ALT SHIFT wheel", "move the current layer"],
 			["SPACE", "show as the player, held only while held"],
 			["CTRL F12", "area backdrops on / off"],
+			["CTRL F11", "outline area bounds, view bounds and stay in boxes, hidden layers too"],
 			["F1", "this help, F1 or ESC closes"]
 		]],
 		["find", [
@@ -163,6 +165,7 @@ const ED_HELP_COLUMNS = [
 			["CTRL S", "save"],
 			["CTRL R", "save and read again"],
 			["CTRL L", "read again"],
+			["CTRL ALT B", "make the area bounds again; saving does it while auto bounds is on"],
 			["CTRL Z", "undo"],
 			["CTRL Y, CTRL SHIFT Z", "redo"]
 		]],
@@ -174,7 +177,7 @@ const ED_HELP_COLUMNS = [
 		]]
 	]
 ];
-const ED_HELP_LATER = "not yet: bounds, area focus";
+const ED_HELP_LATER = "not yet: area focus";
 
 const EdHelp = {
 	el: null,

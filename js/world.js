@@ -991,8 +991,8 @@ class World {
 					});
 				}
 
-				// area bounds find their area
-				if (obj.constructor === oGroupBounds || obj.constructor === oVisBounds) {
+				// area bounds find their area; an edge area's box counts as its bounds too
+				if (obj.constructor === oGroupBounds || obj.constructor === oEdgeGroup || obj.constructor === oVisBounds) {
 					const grp = rm.layer_groups[obj.group];
 					if (grp === undefined) {
 						console.log("bounds " + oname + " name an area the room does not have: " + obj.group);
