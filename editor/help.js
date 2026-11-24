@@ -13,7 +13,6 @@ const ED_HELP_GROUP_GAP = 8;
 const ED_HELP_HEAD_COLOR = "#ffff33";
 const ED_HELP_KEY_COLOR = "#ccccdd";
 const ED_HELP_TEXT_COLOR = "#8888a0";
-const ED_HELP_LATER_COLOR = "#666680";
 const ED_HELP_HOVER_TEXT_COLOR = "#e8e8f0";
 const ED_HELP_HOVER_BACK_COLOR = "#2a2a3c";
 
@@ -89,7 +88,8 @@ const ED_HELP_COLUMNS = [
 			["SHIFT / ALT right click", "the same for every layer / its group"],
 			["double right click", "fold the group"],
 			["SHIFT click folded", "unfold"],
-			["double click folded", "focus on the area"],
+			["double click folded", "focus on the area, its play bounds filling the view"],
+			["CTRL double click folded", "the same, folding and hiding every other group"],
 			["wheel", "change layer, SHIFT moves the layer"],
 			["ENTER", "rename, a cleared name deletes"],
 			["+ row", "add a layer after the current one"],
@@ -177,7 +177,6 @@ const ED_HELP_COLUMNS = [
 		]]
 	]
 ];
-const ED_HELP_LATER = "not yet: area focus";
 
 const EdHelp = {
 	el: null,
@@ -206,8 +205,7 @@ const EdHelp = {
 			+ "#ed_help .row:hover > div { background: " + ED_HELP_HOVER_BACK_COLOR + "; }\n"
 			+ "#ed_help .row:hover .does { color: " + ED_HELP_HOVER_TEXT_COLOR + "; }\n"
 			+ "#ed_help .key { color: " + ED_HELP_KEY_COLOR + "; overflow-wrap: anywhere; padding-right: " + px(ED_HELP_KEY_GAP) + "; }\n"
-			+ "#ed_help .does { overflow-wrap: anywhere; }\n"
-			+ "#ed_help .later { color: " + ED_HELP_LATER_COLOR + "; }\n";
+			+ "#ed_help .does { overflow-wrap: anywhere; }\n";
 		document.head.appendChild(style);
 
 		const el = this.el = document.createElement("div");
@@ -234,7 +232,6 @@ const EdHelp = {
 				}
 			}
 		}
-		add(el, "later", ED_HELP_LATER);
 		document.body.appendChild(el);
 
 		// F1 opens and closes it, escape closes it, and neither reaches the editor or the browser

@@ -102,15 +102,12 @@
 
 ## Editor
 
-Open editor.html in Chrome or Edge, served the same way as the player, and pick the lunch_money folder once. Phases one and two are in: world and room loading, the room list, the layer list, the room drawn close to play, panning and zooming, hovers, selecting and editing entries, the layer list's own editing, the picker bar, undo, and saving with backups. Of phase three the entry, layer and room settings panels are in, of phase four finding, aligning, entry groups, paths, area bounds and B click backdrops, and the F1 help overlay.
+Open editor.html in Chrome or Edge, served the same way as the player, and pick the lunch_money folder once. Phases one and two are in: world and room loading, the room list, the layer list, the room drawn close to play, panning and zooming, hovers, selecting and editing entries, the layer list's own editing, the picker bar, undo, and saving with backups. Of phase three the entry, layer and room settings panels are in, of phase four finding, aligning, entry groups, paths, area bounds, B click backdrops and area focus, and the F1 help overlay.
 
 ### Still to do
 
-Phase four still to do: area focus.
-
 - TestDev arcade groups to tidy by hand: the arcade's front (its green fill and doorway on main) is arcade_fr, which the trigger's script shows and hides, and that works. Four leftover one-entry groups, arcade_fr_1 to arcade_fr_4, look like paste leftovers: the blue inner fill and doorway on midbg (1 and 2), a green strip on main (3) and one on backgrd (4). Nothing names them. Decide which belong with the front and which should be one back group or none.
-- Area focus as the original's F2 click and shift space (fold every area but the one under the mouse).
-- Show a saved room camera spot and the player start.
+- Revisit groups and areas: a layer group is both a folder in the layer list and a play area, picked by its type, which can confuse. Think again about how they are named, made and shown, and whether folders and areas should stay one thing. Includes what group colour should do: the original meant it as the area's background colour but never used it.
 - World settings: no editor panel needed. The world file's other values are kept by the editor itself; only the start room would ever change, and that is for the shipped game, to be settled when we get there.
 
 ### What works
@@ -124,6 +121,7 @@ Phase four still to do: area focus.
 - Saving: control S saves the room, and the world when new names were handed out or a room was added; control R saves and reads the room again; control L reads it again, asking when that would lose changes. The writer gives the original's format exactly, and untouched values are written back as they were read; tools/test_editor_roundtrip.js checks every room and the world come back byte for byte. Every save first copies the old file to assets/backup/<name>.<YYYYMMDD-HHMMSS>.dat, keeping the newest 20 of each; the browser writes to a side file and swaps it in when complete.
 - Area bounds: control alt B makes them again as the original's bounds layer did, and saving does it first while the room's auto bounds is on. Every area but plain groups gets a box round the pictures on its layers that neither scroll apart nor loop, widened out to a 32 grid: its play bounds (lyr_pbounds_ in _lyr_bs.boundsp; oGroupBounds, oEdgeGroup for edge areas, popups purple) and, except for popups, its view bounds padded 170 across and 100 down (lyr_vbounds_ in _lyr_bs.boundsv). The layers are added hidden and locked at the end when missing. Bounds already there are only moved and stretched, so a room whose areas have not changed saves back as it was; bounds of areas that are gone go. One undo step, none when nothing changes. The roundtrip test checks OutForMilk, OFM_caves, OFM_underwater and test_stuff come out as saved.
 - B click on a selected entry makes its sprite its area's backdrop, one undo step.
+- Area focus: a double click on a folded group unfolds it, shows its layers but w and m, makes its main layer current and, for an area with play bounds, zooms so the bounds fill the view with a little room round them and centres on them. A control double click does the same and first folds and hides every other group, plain groups and the bounds group too, as a right click on a folded header hides one (saved, no undo step); a control click on a folded header no longer copies its name.
 - Control F11 outlines play bounds (orange), view bounds (yellow) and stay in boxes (green) on every layer, hidden ones too.
 - Unsaved changes: leaving a room asks save, discard or cancel; leaving the page warns; the room's name and the status line show a star.
 - The entry settings panel (editor/panel.js). Letting go of the right button on an entry selects it (unless already selected) and opens one page panel by the mouse; escape or a press anywhere in the editor closes it (escape drops a change still being typed, a press elsewhere puts it on). While a panel field has the focus the editor takes no keys. It uses assets/fonts/m5x7.ttf at its own 16 pixel size, a whole number of screen pixels to each font pixel.

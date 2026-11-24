@@ -566,7 +566,7 @@ const Editor = {
 		}
 
 		if (EdGui.focuson !== null) {
-			EdGui.focus(EdGui.focuson);
+			EdGui.focus(EdGui.focuson.name, EdGui.focuson.others);
 			EdGui.focuson = null;
 		}
 		// last, so the panel sees whether this step's press opened it or should close it

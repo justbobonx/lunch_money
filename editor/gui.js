@@ -87,6 +87,8 @@ const ED_HUD_BOTTOM_H = 30;
 const ED_HUD_TAG_DX = 20;
 // sublayers that focusing on an area leaves hidden
 const ED_FOCUS_HIDDEN_SUBNAMES = ["w", "m"];
+// the room left round an area's play bounds when focusing on it, as a part of the view, split between both sides
+const ED_FOCUS_MARGIN = 0.1;
 // The entry group fields at the bottom right, as the original's: the group being worked inside,
 // which renames it, over the hovered group's name. Their right ends sit this far from the overlay's
 // right side, and they sit this far up from its bottom.
@@ -120,7 +122,8 @@ const EdGui = {
 	playersHover: -1,
 	// set when folding changed which rows show, the next step pages again
 	needLyrGuiReset: false,
-	// an area to focus on at the end of the step, from a double click on its folded header
+	// an area to focus on at the end of the step, from a double click on its folded header, and whether
+	// control was held, which folds and hides every other group as well
 	focuson: null,
 	// The field being edited, or none: which field, its text, the cursor, the other end of a marked
 	// part, the text before editing, whether any character may be typed, whether a press outside
@@ -491,12 +494,20 @@ const EdGui = {
 		}
 	},
 
-	// Focuses on an area: unfolds it, shows its layers but the hidden sublayers, centres on its bounds
-	// and makes its main layer current. Groups of no area kind are not centred on.
-	focus(name) {
+	// Focuses on an area: unfolds it, shows its layers but the hidden sublayers, zooms so its play bounds
+	// fill the view with a margin, within the view's zoom limits, centres on them and makes its main layer
+	// current. Groups of no area kind are not centred on, and areas with no bounds are only made current.
+	// Asked to, it first folds every other group and hides it, as a right click on a folded header does,
+	// the bounds group too; like that click, the hiding is saved with the room but is no undo step.
+	focus(name, others) {
 		const room = Editor.room;
 		const lgroup = room.lgroups[name];
 		if (lgroup === undefined) return;
+		if (others) {
+			for (const key of Object.keys(room.lgroups)) {
+				if (key !== name) this.fold(room.lgroups[key].col_head_lyr, true);
+			}
+		}
 		this.fold(lgroup.col_head_lyr, false);
 		for (const glyr of lgroup.layers) {
 			glyr.visible = ED_FOCUS_HIDDEN_SUBNAMES.includes(glyr.subname) ? 0 : 1;
@@ -505,7 +516,12 @@ const EdGui = {
 		if (lgroup.type === LGT_NON) return;
 		if (lgroup.bounds !== null) {
 			const b = maskShape(lgroup.bounds, lgroup.bounds.x, lgroup.bounds.y);
-			if (b) EdView.centerOn((b.l + b.r) / 2, (b.t + b.b) / 2);
+			if (b) {
+				const c = Editor.canvas;
+				const fitw = Math.max(b.r - b.l, (b.b - b.t) * c.width / c.height) * (1 + ED_FOCUS_MARGIN);
+				Editor.cam.w = clamp(Math.round(fitw), ED_ZOOM_UNIT * ED_ZOOM_MIN, ED_ZOOM_UNIT * ED_ZOOM_MAX);
+				EdView.centerOn((b.l + b.r) / 2, (b.t + b.b) / 2);
+			}
 		}
 		this.selectLayer(room.layers.findIndex((l) => l.name === name + "."));
 		this.needLyrGuiReset = true;
@@ -635,8 +651,10 @@ const EdGui = {
 		// the name the group or path field renames, the path one only with an entry selected
 		const named = hit.kind === "group" ? EdEdit.inGroup
 			: (hit.kind === "path" && EdEdit.selects.length > 0 ? EdEdit.curPath(EdEdit.selects[0]) : null);
-		// control and a left click copies a field's text, as the original's fields did
-		if (inp.pressed.left && inp.ctrl && hit.kind !== "add") {
+		// control and a left click copies a field's text, as the original's fields did, but not on a
+		// folded group's header, where a control double click focuses on the area alone
+		const foldedHead = hit.kind === "row" && hit.lyr.group !== undefined && room.lgroups[hit.lyr.group].folded;
+		if (inp.pressed.left && inp.ctrl && hit.kind !== "add" && !foldedHead) {
 			navigator.clipboard.writeText(hit.kind === "row" ? hit.lyr.name : (hit.kind === "header" ? room.name
 				: (named !== null ? named : hit.text))).catch(() => {});
 			return true;
@@ -695,7 +713,8 @@ const EdGui = {
 		if (pressed) lyr.txt.lastpress = now;
 		const lgroup = lyr.group !== undefined ? room.lgroups[lyr.group] : undefined;
 
-		// a folded group's header only shows and hides its group, unfolds, or focuses on it
+		// a folded group's header only shows and hides its group, unfolds, or focuses on it, with control
+		// folding and hiding every other group
 		if (lgroup !== undefined && lgroup.folded) {
 			if (inp.pressed.right) {
 				lyr.visible = lyr.visible ? 0 : 1;
@@ -705,7 +724,7 @@ const EdGui = {
 			}
 			if (wh !== 0) this.rotate(wh, false);
 			if (inp.pressed.left && inp.shift) this.fold(lyr, false);
-			if (inp.pressed.left && dbl && this.focuson === null) this.focuson = lyr.group;
+			if (inp.pressed.left && dbl && this.focuson === null) this.focuson = { name: lyr.group, others: inp.ctrl };
 			return true;
 		}
 
