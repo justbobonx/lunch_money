@@ -17,6 +17,9 @@
 		"oStars.js",
 		"oTank.js"
 	],
+	"puzzleBox": [
+		"oPuzBox.js"
+	],
 	"ship": [
 		"goShip.js"
 	]

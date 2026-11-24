@@ -127,6 +127,15 @@
    ]
   },
   {
+   "file": "puzbox.json",
+   "group": "puzbox",
+   "sprites": 15,
+   "size": [
+    1584,
+    32
+   ]
+  },
+  {
    "file": "ship.json",
    "group": "ship",
    "sprites": 61,

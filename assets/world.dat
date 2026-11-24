@@ -1,6 +1,6 @@
 {
 	"curuid":"18D68A",
-	"object_folders":["outformilk","ship"],
+	"object_folders":["outformilk","ship","puzzleBox"],
 	"rooms":[{
 		"name":"TestDev",
 		"index":0

@@ -360,6 +360,8 @@ const ScriptOps = {
 	// An object made at a spot, named when a name is given, with settings laid on, into a layer
 	// by name, the actor's layer, or the pop up layer when none is given. Anything that is not a
 	// layer name, like the minus one some old scripts pass to mean none, also gets the pop up layer.
+	// A script given after the settings, a list of actions or a world script's name, becomes the
+	// object's win script, which a puzzle box runs when it is won and closed.
 	createObj(ca) {
 		let lyr = ca[5];
 		if (lyr === "actor") lyr = this.actor.mylayer;
@@ -370,7 +372,9 @@ const ScriptOps = {
 		} else {
 			const cfg = { x: ca.length > 2 ? ca[2] : 0, y: ca.length > 3 ? ca[3] : 0 };
 			if (ca[4] !== undefined && ca[4] !== 0) cfg.name = ca[4];
-			game.createObject(ca[1], Object.assign(cfg, ca[6]), lyr);
+			Object.assign(cfg, ca[6]);
+			if (ca[7] !== undefined) cfg.winScript = ca[7];
+			game.createObject(ca[1], cfg, lyr);
 		}
 		this.nexta = true;
 	},

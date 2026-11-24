@@ -99,7 +99,7 @@ const INSPECT_PAD = 2;
 const INSPECT_TEXT_COLOR = "#ffffff";
 const INSPECT_BACK_COLOR = "#000000";
 const INSPECT_BACK_ALPHA = 0.6;
-const INSPECT_FIELDS = ["triggerScript", "trigOffScript", "lookScript", "enter_script", "conRoom", "message"];
+const INSPECT_FIELDS = ["triggerScript", "trigOffScript", "lookScript", "enter_script", "winScript", "conRoom", "message"];
 const INSPECT_VALUE_MAX = 40;
 
 // The debug key help, in the middle of the overlay: its font, line spacing, padding and the gap

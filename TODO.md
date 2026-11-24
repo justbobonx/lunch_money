@@ -33,7 +33,6 @@
 - The swimming rat spawns a bubble every update.
 - oDoor's default room roomLIlHouse isn't in the room list, so a door goes nowhere unless its room entry sets one.
 - whynot: the player's layer starts disabled.
-- oPuzBox: the puzzle box minigame (colors, guys, letters, numbers; timer and score), about 1400 lines in the original. Pl_Autumn has eight trig_pb triggers along its left edge that each make one with a different box_type, into the pop up layer. Wanted on a high layer.
 - Death sprays follow whoever did the killing and pass through it: every batch comes from the killer's spot (the rat, the log, the hard landing's own character). Script deaths have no killer here and follow the player; the original followed the script runner, which sits at its trigger.
 - Bubbles count up two each update (the original counts once and again for the wobble), so they fade after 300 updates and are gone at 350, and the wobble jumps back to its start every 80 updates, part way through a swing.
 - The foreground water tiler repeats whole tiles until it passes its stretched size, so a stretch that isn't a whole number of tiles draws a little past its edge (TestDev's water by a pixel each way).
@@ -55,6 +54,20 @@
 - Only looking at the bike gets the player on it. The original got him on for any action, touching and hitting it too.
 - A rider who dies or is hit falls off the bike, keeping the speed the death or the knock gave him. The original kept him pinned to it.
 - A sign (oText) measures its text for centring or right aligning in its own font. The original measured before setting its font, so it used whichever font was drawn last, and two signs at the same spot could land several pixels apart (TestDev's st_rm_text and st_rm_text_1, about 7).
+- Puzzle box (oPuzBox):
+  - Its timer counts updates, so it stops while play or the box is paused. The original counted clock time.
+  - The colour group win check (box types 0 and 1) spreads each kind's first tile through its whole group before looking for strays. The original could miss a group joined only by a winding path, judging a won board unfinished (6 of 4096 boards on 4 by 3).
+  - In the shooting box (box type 3) a tile holds on when it touches the top through any run of tiles. The original could judge a tile hanging on by a winding path loose, so it fell and popped (12 of 4096 boards on 4 by 3).
+  - The word pair picker only starts at whole words. The original could start part way along a line and run off its end.
+  - Quit? and the debug grid are drawn where the view is. The original drew them at the room's top left.
+  - Closing the box puts the controls back as they were before it opened. The original always switched them on.
+  - A grab stops at tiles flashing to pop (box type 3.1). In the original such a tile could be taken and still pop, leaving a copy behind.
+  - Held tiles move with the update, not while drawing.
+  - The hidden cursor of box type 0 no longer moves.
+  - A one tile chain let go (box type 5) is cleared. The original kept it, so it came back as the last chain.
+  - The answer shown on a lost letter box (box type 2) has each letter in its own colour. The original kept the old tile's colour.
+  - Leaving the room closes the box. The pop up layer is shared by every room and keeps its objects through a room change, so the box would otherwise go on over the next room.
+  - A won box runs a win script when it is closed: an extra value after the settings of the createObj script action, or the winScript field of a placed box. Losing or quitting runs nothing. The original had no hook.
 
 ### Notes
 
