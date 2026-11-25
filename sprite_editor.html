@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lunch Money sprite editor</title>
+<style>
+	* { box-sizing: border-box; }
+	html, body { margin: 0; min-height: 100%; background: #12121a; color: #ccccdd; font: 14px/1.4 sans-serif; }
+	[hidden] { display: none !important; }
+	button, input, select { font: 13px sans-serif; background: #1a1a22; color: #ccccdd; border: 1px solid #44445a; padding: 2px 6px; }
+	button { cursor: pointer; }
+	button:hover:not(:disabled) { border-color: #8888aa; }
+	button:disabled { opacity: 0.45; cursor: default; }
+	button.primary { border-color: #66aa66; color: #ccffcc; }
+	button.active { border-color: #ffff33; color: #ffff33; background: #262634; }
+	input.invalid { border-color: #ff4444; background: #2d181c; color: #ffaaaa; }
+	canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+	#ed_gate { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+		background: #000000; opacity: 0.94; z-index: 20; }
+	#ed_gate .box { background: #1a1a22; border: 1px solid #44445a; padding: 20px 26px; max-width: 460px; }
+	#ed_gate h1 { margin: 0 0 10px; font-size: 18px; color: #ffff33; }
+	#ed_gate p { margin: 0 0 14px; white-space: pre-line; }
+	#ed_gate button { font: 14px sans-serif; padding: 6px 12px; margin-right: 8px; }
+
+	#ed_ask { background: #1a1a22; border: 1px solid #44445a; color: #ccccdd; font: 14px sans-serif; padding: 18px 22px; max-width: 460px; }
+	#ed_ask::backdrop { background: #000000; opacity: 0.55; }
+	#ed_ask p { margin: 0 0 14px; white-space: pre-line; }
+	#ed_ask button { font: 14px sans-serif; padding: 6px 12px; margin-right: 8px; }
+
+	.toolbar-bar { position: sticky; top: 0; z-index: 10; background: #12121a; padding: 6px; border-bottom: 1px solid #2e2e42; }
+	.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 1120px; margin: 0 auto;
+		background: #1a1a22; border: 1px solid #2e2e42; padding: 6px; }
+	.toolbar input[type="text"] { width: 170px; }
+	.toolbar select { max-width: 320px; }
+	.status { margin-left: auto; font-size: 13px; color: #99bb99; }
+	.status.status-err { color: #ff6666; }
+
+	.wrap { max-width: 1120px; margin: 0 auto; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+	.section { background: #1a1a22; border: 1px solid #2e2e42; padding: 6px; }
+
+	.identity { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+	.identity .name { font-size: 20px; font-weight: bold; color: #ffff33; }
+	.identity .group-text { color: #33ffff; font-size: 14px; }
+	.identity .strip-info { margin-left: auto; color: #aaaabb; font-size: 13px; }
+	.badge { display: inline-block; padding: 1px 6px; font-size: 11px; border: 1px solid #44445a; color: #aaaabb; }
+	.badge-new { border-color: #ffaa55; color: #ffaa55; }
+	.badge-packed { border-color: #44ccff; color: #44ccff; }
+	.badge-loose { border-color: #8888a0; color: #aaaabb; }
+	.error-banner { margin: 0 0 6px; padding: 6px; background: #2d181c; border: 1px solid #ff4444; color: #ff8888; font-size: 13px; }
+
+	.params { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 42px; }
+	.param-col { display: flex; flex-direction: column; gap: 6px; }
+	.param-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+	.param-row label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #aaaabb; white-space: nowrap; }
+	.param-row .row-label { font-size: 12px; color: #aaaabb; }
+	.param-row input[type="number"] { width: 52px; padding: 2px 4px; }
+	.param-row select { width: 72px; padding: 2px 4px; }
+
+	.view-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+	.view-controls { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #aaaabb; }
+	.strip-scroll { overflow-x: auto; padding: 0; }
+	#se_strip_canvas { display: block; border: 1px solid #44445a; cursor: pointer; }
+	#se_strip_canvas.invalid-strip { border-color: #ff4444; }
+
+	.edit-toggle { display: inline-flex; gap: 6px; margin: 0 0 6px; }
+	.preview-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+	#se_preview_canvas { display: block; border: 1px solid #44445a; cursor: crosshair; }
+	.preview-side { display: flex; flex-direction: column; gap: 6px; min-width: 240px; }
+	.play-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+	.readout { font-size: 13px; color: #ccccdd; }
+	.legend { font-size: 12px; color: #8888a0; display: flex; flex-direction: column; gap: 2px; }
+	.swatch-origin { color: #ffff33; }
+	.swatch-mask { color: #33ff77; }
+</style>
+</head>
+<body>
+<div id="ed_gate">
+	<div class="box">
+		<h1>Lunch Money sprite editor</h1>
+		<p id="ed_gate_msg">Pick the lunch_money folder so the sprite editor can read and save sprite files.</p>
+		<button id="ed_reopen" hidden></button>
+		<button id="ed_pick">Pick the lunch_money folder</button>
+	</div>
+</div>
+
+<dialog id="ed_ask">
+	<p id="ed_ask_msg"></p>
+	<div id="ed_ask_buttons"></div>
+</dialog>
+
+<div class="toolbar-bar">
+	<div class="toolbar">
+		<input id="se_search" type="text" placeholder="Filter sprites...">
+		<select id="se_group_filter"></select>
+		<select id="se_picker"></select>
+		<button id="se_save" class="primary" disabled>Save</button>
+		<button id="se_revert" disabled>Revert</button>
+		<span id="se_status" class="status">Open the lunch_money folder to begin.</span>
+	</div>
+</div>
+
+<div class="wrap">
+	<div class="section">
+		<div class="identity">
+			<span id="se_name" class="name">-</span>
+			<span id="se_new_badge" class="badge badge-new" hidden>new</span>
+			<span class="group-text">Group: <strong id="se_group">-</strong></span>
+			<span id="se_pack_badge" class="badge">-</span>
+			<span id="se_strip_info" class="strip-info">-</span>
+		</div>
+		<div id="se_error_banner" class="error-banner" hidden></div>
+		<div class="params">
+			<div class="param-col">
+				<div class="param-row">
+					<span class="row-label">size</span>
+					<label>w <input id="se_w" type="number" min="1" step="1"></label>
+					<label>h <input id="se_h" type="number" min="1" step="1"></label>
+				</div>
+				<div class="param-row">
+					<span class="row-label">origin</span>
+					<label>x <input id="se_ox" type="number" step="1"></label>
+					<label>y <input id="se_oy" type="number" step="1"></label>
+				</div>
+				<div class="param-row">
+					<label>frames <input id="se_frames" type="number" min="1" step="1"></label>
+					<label>speed <input id="se_image_speed" type="number" min="0" step="any"></label>
+				</div>
+			</div>
+			<div class="param-col">
+				<div class="param-row">
+					<label>mask
+						<select id="se_mask_kind">
+							<option value="rect">rect</option>
+							<option value="circle">circle</option>
+						</select>
+					</label>
+				</div>
+				<div class="param-row">
+					<label>x <input id="se_mask_x" type="number" step="1"></label>
+					<label>y <input id="se_mask_y" type="number" step="1"></label>
+				</div>
+				<div class="param-row" id="se_wrap_mask_wh">
+					<label>w <input id="se_mask_w" type="number" min="0" step="1"></label>
+					<label>h <input id="se_mask_h" type="number" min="0" step="1"></label>
+				</div>
+				<div class="param-row" id="se_wrap_mask_r" hidden>
+					<label>r <input id="se_mask_r" type="number" min="0" step="any"></label>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="section">
+		<div class="view-header">
+			<div class="view-controls">
+				<span id="se_strip_hint">-</span>
+				<label>Zoom
+					<select id="se_strip_zoom">
+						<option value="1">1x</option>
+						<option value="2">2x</option>
+						<option value="4">4x</option>
+						<option value="6">6x</option>
+						<option value="8">8x</option>
+						<option value="12">12x</option>
+					</select>
+				</label>
+			</div>
+		</div>
+		<div class="strip-scroll">
+			<canvas id="se_strip_canvas"></canvas>
+		</div>
+	</div>
+
+	<div class="section">
+		<div class="view-header">
+			<div class="view-controls">
+				<span id="se_hover_readout">Click preview to set origin</span>
+				<label>Zoom
+					<select id="se_preview_zoom">
+						<option value="2">2x</option>
+						<option value="4">4x</option>
+						<option value="8">8x</option>
+						<option value="12">12x</option>
+						<option value="16">16x</option>
+						<option value="24">24x</option>
+					</select>
+				</label>
+			</div>
+		</div>
+		<div class="edit-toggle">
+			<button type="button" id="se_edit_origin" class="active">Origin</button>
+			<button type="button" id="se_edit_mask">Mask</button>
+		</div>
+		<div class="preview-row">
+			<canvas id="se_preview_canvas"></canvas>
+			<div class="preview-side">
+				<div id="se_frame_readout" class="readout">Frame 1 / 1</div>
+				<div class="play-buttons">
+					<button id="se_btn_loop">Loop</button>
+					<button id="se_btn_once">Play once</button>
+					<button id="se_btn_stop" class="active">Stop</button>
+					<button id="se_btn_prev">Step back</button>
+					<button id="se_btn_next">Step forward</button>
+				</div>
+				<div class="legend">
+					<span class="swatch-origin">Yellow crosshair: origin</span>
+					<span class="swatch-mask">Green box: collision mask</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+	const WORLD_FILE = "assets/world.dat";
+</script>
+<script src="editor/folder.js"></script>
+<script src="editor/sprite_packer.js"></script>
+<script src="editor/sprite_editor.js"></script>
+<script>
+	SpriteEditor.start();
+</script>
+</body>
+</html>
