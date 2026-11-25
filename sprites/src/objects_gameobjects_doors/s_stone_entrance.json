@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 14,
   "h": 6,
-  "x": -7,
-  "y": 0
+  "x": 1,
+  "y": 1
  },
  "image_speed": 0.5,
  "group": "objects_gameobjects_doors"

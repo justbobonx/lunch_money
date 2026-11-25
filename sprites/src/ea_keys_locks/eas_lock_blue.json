@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 6,
   "h": 5,
-  "x": -3,
-  "y": -3
+  "x": 0,
+  "y": 0
  },
  "image_speed": 0.5,
  "group": "ea_keys_locks"

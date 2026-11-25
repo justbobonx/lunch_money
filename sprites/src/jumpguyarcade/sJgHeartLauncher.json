@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 46,
   "h": 10,
-  "x": -23,
-  "y": -3
+  "x": 0,
+  "y": 4
  },
  "image_speed": 0.25,
  "group": "jumpguyarcade"

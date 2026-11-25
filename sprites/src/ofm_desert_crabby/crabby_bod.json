@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 22,
   "h": 13,
-  "x": -4,
-  "y": 3
+  "x": 5,
+  "y": 13
  },
  "image_speed": 0.5,
  "group": "ofm_desert_crabby"

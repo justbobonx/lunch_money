@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 95,
   "h": 21,
-  "x": -48,
-  "y": -10
+  "x": 0,
+  "y": 2
  },
  "image_speed": 0.25,
  "group": "weather"

@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 7,
   "h": 5,
-  "x": -3,
-  "y": -4
+  "x": 3,
+  "y": 8
  },
  "image_speed": 0.25,
  "group": "doggie"

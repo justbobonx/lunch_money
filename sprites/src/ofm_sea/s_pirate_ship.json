@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 66,
   "h": 6,
-  "x": -33,
-  "y": -8
+  "x": 1,
+  "y": 45
  },
  "image_speed": 0.5,
  "group": "ofm_sea"

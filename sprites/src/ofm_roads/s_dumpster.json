@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 18,
   "h": 12,
-  "x": -9,
-  "y": -11
+  "x": 1,
+  "y": 0
  },
  "image_speed": 0.5,
  "group": "ofm_roads"

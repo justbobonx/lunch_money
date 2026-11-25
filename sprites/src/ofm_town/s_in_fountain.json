@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 8,
   "h": 5,
-  "x": -4,
-  "y": -3
+  "x": 0,
+  "y": 3
  },
  "image_speed": 0.5,
  "group": "ofm_town"

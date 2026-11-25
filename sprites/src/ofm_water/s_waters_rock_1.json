@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 12,
   "h": 7,
-  "x": -6,
-  "y": -6
+  "x": 4,
+  "y": 6
  },
  "image_speed": 0.05,
  "group": "ofm_water"

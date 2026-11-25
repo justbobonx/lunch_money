@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 18,
   "h": 2,
-  "x": -8,
-  "y": -2
+  "x": 4,
+  "y": 8
  },
  "image_speed": 0.166667,
  "group": "wynot_jnc"

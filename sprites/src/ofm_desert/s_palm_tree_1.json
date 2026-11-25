@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 5,
   "h": 10,
-  "x": -3,
-  "y": -7
+  "x": 6,
+  "y": 13
  },
  "image_speed": 0.5,
  "group": "ofm_desert"

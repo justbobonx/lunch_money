@@ -7,8 +7,8 @@
  "mask": {
   "kind": "circle",
   "r": 7.0,
-  "x": 0.0,
-  "y": 0.0
+  "x": 7.0,
+  "y": 7.0
  },
  "image_speed": 0.2,
  "group": "jumpguyarcade"

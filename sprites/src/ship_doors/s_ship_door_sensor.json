@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 35,
   "h": 27,
-  "x": -17,
-  "y": -16
+  "x": -3,
+  "y": -4
  },
  "image_speed": 0.333333,
  "group": "ship_doors"

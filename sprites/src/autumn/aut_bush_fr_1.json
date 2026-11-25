@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 38,
   "h": 18,
-  "x": -18,
-  "y": -16
+  "x": 3,
+  "y": 12
  },
  "image_speed": 0.5,
  "group": "autumn"

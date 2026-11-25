@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 6,
   "h": 4,
-  "x": -3,
-  "y": -4,
+  "x": 0,
+  "y": 0,
   "rotates": true
  },
  "image_speed": 0.25,

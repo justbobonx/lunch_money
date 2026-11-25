@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 10,
   "h": 11,
-  "x": -5,
-  "y": -6
+  "x": 3,
+  "y": 2
  },
  "image_speed": 0.5,
  "group": "ofm_forest"

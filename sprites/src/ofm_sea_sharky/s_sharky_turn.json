@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 18,
   "h": 16,
-  "x": -13,
-  "y": -10
+  "x": 1,
+  "y": 0
  },
  "image_speed": 0.066667,
  "group": "ofm_sea_sharky"

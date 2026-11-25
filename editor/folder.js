@@ -91,17 +91,46 @@ const EdFolder = {
 		return fh.getFile();
 	},
 
-	// Writes a file's new text. What it held before goes to the backup folder first, named by the
-	// file and the time down to the second, counting on when two saves share a second, and only the
+	// Returns the folder handle at a path from the game's folder, walking one folder at a time.
+	async folderAt(path, create) {
+		const parts = path.split("/").filter((p) => p !== "" && p !== ".");
+		let dir = this.handle;
+		for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: create });
+		return dir;
+	},
+
+	// Lists the subfolder names and file names directly inside a folder, skipping hidden names.
+	async list(path) {
+		const dir = await this.folderAt(path, false);
+		const dirs = [];
+		const files = [];
+		for await (const [name, entry] of dir.entries()) {
+			if (name.startsWith(".")) continue;
+			if (entry.kind === "directory") dirs.push(name);
+			else if (entry.kind === "file") files.push(name);
+		}
+		return { dirs: dirs, files: files };
+	},
+
+	// Removes a file inside the folder if it exists.
+	async remove(path) {
+		try {
+			const at = await this.dirAt(path, false);
+			await at.dir.removeEntry(at.name);
+		} catch (e) {}
+	},
+
+	// Writes a file's new text or bytes. What it held before goes to the backup folder first, named by
+	// the file and the time down to the second, counting on when two saves share a second, and only the
 	// newest of a file's backups are kept.
-	async save(path, text) {
+	async save(path, data) {
 		const at = await this.dirAt(path, true);
 		const dot = at.name.lastIndexOf(".");
 		const base = dot > 0 ? at.name.substring(0, dot) : at.name;
 		const ext = dot > 0 ? at.name.substring(dot) : "";
 		let old = null;
 		try {
-			old = await (await (await at.dir.getFileHandle(at.name)).getFile()).text();
+			old = await (await (await at.dir.getFileHandle(at.name)).getFile()).arrayBuffer();
 		} catch (e) {
 			old = null;
 		}
@@ -130,13 +159,14 @@ const EdFolder = {
 			for (const b of mine.slice(0, Math.max(0, mine.length - ED_BACKUP_KEEP))) await bdir.removeEntry(b.key);
 		}
 		const w = await (await at.dir.getFileHandle(at.name, { create: true })).createWritable();
-		await w.write(text);
+		await w.write(data);
 		await w.close();
 	},
 
 	// The readers the player's loaders take, all reading through the folder. They are arrow functions
 	// so they can be handed over on their own.
 	readText: (path) => EdFolder.fileAt(path).then((f) => f.text()),
+	readBytes: (path) => EdFolder.fileAt(path).then((f) => f.arrayBuffer()).then((b) => new Uint8Array(b)),
 	readJson: (path) => EdFolder.fileAt(path).then((f) => f.text()).then((t) => JSON.parse(t)),
 	loadImage: (path) => EdFolder.fileAt(path).then((f) => createImageBitmap(f)),
 

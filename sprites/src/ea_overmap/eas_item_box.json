@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 18,
   "h": 18,
-  "x": -1,
-  "y": -1
+  "x": 0,
+  "y": 0
  },
  "image_speed": 0.5,
  "group": "ea_overmap"

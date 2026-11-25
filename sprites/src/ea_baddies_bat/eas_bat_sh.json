@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 18,
   "h": 10,
-  "x": -9,
-  "y": 11
+  "x": 2,
+  "y": 6
  },
  "image_speed": 0.2,
  "group": "ea_baddies_bat"

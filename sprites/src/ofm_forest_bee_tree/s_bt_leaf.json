@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 10,
   "h": 8,
-  "x": -3,
-  "y": -3
+  "x": 0,
+  "y": 0
  },
  "image_speed": 0.5,
  "group": "ofm_forest_bee_tree"

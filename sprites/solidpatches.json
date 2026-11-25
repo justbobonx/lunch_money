@@ -100,8 +100,8 @@
 "kind":"rect",
 "w":4,
 "h":4,
-"x":-2,
-"y":-4,
+"x":0,
+"y":0,
 "rotates":true
 },
 "image_speed":0.25,
@@ -123,8 +123,8 @@
 "kind":"rect",
 "w":2,
 "h":2,
-"x":-1,
-"y":-1,
+"x":0,
+"y":0,
 "rotates":true
 },
 "image_speed":0.25,
@@ -146,8 +146,8 @@
 "kind":"rect",
 "w":2,
 "h":2,
-"x":-1,
-"y":-1,
+"x":0,
+"y":0,
 "rotates":true
 },
 "image_speed":0.25,
@@ -479,7 +479,7 @@
 "kind":"rect",
 "w":18,
 "h":16,
-"x":-2,
+"x":0,
 "y":0
 },
 "image_speed":0.5,
@@ -611,8 +611,8 @@
 "kind":"rect",
 "w":2,
 "h":2,
-"x":-1,
-"y":-1
+"x":0,
+"y":0
 },
 "image_speed":0.25,
 "frames":[
@@ -678,8 +678,8 @@
 "kind":"rect",
 "w":16,
 "h":14,
-"x":-8,
-"y":-7
+"x":0,
+"y":1
 },
 "image_speed":0.5,
 "frames":[
@@ -701,7 +701,7 @@
 "w":1,
 "h":2,
 "x":0,
-"y":-1
+"y":0
 },
 "image_speed":0.5,
 "frames":[

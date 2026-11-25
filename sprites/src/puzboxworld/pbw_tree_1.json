@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 24,
   "h": 43,
-  "x": -11,
-  "y": -42
+  "x": 5,
+  "y": 5
  },
  "image_speed": 0.5,
  "group": "puzboxworld"

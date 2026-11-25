@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 8,
   "h": 8,
-  "x": -4,
-  "y": -7
+  "x": 1,
+  "y": 1
  },
  "image_speed": 0.25,
  "group": "ofm_signs"

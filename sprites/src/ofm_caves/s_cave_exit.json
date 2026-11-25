@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 12,
   "h": 6,
-  "x": -6,
-  "y": 0
+  "x": 4,
+  "y": 25
  },
  "image_speed": 0.5,
  "group": "ofm_caves"

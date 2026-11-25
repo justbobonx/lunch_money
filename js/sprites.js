@@ -35,6 +35,16 @@ function spriteSourceFromAddress() {
 	return SPRITE_SOURCE;
 }
 
+// A stored mask is measured from the frame's top left. The rest of the game uses the same box
+// or circle measured from the origin, so the loader shifts it once here.
+function maskFromStored(mask, ox, oy) {
+	if (!mask) return mask;
+	const out = Object.assign({}, mask);
+	if (out.x !== undefined) out.x = out.x - ox;
+	if (out.y !== undefined) out.y = out.y - oy;
+	return out;
+}
+
 // Every sprite name a saved room places, found by reading the text, so they can be loaded first.
 function spriteNamesInRoom(text) {
 	const names = new Set();
@@ -120,7 +130,7 @@ const Sprites = {
 		for (let i = 0; i < s.frames; i++) frames.push([i * s.w, 0, s.w, s.h]);
 		return {
 			name: name, w: s.w, h: s.h, ox: s.ox, oy: s.oy,
-			mask: s.mask, imageSpeed: s.image_speed, frameCount: s.frames, frames: frames,
+			mask: maskFromStored(s.mask, s.ox, s.oy), imageSpeed: s.image_speed, frameCount: s.frames, frames: frames,
 			image: null, group: group, state: "index", guessed: false
 		};
 	},

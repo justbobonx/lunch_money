@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 10,
   "h": 4,
-  "x": -68,
-  "y": -4
+  "x": 7,
+  "y": 37
  },
  "image_speed": 0.283333,
  "group": "chars"

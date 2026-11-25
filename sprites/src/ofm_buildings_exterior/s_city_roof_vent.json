@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 9,
   "h": 11,
-  "x": -4,
-  "y": -9
+  "x": 1,
+  "y": 0
  },
  "image_speed": 0.5,
  "group": "ofm_buildings_exterior"

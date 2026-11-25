@@ -10,8 +10,8 @@
 "kind":"rect",
 "w":4,
 "h":4,
-"x":-1,
-"y":-3
+"x":1,
+"y":1
 },
 "image_speed":0.066667,
 "frames":[
@@ -32,8 +32,8 @@
 "kind":"rect",
 "w":4,
 "h":1,
-"x":-2,
-"y":1
+"x":0,
+"y":0
 },
 "image_speed":0.5,
 "frames":[
@@ -54,8 +54,8 @@
 "kind":"rect",
 "w":8,
 "h":8,
-"x":-4,
-"y":-4
+"x":0,
+"y":0
 },
 "image_speed":0.5,
 "frames":[
@@ -76,8 +76,8 @@
 "kind":"rect",
 "w":8,
 "h":1,
-"x":-4,
-"y":3
+"x":0,
+"y":0
 },
 "image_speed":0.5,
 "frames":[
@@ -120,8 +120,8 @@
 "kind":"rect",
 "w":12,
 "h":13,
-"x":-6,
-"y":-6
+"x":0,
+"y":0
 },
 "image_speed":0.5,
 "frames":[
@@ -164,8 +164,8 @@
 "kind":"rect",
 "w":8,
 "h":8,
-"x":-4,
-"y":-4
+"x":0,
+"y":0
 },
 "image_speed":0.5,
 "frames":[

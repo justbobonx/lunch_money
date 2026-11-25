@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 3,
   "h": 5,
-  "x": -1,
-  "y": -2
+  "x": 2,
+  "y": 5
  },
  "image_speed": 0.25,
  "group": "inventory"

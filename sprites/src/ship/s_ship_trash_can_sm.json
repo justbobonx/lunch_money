@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 7,
   "h": 5,
-  "x": -3,
-  "y": -5
+  "x": 1,
+  "y": 8
  },
  "image_speed": 0.5,
  "group": "ship"

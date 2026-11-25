@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 8,
   "h": 2,
-  "x": -4,
-  "y": -1
+  "x": 0,
+  "y": 6
  },
  "image_speed": 0.016667,
  "group": "backgrounds"

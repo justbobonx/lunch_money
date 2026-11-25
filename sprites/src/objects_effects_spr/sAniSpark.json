@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 9,
   "h": 9,
-  "x": -4,
-  "y": -4
+  "x": 0,
+  "y": 0
  },
  "image_speed": 0.2,
  "group": "objects_effects_spr"

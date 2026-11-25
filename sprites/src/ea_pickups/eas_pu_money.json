@@ -8,8 +8,8 @@
   "kind": "rect",
   "w": 8,
   "h": 9,
-  "x": -4,
-  "y": -8
+  "x": 2,
+  "y": 2
  },
  "image_speed": 0.1,
  "group": "ea_pickups"
