@@ -2,6 +2,9 @@
 	"editor": [
 		"oGuyPlacer.js"
 	],
+	"gameBox": [
+		"goGameBox.js"
+	],
 	"outformilk": [
 		"goFarm.js",
 		"goItems.js",

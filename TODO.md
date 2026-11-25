@@ -18,7 +18,7 @@
 - Locker contents are not saved: whatever is moved into or out of an oShipLocker is lost when the room reloads (restart, room picker, a fresh visit), and its start items come back. Goes with the world save.
 - The ship console screen leaves out the original's choice menu (screenacttree, the prompt with the blinking cursor) and the consoles' actonScript room setting, which nothing runs (on the teleport console it only loops a sparkle script, flavour). Port them when a console needs a real menu.
 - Pre-draw events don't run.
-- Missing sprites: sGameBoxV, guy_stand_2, s_city_roof_wh, sBlock, s_egg, s_tnt, s_honeycomb.
+- Missing sprites: guy_stand_2, s_city_roof_wh, sBlock, s_egg, s_tnt, s_honeycomb.
 - Stand-in objects get only their parent's behavior, not the original's own create settings (oGrGrass was one, now ported). Each remaining stand-in needs a real class or room config.
 - eaoHole: a top down floor zone that drops the player into a hole (fall animation, half a life, a short respawn script). No room uses it yet; needs the fall-in-hole pieces.
 - oBoat: when ported, it should run the floor zone check with real speed values like the player does; the original passed none, which would break the sideways slope.
@@ -41,6 +41,8 @@
 - Blood that stops on a solid with no lifetime stays until revive or a room switch, keeping its burst alive with it.
 - The top down death splatter never runs: the original never sets how much to splatter.
 - Angles still use GM's convention: degrees, counterclockwise, with y down (pointDirection, lengthdir and everything built on them). Convert to radians and the usual JS direction later.
+- Spaze: a falling ship is always taken out once the hit check runs, even when the shot missed and it has not reached the bottom, so ships vanish as soon as they move or a shot is in the air. The original did this too.
+- Spaze: a ship that hits a shield still counts toward the next round. Pressing fire again pulls the shot back to the gun. There is no win.
 
 ### Changes from the original
 
@@ -68,6 +70,16 @@
   - The answer shown on a lost letter box (box type 2) has each letter in its own colour. The original kept the old tile's colour.
   - Leaving the room closes the box. The pop up layer is shared by every room and keeps its objects through a room change, so the box would otherwise go on over the next room.
   - A won box runs a win script when it is closed: an extra value after the settings of the createObj script action, or the winScript field of a placed box. Losing or quitting runs nothing. The original had no hook.
+
+- Arcade cabinet (oGameBoxV):
+  - Leaving puts the zoom, the camera's target and the controls back as they were before the game started. The original always zoomed to one and switched the controls on.
+  - Munchie and Spaze keep a lowest pace of one and a shortest power time of one, so a late round never divides by zero or sets a negative time.
+  - Munchie starts at round one. X after a clear or a death starts the current round again; waiting through the flash still goes on to the next. The original started at zero and X sent you back there.
+  - Munchie's walls are drawn from the maze picture, in the wall colour, flashing after a clear. The original tinted a missing picture, so the walls never showed.
+  - Munchie checks for a hit after everyone has moved, so two pieces swapping through each other still collide.
+  - Destroying the cabinet also removes its game and its snow. The original tried to remove the game from the wrong value and left the snow behind.
+  - A cleared Munchie board runs the cabinet's win script, given by the script that made it or by the room it is placed in, each time a board is cleared. The original had no hook.
+  - The unused throwaway picture and the empty destroy calls are gone.
 
 ### Notes
 
@@ -112,6 +124,11 @@
 - Room picker has no gamepad support.
 - Drawing the room at 640×360 instead of full screen resolution, if fps is still poor in heavier rooms.
 - Particles use plain random, while the rest of the port uses its seeded generator; switch them if replays ever matter.
+- Puzzle box at 32 pixel tiles: the big guy sprites (s_pb_box_guys_32) look better, so allow a box with 32 pixel cells. The tile size is one setting, but it needs 32 pixel empty cell and circuit sprites, and colour, letter and number tiles if those modes go big too.
+- Puzzle box money exchanger type: tiles of 1, 5, 10, 50, 100, 500 and 1000 that merge up into the next value, with a 1000 popping. Needs its own number tiles, which Bob will draw.
+- DodgeEm is unfinished, as in the original: only the car's steering and speed. The road pictures (sMBGDodgeEm, sMBGDodgeEm_cur_r) are packed and ready.
+- sGameBoxH, a wide cabinet picture, is packed and unused.
+- The arcade cabinet in OutForMilk sits in the swamp.bg layer, so it may be decoration you cannot use.
 
 ## Editor
 

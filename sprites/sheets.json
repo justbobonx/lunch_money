@@ -55,6 +55,15 @@
    ]
   },
   {
+   "file": "gamebox.json",
+   "group": "gamebox",
+   "sprites": 7,
+   "size": [
+    281,
+    38
+   ]
+  },
+  {
    "file": "guy.json",
    "group": "guy",
    "sprites": 46,

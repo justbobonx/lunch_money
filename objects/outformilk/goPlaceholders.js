@@ -7,6 +7,3 @@ class oBouncer extends oObject {
 	}
 }
 oBouncer.ported = false;
-
-class oGameBoxV extends oIaBgObject {}
-oGameBoxV.ported = false;

@@ -2,12 +2,12 @@
 	"layer_groups":{
 		
 	},
-	"camy":394,
-	"camw":1120,
+	"camy":-157.385797,
+	"camw":1760,
 	"roomw":320,
 	"bd_color":"000000",
 	"roomh":180,
-	"camh":700,
+	"camh":1100,
 	"grid_lock":0,
 	"layers":[
 		{
@@ -4840,6 +4840,9 @@
 					"name":"st_rm_text"
 				},
 				{
+					"objinit":»{
+						"gamename": "oGbGameMunchie"
+					}«,
 					"x":-615,
 					"isobj":"oGameBoxV",
 					"y":480,
@@ -5811,10 +5814,10 @@
 		}
 	],
 	"grid_size":8,
-	"curlyri":"5",
+	"curlyri":"4",
 	"last_ob_flt":"sc",
-	"last_sp_flt":"bou",
+	"last_sp_flt":"",
 	"autogen_boundry_layers":null,
 	"room_init":»{}«,
-	"camx":-649.765625
+	"camx":-1351.738754
 }

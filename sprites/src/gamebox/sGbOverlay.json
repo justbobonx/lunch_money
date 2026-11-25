@@ -1,0 +1,16 @@
+{
+ "w": 15,
+ "h": 20,
+ "frames": 5,
+ "ox": 0,
+ "oy": 0,
+ "mask": {
+  "kind": "rect",
+  "w": 15,
+  "h": 20,
+  "x": 0,
+  "y": 0
+ },
+ "image_speed": 0.033333,
+ "group": "gamebox"
+}

@@ -22,11 +22,9 @@ const SPRITE_ALWAYS_LOAD = ["sBgBlox3", "sBgBlox_btm_out", "s_msg_done"];
 // size used for any level sprite that is neither in the index nor guessed
 const UNKNOWN_SPRITE_SIZE = 16;
 
-// Sprites the game asks for that are missing from the converted set.
-// The size is a guess from how TestDev places it, and the mask is the whole image.
-const SPRITE_GUESSES = {
-	sGameBoxV: { w: 16, h: 24, ox: 0, oy: 0 }
-};
+// Sprites a room can place that are not in the converted set, with a guessed size and a mask
+// of the whole picture, so they show as a faint box until their art arrives.
+const SPRITE_GUESSES = {};
 
 // picks the source from the page address when there is one
 function spriteSourceFromAddress() {
