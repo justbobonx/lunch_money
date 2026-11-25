@@ -8,9 +8,12 @@
 //            a while. Clearing the board flashes the walls, runs the cabinet's win script, then
 //            starts the next round a little faster. X after a death or during the flash starts
 //            the current round again.
-//   Spaze    move along the bottom and fire up at falling ships; a row of shields at the bottom
-//            takes one hit each. There is no win; X after a death starts again.
-//   DodgeEm  only the car's steering and speed so far, as in the original.
+//   Spaze    move the ship along the bottom and fire up at waves of falling vaders; a row of
+//            shields at the bottom takes one hit each. There is no win; X after a death starts
+//            again from the first round.
+//   DodgeEm  hold A to build speed, steer across five slots, and dodge the cars ahead until the
+//            red line at the top fills; a full line wins, flashes, runs the cabinet's win script
+//            and starts a harder race. X after a death starts the current race again.
 // Times and speeds count updates, so they stop while play is paused.
 
 // the screen's size in pixels, and where it sits on the cabinet
@@ -88,7 +91,7 @@ const GB_MUNCHIE_BOARD = [
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 ];
 
-// Spaze: the sky, the ship, its sides, the gun ready and the gun after a shot, the shot and its trail
+// Spaze: the sky, the player's ship, its sides, the gun ready and the gun after a shot, the shot and its trail
 const GB_SPAZE_START = 7;
 const GB_SPAZE_SPRITE = "sMBGSpaze";
 const GB_SPAZE_SHIP = "#00ffff";
@@ -98,9 +101,6 @@ const GB_SPAZE_GUN_SHOT = "#006666";
 const GB_SPAZE_SHOT = "#ffffff";
 const GB_SPAZE_SHOT_TRAIL_ALPHA = 0.7;
 const GB_SPAZE_SHIELD = "#aa8800";
-const GB_SPAZE_SHIPS = ["#00ff00", "#00cc44", "#44cc00"];
-const GB_SPAZE_SHIP_GHOST = 0.5;
-const GB_SPAZE_SHIP_SHAPE = [0, 0, -1, -1, 1, -1];
 const GB_SPAZE_PLAYER_PACE = 2;
 const GB_SPAZE_PLAYER_MIN = 1;
 const GB_SPAZE_PLAYER_MAX = 13;
@@ -108,31 +108,77 @@ const GB_SPAZE_PLAYER_ROW = 18;
 const GB_SPAZE_GUN_ROW = 17;
 const GB_SPAZE_SHOT_ROW = 18;
 const GB_SPAZE_SHIELD_ROW = 19;
-const GB_SPAZE_SHIP_MAX = 10;
-const GB_SPAZE_SHIP_PACE = 15;
-const GB_SPAZE_SHIP_PACE_STEP = 3;
-const GB_SPAZE_SHIP_PACE_WOBBLE = 5;
-const GB_SPAZE_SPAWN_BASE = 20;
-const GB_SPAZE_SPAWN_EACH = 30;
-const GB_SPAZE_SPAWN_PER_LEVEL = 5;
+// vaders: colours, the faint trailing cells, the three-cell shape, and how many may be out
+const GB_SPAZE_VADERS = ["#33bb33", "#00cc66", "#77cc00"];
+const GB_SPAZE_VADER_GHOST = 0.5;
+const GB_SPAZE_VADER_SHAPE = [0, 0, -1, -1, 1, -1];
+const GB_SPAZE_VADER_MAX = 10;
+// each wave picks a shared fall beat from this start, minus the level and a little random, down to this floor
+const GB_SPAZE_DROP_START = 22;
+const GB_SPAZE_DROP_WOBBLE = 8;
+const GB_SPAZE_DROP_MIN = 4;
+// how many come in a wave at the lowest level, and the pause after a wave is cleared
+const GB_SPAZE_WAVE_MIN = 3;
+const GB_SPAZE_WAVE_MAX = 5;
+const GB_SPAZE_WAVE_PAUSE = 60;
+// wait after a spawn is the beat, plus this many beats for each vader already out, plus a little noise
+const GB_SPAZE_SPAWN_EACH_BEATS = 1.5;
 const GB_SPAZE_SPAWN_WOBBLE = 5;
+const GB_SPAZE_SPAWN_CLEAR_ROWS = 2;
+const GB_SPAZE_SPAWN_CLEAR_GAP = 3;
+// at the end of a wave the level rises once if kills are above this many times the level
 const GB_SPAZE_KILLS_PER_LEVEL = 10;
 const GB_SPAZE_DEATH_WEAR = 10;
 const GB_SPAZE_BLAST_GROW = 0.95;
 const GB_SPAZE_BLAST_STEP = 10;
 const GB_SPAZE_BLAST_MAX = 5;
+// a white burst: the first look, then the centre only, each held this many updates
+const GB_SPAZE_POP = "#cccc99";
+const GB_SPAZE_POP_FRAME = 6;
+const GB_SPAZE_POP_CROSS = [-1, -1, 1, -1, 0, 0, -1, 1, 1, 1];
 
-// DodgeEm: the car, its start column, how far it may go, the step it takes, and how speed builds and fades
+// DodgeEm: the road, the car, the five steer columns, how speed builds and fades, and where the car sits
+const GB_DODGE_ROAD = "sMBGDodgeEm";
+const GB_DODGE_CURVE = "sMBGDodgeEm_cur_r";
 const GB_DODGE_CAR = "sMBGDodgeEm_car";
 const GB_DODGE_START = 7;
 const GB_DODGE_MIN = 3;
 const GB_DODGE_MAX = 11;
 const GB_DODGE_STEP = 2;
+const GB_DODGE_LANES = [3, 5, 7, 9, 11];
 const GB_DODGE_PACE = 2;
 const GB_DODGE_SPEED_UP = 2;
 const GB_DODGE_SPEED_DOWN = 5;
 const GB_DODGE_SPEED_MAX = 100;
 const GB_DODGE_CAR_Y = 15;
+const GB_DODGE_CAR_W = 3;
+const GB_DODGE_CAR_H = 4;
+// other cars, tinted from this list, spawn in this band and close in by the gap in speeds
+const GB_DODGE_TINTS = ["#e54444", "#44e544", "#e5e544", "#e544e5", "#44e5e5", "#e58c44"];
+const GB_DODGE_SPAWN_Y_MIN = 8;
+const GB_DODGE_SPAWN_Y_MAX = 10;
+const GB_DODGE_SPAWN_WAIT = 45;
+const GB_DODGE_SPAWN_PER_LEVEL = 5;
+const GB_DODGE_SPAWN_WAIT_MIN = 14;
+const GB_DODGE_CARS_BASE = 3;
+const GB_DODGE_CARS_PER_LEVEL = 1;
+const GB_DODGE_CARS_CAP = 6;
+const GB_DODGE_TRAFFIC_SPEED_MIN = 25;
+const GB_DODGE_TRAFFIC_SPEED_MAX = 70;
+const GB_DODGE_CLOSE_SCALE = 120;
+const GB_DODGE_CLOSE_PER_LEVEL = 8;
+const GB_DODGE_CLOSE_SCALE_MIN = 70;
+// distance that fills the red line, the win wait and flash, and the curve timing
+const GB_DODGE_RACE_LENGTH = 480;
+const GB_DODGE_BAR = "#ff0000";
+const GB_DODGE_WIN_WAIT = 200;
+const GB_DODGE_FLASH_UPDATES = 20;
+const GB_DODGE_ROAD_FLASH = "#99ffff";
+const GB_DODGE_CURVE_WAIT_MIN = 90;
+const GB_DODGE_CURVE_WAIT_MAX = 180;
+const GB_DODGE_CURVE_HOLD = 40;
+// a fresh generator per race, keyed by the round, so a restart of the same round plays the same
+const GB_DODGE_SEED = 7741;
 
 // The snow on an idle cabinet screen: a field of random greys with a little glass over it.
 class oStaticBox extends oBaseObject {
@@ -421,17 +467,23 @@ class oGbGameMunchie extends oGbGame {
 	}
 }
 
-// Ships drop from the top; the gun at the bottom fires up, and shields take a hit each.
+// The ship at the bottom fires up at waves of vaders dropping on a shared beat; shields take a hit each.
 class oGbGameSpaze extends oGbGame {
 	constructor() {
 		super();
-		this.me = GB_SPAZE_START;
+		this.ship = GB_SPAZE_START;
 		this.shot = [0, -1];
 		this.shield = [];
-		this.ships = [];
-		this.shipColour = -1;
+		this.vaders = [];
+		this.vaderColour = -1;
 		this.killed = 0;
 		this.spawnWait = 0;
+		this.dropWait = 0;
+		this.waveBeat = GB_SPAZE_DROP_START;
+		this.waveSize = 0;
+		this.waveSpawned = 0;
+		this.wavePause = 0;
+		this.pops = [];
 	}
 
 	screenSprites() {
@@ -439,99 +491,166 @@ class oGbGameSpaze extends oGbGame {
 	}
 
 	newGame(newlev) {
-		super.newGame(newlev);
-		this.ships = [];
-		this.me = GB_SPAZE_START;
+		// with no round given this starts at the first one, as the original did
+		super.newGame(newlev !== undefined ? newlev : 0);
+		this.vaders = [];
+		this.pops = [];
+		this.ship = GB_SPAZE_START;
 		this.shot = [0, -1];
 		this.shield = [];
 		for (let i = 0; i < GB_SCREEN_W; i++) this.shield[i] = 1;
 		this.killed = 0;
+		this.startWave();
 	}
 
-	// True when this ship is still in play. A hit, a landing, or a bump of the gun ends it.
-	// The original always took it out once the check ran, typo and all, and that is kept.
-	hitShip(ship) {
+	// pick this wave's size and a fall beat that stays fixed until the wave is done
+	startWave() {
+		const most = GB_SPAZE_WAVE_MAX + this.level;
+		this.waveSize = rng.irandomRange(GB_SPAZE_WAVE_MIN, most);
+		this.waveBeat = Math.max(GB_SPAZE_DROP_MIN, GB_SPAZE_DROP_START - this.level - rng.irandom(GB_SPAZE_DROP_WOBBLE));
+		this.waveSpawned = 0;
+		this.spawnWait = 0;
+		this.dropWait = this.waveBeat;
+		this.wavePause = 0;
+	}
+
+	// a pale burst at a spot, first the cross, then the centre, each for a short time
+	addPop(x, y) {
+		this.pops.push([x, y, 1, GB_SPAZE_POP_FRAME]);
+	}
+
+	// count down bursts; they never hit anything
+	tickPops() {
+		for (let i = 0; i < this.pops.length; i++) {
+			const pop = this.pops[i];
+			if (--pop[3] > 0) continue;
+			if (pop[2] === 1) {
+				pop[2] = 2;
+				pop[3] = GB_SPAZE_POP_FRAME;
+			} else {
+				this.pops.splice(i, 1);
+				i--;
+			}
+		}
+	}
+
+	// True when this vader is still in play. A hit, a landing, or a bump of the ship ends it.
+	// A shot or a landing leaves a burst; bumping the ship does not, so the fire at the ship can show.
+	hitVader(vader) {
 		let gone = 0;
-		if (this.shot[1] === ship[1] && Math.abs(ship[0] - this.shot[0]) <= 1) {
+		let burst = 0;
+		if (this.shot[1] === vader[1] && Math.abs(vader[0] - this.shot[0]) <= 1) {
 			this.shot[1] = -1;
 			gone = 1;
+			burst = 1;
 		}
-		if (ship[1] === GB_SPAZE_SHIELD_ROW) {
-			if (this.shield[ship[0]] === 0) {
-				this.me = ship[0];
+		if (vader[1] === GB_SPAZE_SHIELD_ROW) {
+			if (this.shield[vader[0]] === 0) {
+				this.ship = vader[0];
 				this.dead = true;
 				this.step = 0;
 			} else {
-				this.shield[ship[0]] = 0;
+				this.shield[vader[0]] = 0;
 			}
 			gone = 1;
+			burst = 1;
 		}
-		if (ship[1] === GB_SPAZE_PLAYER_ROW && Math.abs(ship[0] - this.me) <= 1) {
+		if (vader[1] === GB_SPAZE_PLAYER_ROW && Math.abs(vader[0] - this.ship) <= 1) {
 			this.dead = true;
 			this.step = 0;
 			gone = 1;
+			burst = 0;
 		}
-		if ((gone = 1)) {
-			const i = this.ships.indexOf(ship);
-			if (i >= 0) this.ships.splice(i, 1);
+		if (gone) {
+			const i = this.vaders.indexOf(vader);
+			if (i >= 0) this.vaders.splice(i, 1);
 			this.killed++;
-			if (Math.floor(this.killed / GB_SPAZE_KILLS_PER_LEVEL) > this.level) this.level++;
+			if (burst) this.addPop(vader[0], vader[1]);
 			return false;
 		}
 		return true;
 	}
 
-	spawnShip() {
+	spawnVader() {
+		if (this.waveSpawned >= this.waveSize) return;
 		if (this.spawnWait > 0 && --this.spawnWait > 0) return;
-		if (this.ships.length < GB_SPAZE_SHIP_MAX) {
-			this.shipColour = (this.shipColour + 1) % GB_SPAZE_SHIPS.length;
-			const pace = Math.max(1, GB_SPAZE_SHIP_PACE - Math.floor(this.level / GB_SPAZE_SHIP_PACE_STEP)) + rng.irandom(GB_SPAZE_SHIP_PACE_WOBBLE);
-			this.ships.push([rng.irandomRange(1, 13), 0, pace, GB_SPAZE_SHIPS[this.shipColour]]);
-			this.spawnWait = GB_SPAZE_SPAWN_BASE + this.ships.length * GB_SPAZE_SPAWN_EACH - this.level * GB_SPAZE_SPAWN_PER_LEVEL + rng.irandom(GB_SPAZE_SPAWN_WOBBLE);
+		const here = this.vaders.length;
+		if (here >= GB_SPAZE_VADER_MAX) {
+			this.spawnWait = 1;
+			return;
 		}
+		// a new vader keeps clear of any vader still near the top, tails included, and waits a beat if no column is free
+		const free = [];
+		for (let col = 1; col <= 13; col++) {
+			let clear = true;
+			for (const vader of this.vaders) {
+				if (vader[1] < GB_SPAZE_SPAWN_CLEAR_ROWS && Math.abs(vader[0] - col) < GB_SPAZE_SPAWN_CLEAR_GAP) clear = false;
+			}
+			if (clear) free.push(col);
+		}
+		if (free.length === 0) {
+			this.spawnWait = 1;
+			return;
+		}
+		this.vaderColour = (this.vaderColour + 1) % GB_SPAZE_VADERS.length;
+		this.vaders.push([free[rng.irandom(free.length - 1)], 0, GB_SPAZE_VADERS[this.vaderColour]]);
+		this.waveSpawned++;
+		this.spawnWait = this.waveBeat + here * Math.floor(GB_SPAZE_SPAWN_EACH_BEATS * this.waveBeat) + rng.irandom(GB_SPAZE_SPAWN_WOBBLE);
 	}
 
 	afterDeath() {
 		const wear = Math.floor(this.step / GB_SPAZE_DEATH_WEAR);
-		this.shield[Math.max(this.me - wear, 0)] = 0;
-		this.shield[Math.min(this.me + wear, GB_SCREEN_W - 1)] = 0;
+		this.shield[Math.max(this.ship - wear, 0)] = 0;
+		this.shield[Math.min(this.ship + wear, GB_SCREEN_W - 1)] = 0;
+		this.tickPops();
 	}
 
 	play() {
 		const con = game.uiController;
 		if (con.iBtnA) {
-			this.shot[0] = this.me;
+			this.shot[0] = this.ship;
 			this.shot[1] = GB_SPAZE_SHOT_ROW;
 		}
 		if (this.step % GB_SPAZE_PLAYER_PACE === 0) {
-			if (con.iLeft && this.me > GB_SPAZE_PLAYER_MIN) this.me -= 1;
-			else if (con.iRight && this.me < GB_SPAZE_PLAYER_MAX) this.me += 1;
+			if (con.iLeft && this.ship > GB_SPAZE_PLAYER_MIN) this.ship -= 1;
+			else if (con.iRight && this.ship < GB_SPAZE_PLAYER_MAX) this.ship += 1;
 		}
 		if (this.shot[1] >= 0) {
 			this.shot[1]--;
-			for (let i = 0; i < this.ships.length; i++) {
-				if (!this.hitShip(this.ships[i])) i--;
+			for (let i = 0; i < this.vaders.length; i++) {
+				if (!this.hitVader(this.vaders[i])) i--;
 			}
 		}
-		for (let i = 0; i < this.ships.length; i++) {
-			const ship = this.ships[i];
-			if (this.step % ship[2] !== 0) continue;
-			ship[1]++;
-			if (!this.hitShip(ship)) i--;
+		if (this.wavePause > 0) {
+			if (--this.wavePause === 0) this.startWave();
+		} else {
+			if (--this.dropWait <= 0) {
+				for (let i = 0; i < this.vaders.length; i++) {
+					const vader = this.vaders[i];
+					vader[1]++;
+					if (!this.hitVader(vader)) i--;
+				}
+				this.dropWait = this.waveBeat;
+			}
+			this.spawnVader();
+			if (this.waveSpawned >= this.waveSize && this.vaders.length === 0) {
+				if (this.killed > this.level * GB_SPAZE_KILLS_PER_LEVEL) this.level++;
+				this.wavePause = GB_SPAZE_WAVE_PAUSE;
+			}
 		}
-		this.spawnShip();
+		this.tickPops();
 	}
 
 	picture() {
 		Draw.sprite(GB_SPAZE_SPRITE, 0, this.x, this.y);
 		if (!this.dead) {
 			Draw.color = GB_SPAZE_SHIP;
-			this.drawPixel(this.me, GB_SPAZE_PLAYER_ROW);
+			this.drawPixel(this.ship, GB_SPAZE_PLAYER_ROW);
 			Draw.color = GB_SPAZE_SHIP_SIDE;
-			this.drawPixel(this.me - 1, GB_SPAZE_PLAYER_ROW);
-			this.drawPixel(this.me + 1, GB_SPAZE_PLAYER_ROW);
+			this.drawPixel(this.ship - 1, GB_SPAZE_PLAYER_ROW);
+			this.drawPixel(this.ship + 1, GB_SPAZE_PLAYER_ROW);
 			Draw.color = this.shot[1] < 0 ? GB_SPAZE_GUN_READY : GB_SPAZE_GUN_SHOT;
-			this.drawPixel(this.me, GB_SPAZE_GUN_ROW);
+			this.drawPixel(this.ship, GB_SPAZE_GUN_ROW);
 		} else {
 			const grow = Math.min(Math.floor(Math.pow(this.step, GB_SPAZE_BLAST_GROW) / GB_SPAZE_BLAST_STEP), GB_SPAZE_BLAST_MAX);
 			const n = 2 + grow * 4;
@@ -543,24 +662,34 @@ class oGbGameSpaze extends oGbGame {
 				const g = grow + Math.floor(Math.random() * (15 - grow + 1));
 				const b = Math.floor(Math.random() * (g * (grow / 5) + 1));
 				Draw.color = "rgb(255," + (g * 17) + "," + (b * grow) + ")";
-				this.drawPixel(this.me - cx, 19 + cy);
+				this.drawPixel(this.ship - cx, 19 + cy);
 			}
 		}
 		if (!this.win) {
-			for (const ship of this.ships) {
-				const cx = ship[0], cy = ship[1];
-				for (let k = 0; k < GB_SPAZE_SHIP_SHAPE.length; k += 2) {
-					Draw.color = ship[3];
-					Draw.alpha = GB_SPAZE_SHIP_GHOST;
-					this.drawPixel(cx + GB_SPAZE_SHIP_SHAPE[k], cy + GB_SPAZE_SHIP_SHAPE[k + 1] - 1);
+			for (const vader of this.vaders) {
+				const cx = vader[0], cy = vader[1];
+				for (let k = 0; k < GB_SPAZE_VADER_SHAPE.length; k += 2) {
+					Draw.color = vader[2];
+					Draw.alpha = GB_SPAZE_VADER_GHOST;
+					this.drawPixel(cx + GB_SPAZE_VADER_SHAPE[k], cy + GB_SPAZE_VADER_SHAPE[k + 1] - 1);
 					Draw.alpha = 1;
-					this.drawPixel(cx + GB_SPAZE_SHIP_SHAPE[k], cy + GB_SPAZE_SHIP_SHAPE[k + 1]);
+					this.drawPixel(cx + GB_SPAZE_VADER_SHAPE[k], cy + GB_SPAZE_VADER_SHAPE[k + 1]);
 				}
 			}
 		}
 		Draw.color = GB_SPAZE_SHIELD;
 		for (let i = 0; i < this.shield.length; i++) {
 			if (this.shield[i]) this.drawPixel(i, GB_SPAZE_SHIELD_ROW);
+		}
+		Draw.color = GB_SPAZE_POP;
+		for (const pop of this.pops) {
+			if (pop[2] === 1) {
+				for (let k = 0; k < GB_SPAZE_POP_CROSS.length; k += 2) {
+					this.drawPixel(pop[0] + GB_SPAZE_POP_CROSS[k], pop[1] + GB_SPAZE_POP_CROSS[k + 1]);
+				}
+			} else {
+				this.drawPixel(pop[0], pop[1]);
+			}
 		}
 		if (this.shot[1] >= 0) {
 			if (this.shot[1] < GB_SPAZE_GUN_ROW) {
@@ -576,23 +705,85 @@ class oGbGameSpaze extends oGbGame {
 	}
 }
 
-// Only the car so far: it slides back to the middle, A builds speed, and the speed is stored
-// on the picture even though this game has none of its own.
+// Steer across five slots, hold A to build speed, and dodge the cars ahead until the red line fills.
 class oGbGameDodgeEm extends oGbGame {
 	constructor() {
 		super();
 		this.me = GB_DODGE_START;
 		this.pace = 0;
+		this.cars = [];
+		this.roll = new Rng(GB_DODGE_SEED);
+		this.tintAt = -1;
+		this.spawnWait = 0;
+		this.travel = 0;
+		this.roadFrame = 0;
+		this.curveSide = 0;
+		this.curveLeft = 0;
+		this.curveWait = 0;
 	}
 
 	screenSprites() {
-		return [GB_OVERLAY_SPRITE, GB_DODGE_CAR];
+		return [GB_OVERLAY_SPRITE, GB_DODGE_ROAD, GB_DODGE_CURVE, GB_DODGE_CAR];
 	}
 
 	newGame(newlev) {
 		super.newGame(newlev);
 		this.me = GB_DODGE_START;
 		this.pace = 0;
+		this.cars = [];
+		this.roll = new Rng(GB_DODGE_SEED + this.level);
+		this.tintAt = -1;
+		this.spawnWait = 0;
+		this.travel = 0;
+		this.roadFrame = 0;
+		this.curveSide = 0;
+		this.curveLeft = 0;
+		this.curveWait = this.roll.irandomRange(GB_DODGE_CURVE_WAIT_MIN, GB_DODGE_CURVE_WAIT_MAX);
+	}
+
+	// how many other cars may be out, and how long to wait between them, tighter in later rounds but capped
+	carCap() {
+		return Math.min(GB_DODGE_CARS_CAP, GB_DODGE_CARS_BASE + (this.level - 1) * GB_DODGE_CARS_PER_LEVEL);
+	}
+
+	spawnGap() {
+		return Math.max(GB_DODGE_SPAWN_WAIT_MIN, GB_DODGE_SPAWN_WAIT - (this.level - 1) * GB_DODGE_SPAWN_PER_LEVEL);
+	}
+
+	// a smaller scale means they close in faster; later rounds cap at a floor
+	closeScale() {
+		return Math.max(GB_DODGE_CLOSE_SCALE_MIN, GB_DODGE_CLOSE_SCALE - (this.level - 1) * GB_DODGE_CLOSE_PER_LEVEL);
+	}
+
+	// the player's car and this one share a pixel
+	hitsPlayer(car) {
+		if (car[1] + GB_DODGE_CAR_H <= GB_DODGE_CAR_Y || GB_DODGE_CAR_Y + GB_DODGE_CAR_H <= car[1]) return false;
+		return Math.abs(this.me - car[0]) < GB_DODGE_CAR_W;
+	}
+
+	spawnCar() {
+		if (this.pace <= 0 || (this.spawnWait > 0 && --this.spawnWait > 0)) return;
+		if (this.cars.length >= this.carCap()) return;
+		const open = [];
+		for (const lane of GB_DODGE_LANES) {
+			let free = true;
+			for (const car of this.cars) {
+				if (Math.abs(car[0] - lane) < GB_DODGE_CAR_W && car[1] < GB_DODGE_SPAWN_Y_MAX + GB_DODGE_CAR_H) {
+					free = false;
+					break;
+				}
+			}
+			if (free) open.push(lane);
+		}
+		if (open.length === 0) return;
+		this.tintAt = (this.tintAt + 1) % GB_DODGE_TINTS.length;
+		this.cars.push([
+			open[this.roll.irandom(open.length - 1)],
+			this.roll.irandomRange(GB_DODGE_SPAWN_Y_MIN, GB_DODGE_SPAWN_Y_MAX),
+			this.roll.irandomRange(GB_DODGE_TRAFFIC_SPEED_MIN, GB_DODGE_TRAFFIC_SPEED_MAX),
+			GB_DODGE_TINTS[this.tintAt]
+		]);
+		this.spawnWait = this.spawnGap();
 	}
 
 	play() {
@@ -603,12 +794,72 @@ class oGbGameDodgeEm extends oGbGame {
 			else if (!con.iLeft && !con.iRight) this.me = this.me - sign(this.me - GB_DODGE_START) * GB_DODGE_STEP;
 			if (con.iBtnAd) this.pace = Math.min(this.pace + GB_DODGE_SPEED_UP, GB_DODGE_SPEED_MAX);
 			else this.pace = Math.max(this.pace - GB_DODGE_SPEED_DOWN, 0);
-			this.spd = this.pace / GB_DODGE_SPEED_MAX;
+		}
+
+		// the road only rolls while there is speed, by that share of a frame each update
+		this.roadFrame += this.pace / GB_DODGE_SPEED_MAX;
+
+		const close = this.closeScale();
+		for (let i = 0; i < this.cars.length; i++) {
+			const car = this.cars[i];
+			car[1] += (this.pace - car[2]) / close;
+			if (car[1] > GB_SCREEN_H || car[1] + GB_DODGE_CAR_H < 0) {
+				this.cars.splice(i, 1);
+				i--;
+			}
+		}
+
+		if (this.curveLeft > 0) {
+			this.curveLeft--;
+			if (this.curveLeft === 0) {
+				this.curveSide = 0;
+				this.curveWait = this.roll.irandomRange(GB_DODGE_CURVE_WAIT_MIN, GB_DODGE_CURVE_WAIT_MAX);
+			}
+		} else if (--this.curveWait <= 0) {
+			this.curveSide = this.roll.irandom(1) === 0 ? -1 : 1;
+			this.curveLeft = GB_DODGE_CURVE_HOLD;
+		}
+
+		this.spawnCar();
+
+		for (const car of this.cars) {
+			if (this.hitsPlayer(car)) {
+				this.dead = true;
+				this.step = 0;
+				return;
+			}
+		}
+
+		this.travel += this.pace / GB_DODGE_SPEED_MAX;
+		if (this.travel >= GB_DODGE_RACE_LENGTH) {
+			this.win = GB_DODGE_WIN_WAIT;
+			this.step = 0;
+			this.runWin();
 		}
 	}
 
 	picture() {
-		Draw.sprite(GB_DODGE_CAR, 0, this.x + this.me, this.y + GB_DODGE_CAR_Y);
+		const flash = this.win && Math.floor(this.step / GB_DODGE_FLASH_UPDATES) % 2 > 0;
+		const tint = flash ? GB_DODGE_ROAD_FLASH : NO_TINT;
+		if (this.curveSide < 0) {
+			// flip around the right edge so the bent road still covers the screen
+			Draw.spriteExt(GB_DODGE_CURVE, 0, this.x + GB_SCREEN_W, this.y, -1, 1, 0, tint, 1);
+		} else if (this.curveSide > 0) {
+			Draw.spriteExt(GB_DODGE_CURVE, 0, this.x, this.y, 1, 1, 0, tint, 1);
+		} else {
+			Draw.spriteExt(GB_DODGE_ROAD, this.roadFrame, this.x, this.y, 1, 1, 0, tint, 1);
+		}
+		if (!this.win) {
+			for (const car of this.cars) {
+				Draw.spriteExt(GB_DODGE_CAR, 0, this.x + car[0], this.y + car[1], 1, 1, 0, car[3], 1);
+			}
+		}
+		if (!this.dead) {
+			Draw.sprite(GB_DODGE_CAR, 0, this.x + this.me, this.y + GB_DODGE_CAR_Y);
+		}
+		const filled = Math.min(GB_SCREEN_W, Math.floor(this.travel / GB_DODGE_RACE_LENGTH * GB_SCREEN_W));
+		Draw.color = GB_DODGE_BAR;
+		for (let i = 0; i < filled; i++) this.drawPixel(i, 0);
 	}
 }
 
