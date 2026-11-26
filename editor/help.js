@@ -56,6 +56,7 @@ const ED_HELP_COLUMNS = [
 			["A click", "animation stop / start"],
 			["A wheel", "animation start frame"],
 			["S click", "the selection takes the sprite under the mouse"],
+			["E click", "open its sprite in the sprite editor"],
 			["O click", "the selection takes the object type under the mouse"],
 			["O drag", "move the picture's offset"],
 			["O DEL", "objects back to plain sprites"],
@@ -77,7 +78,8 @@ const ED_HELP_COLUMNS = [
 			["wheel in room", "next / last item"],
 			["wheel over bar", "next / last page"],
 			["drag item into room", "place it there"],
-			["S click item", "the selection takes its sprite or object type"]
+			["S click item", "the selection takes its sprite or object type"],
+			["E click item", "open its sprite in the sprite editor"]
 		]],
 		["layer list", [
 			["click", "make current"],

@@ -215,12 +215,19 @@ const SpriteEditor = {
 			}
 			name = name.trim();
 			if (!name) return;
+			this.blurActiveField();
 			if (EdFolder.handle === null || this.sprites.length === 0) {
 				this.wantedSprite = name;
 				return;
 			}
 			this.openByQuery(name);
 		};
+	},
+
+	// Drops the keyboard from whatever field has it, so a held E does not type there.
+	blurActiveField() {
+		const el = document.activeElement;
+		if (el && el !== document.body && el !== document.documentElement && typeof el.blur === "function") el.blur();
 	},
 
 	bindEvents() {
@@ -307,6 +314,7 @@ const SpriteEditor = {
 		this.el.btnPrev.addEventListener("click", () => this.stepFrame(-1));
 		this.el.btnNext.addEventListener("click", () => this.stepFrame(1));
 
+		window.addEventListener("focus", () => this.blurActiveField());
 		window.addEventListener("keydown", (e) => {
 			if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
 				e.preventDefault();

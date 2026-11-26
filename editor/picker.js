@@ -160,8 +160,8 @@ const EdPicker = {
 	},
 
 	// The bar's share of a step in the picking modes: the cell under the mouse, a press picking it
-	// or, with S, giving its sprite or object to the selection, and the wheel turning pages. Tells
-	// whether the mouse is on the bar.
+	// or, with E, opening its sprite in the sprite editor, with S, giving its sprite or object to
+	// the selection, and the wheel turning pages. Tells whether the mouse is on the bar.
 	step() {
 		const ed = Editor;
 		const inp = ed.inp;
@@ -177,7 +177,10 @@ const EdPicker = {
 		if (ed.mouse.gy >= L.top && lx < L.ipw && i < Math.min(this.items.length, L.first + L.cap)) this.hoverCell = i;
 		if (inp.pressed.left && this.hoverCell >= 0) {
 			const it = this.item(this.hoverCell);
-			if (inp.keysDown.has("KeyF")) {
+			if (inp.keysDown.has("KeyE")) {
+				// a sprite cell opens itself; an object cell opens its own sprite
+				EdSpriteLink.open(it.spi);
+			} else if (inp.keysDown.has("KeyF")) {
 				// an object cell finds entries of that object type, a sprite cell plain sprites of it
 				EdEdit.find(it.isobj !== undefined ? { isobj: it.isobj } : { spi: it.spi }, inp.alt);
 			} else if (EdEdit.selects.length > 0 && inp.keysDown.has("KeyS")) {

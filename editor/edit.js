@@ -873,7 +873,10 @@ const EdEdit = {
 			const ml = EdView.mouseOn(lyr);
 			const gx = snap(ml.x);
 			const gy = snap(ml.y);
-			if (item !== null && inp.pressed.left) {
+			if (item !== null && inp.pressed.left && held("KeyE")) {
+				// an E click on an entry opens its sprite and never places
+				if (ed.hovers.length > 0) EdSpriteLink.open(ed.hovers[ed.curhoveri].spi);
+			} else if (item !== null && inp.pressed.left) {
 				this.push();
 				const rec = this.add(item, gx, gy, inp.ctrl);
 				this.placeX = gx;
@@ -950,6 +953,10 @@ const EdEdit = {
 
 		const hovers = ed.hovers;
 		if (inp.pressed.left) {
+			if (held("KeyE")) {
+				// an E click on an entry opens its sprite and never selects or starts a box
+				if (hovers.length > 0) EdSpriteLink.open(hovers[ed.curhoveri].spi);
+			} else {
 			// a G click on an entry, or a double click on the selection, goes inside its next group
 			const into = hovers.length === 0 ? null : (held("KeyG") ? this.nextGroup(hovers[ed.curhoveri])
 				: (this.dbl && !inp.shift && !this.hoverWheeled && hovers.some((h) => h.selected) ? this.nextGroup(hovers.find((h) => h.selected)) : null));
@@ -1084,6 +1091,7 @@ const EdEdit = {
 					this.inGroup = up < g.length && !inp.ctrl ? g[up] : null;
 					ed.rehover = true;
 				}
+			}
 			}
 		}
 
