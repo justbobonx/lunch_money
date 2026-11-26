@@ -102,12 +102,15 @@ const EdPicker = {
 		Editor.markHover();
 	},
 
-	// the names passing the filter, any part of the name matching, case aside
+	// the names passing the filter, any part of the name matching, case aside. The current pick
+	// stays if its name is still in the list, otherwise the first item.
 	refilter() {
 		const f = this.filter.text.toLowerCase();
 		const all = this.mode === 1 ? this.spriteNames : (this.mode === 2 ? Object.keys(this.objects).sort((a, b) => a.toLowerCase() < b.toLowerCase() ? -1 : 1) : []);
+		const keep = this.items[this.curspi];
 		this.items = all.filter((n) => f === "" || n.toLowerCase().includes(f));
-		this.curspi = clamp(this.curspi, 0, Math.max(0, this.items.length - 1));
+		const i = keep !== undefined ? this.items.indexOf(keep) : -1;
+		this.curspi = i >= 0 ? i : 0;
 	},
 
 	// An item by its spot in the list: its name, the sprite it places with, and for an object its

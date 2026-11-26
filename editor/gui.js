@@ -127,8 +127,9 @@ const EdGui = {
 	focuson: null,
 	// The field being edited, or none: which field, its text, the cursor, the other end of a marked
 	// part, the text before editing, whether any character may be typed, whether a press outside
-	// commits rather than cancels, and what committing and cancelling do. A right press time for
-	// the double right press that clears it.
+	// commits rather than cancels, whether it updates as it is typed and lets a left press outside
+	// carry on, and what committing and cancelling do. A right press time for the double right
+	// press that clears it.
 	edit: null,
 	lastRightPress: 0,
 
@@ -290,7 +291,7 @@ const EdGui = {
 		EdRoom.relink(room);
 		this.pretext(lyr);
 		this.page();
-		this.startEdit("row", lyr, "", true, false, true);
+		this.startEdit("row", lyr, "", true, false, true, false);
 	},
 
 	// A layer's new name from its row. A cleared name deletes the layer and its entries, asking first
@@ -351,10 +352,11 @@ const EdGui = {
 		this.page();
 	},
 
-	// Starts editing a field with the cursor at its end.
-	startEdit(kind, lyr, text, alltext, outpressgood, fresh) {
+	// Starts editing a field with the cursor at its end. A live field updates as it is typed and
+	// lets a left press outside it carry on after it commits.
+	startEdit(kind, lyr, text, alltext, outpressgood, fresh, live) {
 		this.edit = { kind: kind, lyr: lyr, text: text, pos: text.length, copypos: -1, pre: text,
-			alltext: alltext, outpressgood: outpressgood, fresh: fresh };
+			alltext: alltext, outpressgood: outpressgood, fresh: fresh, live: live };
 	},
 
 	// Names a room not saved yet, from the header or the room panel. A name left empty or another
@@ -400,7 +402,9 @@ const EdGui = {
 
 	// The field being edited takes the step's keys, each in turn as the original's text field took
 	// them, and the mouse: a press on it commits, a right press cancels and a quick second one
-	// clears it, a press elsewhere cancels or, for the filter, commits.
+	// clears it, a press elsewhere cancels or, when a press outside commits, commits. A live
+	// field's left press outside commits and then lets that same press carry on. Tells whether
+	// the field held the press.
 	editStep(hit) {
 		const ed = Editor;
 		const inp = ed.inp;
@@ -410,16 +414,17 @@ const EdGui = {
 		const now = currentTime();
 		const pressed = inp.pressed.left || inp.pressed.right || inp.pressed.middle;
 		const doubleRight = inp.pressed.right && onIt && now - this.lastRightPress < ED_DOUBLE_MS;
+		const pass = e.live && inp.pressed.left && !onIt;
 		if (inp.pressed.right) this.lastRightPress = now;
 		if (doubleRight) {
 			e.text = "";
 			e.pos = 0;
-		} else if ((inp.pressed.right && onIt) || (pressed && !onIt && !e.outpressgood)) {
+		} else if ((inp.pressed.right && onIt) || (pressed && !onIt && !e.outpressgood && !pass)) {
 			this.endEdit(false);
-			return;
-		} else if ((inp.pressed.left && onIt) || (pressed && !onIt && e.outpressgood)) {
+			return true;
+		} else if ((inp.pressed.left && onIt) || (pressed && !onIt && e.outpressgood) || pass) {
 			this.endEdit(true);
-			return;
+			return this.edit !== null || !pass;
 		}
 		// holding control marks from where the cursor was, and letting it go puts the cursor back there
 		if (inp.keysPressed.has("ControlLeft") || inp.keysPressed.has("ControlRight")) e.copypos = e.pos;
@@ -432,11 +437,11 @@ const EdGui = {
 			const ce = Math.max(e.pos, e.copypos);
 			if (k.code === "Escape") {
 				this.endEdit(false);
-				return;
+				return true;
 			}
 			if (k.code === "Enter" || k.code === "NumpadEnter") {
 				this.endEdit(true);
-				return;
+				return true;
 			}
 			if (k.code === "Backspace" && k.shift) {
 				e.text = "";
@@ -457,7 +462,7 @@ const EdGui = {
 					e.text = e.text.substring(0, e.pos) + cbt + e.text.substring(e.pos);
 					e.pos += cbt.length;
 					e.copypos = -1;
-					if (e.kind === "filter") {
+					if (e.live) {
 						EdPicker.filter.text = e.text;
 						EdPicker.refilter();
 					}
@@ -488,10 +493,11 @@ const EdGui = {
 				}
 			}
 		}
-		if (e.kind === "filter" && e.text !== before) {
+		if (e.live && e.text !== before) {
 			EdPicker.filter.text = e.text;
 			EdPicker.refilter();
 		}
+		return true;
 	},
 
 	// Focuses on an area: unfolds it, shows its layers but the hidden sublayers, zooms so its play bounds
@@ -633,10 +639,10 @@ const EdGui = {
 		for (const f of this.fields()) {
 			if (mx >= f.x && mx < f.x + f.w && my >= f.y && my < f.y + f.h) hit = f;
 		}
-		// a field being edited holds every key and click until it is done
+		// a field being edited holds every key and click until it is done, except a live field's
+		// left press outside, which commits and then carries on
 		if (this.edit !== null) {
-			this.editStep(hit);
-			return true;
+			if (this.editStep(hit)) return true;
 		}
 		if (EdPicker.step()) return true;
 		if (hit === null) return false;
@@ -665,7 +671,7 @@ const EdGui = {
 		if (hit.kind === "filter") {
 			if (inp.pressed.left || inp.pressed.right) {
 				if (EdPicker.mode === 0) EdPicker.setMode(1);
-				this.startEdit("filter", null, EdPicker.filter.text, false, true, false);
+				this.startEdit("filter", null, EdPicker.filter.text, false, true, false, true);
 				if (inp.pressed.right) {
 					const now = currentTime();
 					if (now - this.lastRightPress < ED_DOUBLE_MS) {
@@ -683,7 +689,7 @@ const EdGui = {
 		// the group field renames the group being worked inside, and the path field the selected
 		// entry's current path, from a click or enter
 		if (hit.kind === "group" || hit.kind === "path") {
-			if (named !== null && (inp.pressed.left || inp.keysPressed.has("Enter"))) this.startEdit(hit.kind, null, named, false, true, false);
+			if (named !== null && (inp.pressed.left || inp.keysPressed.has("Enter"))) this.startEdit(hit.kind, null, named, false, true, false, false);
 			return true;
 		}
 
@@ -698,7 +704,7 @@ const EdGui = {
 			}
 			if (pressed) this.headerLastPress = now;
 			// enter renames a room not saved yet; a saved one keeps its name, which its file carries
-			if (inp.keysPressed.has("Enter") && !ed.world.savedRooms.includes(room.name)) this.startEdit("header", null, room.name, false, false, false);
+			if (inp.keysPressed.has("Enter") && !ed.world.savedRooms.includes(room.name)) this.startEdit("header", null, room.name, false, false, false, false);
 			return true;
 		}
 		// the add button adds on letting go, so the press does not end the new name's editing
@@ -739,7 +745,7 @@ const EdGui = {
 			EdView.centerOn(cx / lyr.lsprites.length, cy / lyr.lsprites.length);
 		}
 		// enter starts renaming the row
-		if (inp.keysPressed.has("Enter")) this.startEdit("row", lyr, lyr.txt.text, true, false, false);
+		if (inp.keysPressed.has("Enter")) this.startEdit("row", lyr, lyr.txt.text, true, false, false, false);
 		// Z and D clicks toggle sorting and disabled; a shift click opens the layer panel, or closes it
 		// again, with alt on every layer of the layer's group; a plain click makes the layer current.
 		if (inp.pressed.left && !inp.ctrl) {

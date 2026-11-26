@@ -69,6 +69,8 @@ const ED_MOUSE_MARK_COLOR = "#ffff88";
 const ED_MOUSE_MARK_ALPHA = 0.6;
 const ED_MOUSE_DOT_COLOR = "#ffffff";
 const ED_MOUSE_DOT_ALPHA = 0.8;
+// how long each frame of the picker's item at the mouse lasts, in seconds
+const ED_PICK_CURSOR_FRAME_SEC = 0.5;
 // Marks are drawn in room pixels as the original drew them, so they sit on the pixel grid: lines
 // one pixel of their layer wide, hugging the pixels at a box's edge. This is the thinnest a line
 // or a dot mark gets, in page pixels, so they still show when zoomed far out.
@@ -691,7 +693,11 @@ const EdView = {
 			ctx.imageSmoothingEnabled = ln.s < 1;
 			Draw.subpixel = true;
 			Draw.lpSprite(pv);
-			Draw.animate(pv, ed.steps);
+			const n = Sprites.get(item.spi).frameCount;
+			if (n > 0) {
+				pv.ifr += ed.steps / (GAME_FPS * ED_PICK_CURSOR_FRAME_SEC);
+				if (pv.ifr >= n) pv.ifr -= n * Math.floor(pv.ifr / n);
+			}
 			if (!ed.showAsPlayer) {
 				const px = Math.floor(ml.x);
 				const py = Math.floor(ml.y);

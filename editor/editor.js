@@ -333,7 +333,7 @@ const Editor = {
 		game.roombyname[name] = game.rooms.length - 1;
 		await this.openRoom(game.rooms.length - 1, true);
 		if (this.room === null || this.room.name !== name) return;
-		EdGui.startEdit("header", null, "", false, false, false);
+		EdGui.startEdit("header", null, "", false, false, false, false);
 	},
 
 	// Takes up a room just built, from its file, an undo step or a panel change, leaving the camera
